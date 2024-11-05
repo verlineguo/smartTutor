@@ -1,0 +1,5 @@
+hidden.txt
+/.ssh
+*.pyc
+myenv/
+__pycache__/
