@@ -1,0 +1,142 @@
+/* Start CSS for Form in Login Page*/
+.wave-group {
+    position: relative;
+    border-bottom: 1px solid #515151;
+}
+
+.wave-group i {
+    position: absolute;
+    left: -25px;
+    top: 16px;
+}
+
+.wave-group .input {
+    font-size: 16px;
+    padding: 10px 10px 10px 5px;
+    display: block;
+    border: none;
+    background: transparent;
+}
+
+.wave-group .input:focus {
+    outline: none;
+}
+
+.wave-group .label {
+    color: #999;
+    font-size: 18px;
+    font-weight: normal;
+    position: absolute;
+    pointer-events: none;
+    left: 5px;
+    top: 10px;
+    display: flex;
+}
+
+.wave-group .label-char {
+    transition: 0.2s ease all;
+    transition-delay: calc(var(--index) * .05s);
+}
+
+.wave-group .input:focus ~ label .label-char,
+.wave-group .input:valid ~ label .label-char {
+    transform: translateY(-30px);
+    font-size: 16px;
+    color: #1A1C1B;
+}
+
+.wave-group .bar {
+    position: relative;
+    display: block;
+}
+
+.wave-group .bar:before,.wave-group .bar:after {
+    content: '';
+    height: 2px;
+    width: 0;
+    bottom: 1px;
+    position: absolute;
+    background: #1A1C1B;
+    transition: 0.2s ease all;
+    -moz-transition: 0.2s ease all;
+    -webkit-transition: 0.2s ease all;
+}
+
+.wave-group .bar:before {
+    left: 50%;
+}
+
+.wave-group .bar:after {
+    right: 50%;
+}
+
+.wave-group .input:focus ~ .bar:before,
+.wave-group .input:focus ~ .bar:after {
+    width: 50%;
+}
+/* End CSS for Form in Login Page*/
+
+.textSidebar {
+    color: white; /* Latar belakang putih */
+}
+.nav-link.active .textSidebar {
+    color: #343a40; /* Change this to the desired dark color */
+}
+
+/* End Sidebar */
+/* Gaya untuk tombol dengan warna latar belakang biru dan icon */
+.btn-blue {
+    background-color: #007bff; /* Warna biru (sesuaikan dengan preferensi Anda) */
+    color: #fff; /* Warna teks putih agar kontras */
+    border: none; /* Hilangkan border jika Anda tidak memerlukannya */
+    padding: 10px 20px; /* Sesuaikan padding sesuai kebutuhan */
+    border-radius: 3px; /* Bentuk sudut tombol */
+    cursor: pointer; /* Ganti kursor saat digerakkan ke tombol */
+}
+.btn-green {
+    background-color: #10a760; /* Warna biru (sesuaikan dengan preferensi Anda) */
+    color: #fff; /* Warna teks putih agar kontras */
+    border: none; /* Hilangkan border jika Anda tidak memerlukannya */
+    padding: 10px 20px; /* Sesuaikan padding sesuai kebutuhan */
+    border-radius: 3px; /* Bentuk sudut tombol */
+    cursor: pointer; /* Ganti kursor saat digerakkan ke tombol */
+}
+.btn-red {
+    background-color: #da3e33; /* Warna biru (sesuaikan dengan preferensi Anda) */
+    color: #fff; /* Warna teks putih agar kontras */
+    border: none; /* Hilangkan border jika Anda tidak memerlukannya */
+    padding: 10px 20px; /* Sesuaikan padding sesuai kebutuhan */
+    border-radius: 3px; /* Bentuk sudut tombol */
+    cursor: pointer; /* Ganti kursor saat digerakkan ke tombol */
+}
+
+/* Gaya untuk tombol biru saat digerakkan (hover) */
+.btn-blue:hover {
+    background-color: #0056b3; /* Warna biru lebih gelap saat hover (sesuaikan dengan preferensi Anda) */
+}
+.navbar-vertical .navbar-nav>.nav-item .nav-link.active .icon {
+    background-image: linear-gradient(310deg,#c4c4c4,#c4c4c4);
+}
+.icon {
+    border: 2px solid black; /* Membuat garis tepi sebanyak 2px dengan warna hitam */
+  }
+  .horizontal {
+    border: 2px solid white; /* Atur ketebalan dan warna garis sesuai keinginan (dalam contoh ini, hitam) */
+    width: 90%;
+    display: block; /* Mengatur elemen sebagai blok */
+    margin: 0 auto; /
+  }
+  .menu {
+    margin-top: 20px; /* Menambahkan margin atas 20px ke elemen menu */
+  }
+  /* Mengatur tampilan label */
+  label {
+    font-weight: bold;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  .dataTables_length select {
+      width: 70px !important;
+  }
+
