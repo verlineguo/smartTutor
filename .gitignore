@@ -1,4 +1,5 @@
 hidden.txt
+flask_app/
 /.ssh
 *.pyc
 myenv/
