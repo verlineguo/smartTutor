@@ -8,28 +8,41 @@
     <link rel="stylesheet" href="{{ asset('./assets/dashboard/datatables-rowgroup-bs5/rowgroup.bootstrap5.css') }}">
     <link rel="stylesheet" href="{{ asset('./assets/css/generate.css') }}" />
 @endsection
+@section('add-css')
+    <style>
+        #skipInfo {
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+
+        .text-wrap {
+            white-space: normal;
+            word-wrap: break-word;
+            min-width: 200px;
+        }
+
+        .dataTables_filter {
+            float: right;
+            text-align: right;
+            margin-right: 10px;
+        }
+    </style>
+@endsection
 @section('info-page')
     <ol class="breadcrumb bg-transparent mb-0 pb-0 pt-1 px-0 me-sm-6 me-5">
         <li class="breadcrumb-item text-sm"><a class="opacity-5 text-dark" href="javascript:;">Pages</a></li>
-        <li class="breadcrumb-item text-sm text-dark active text-capitalize" aria-current="page">
-            generate</li>
+        <li class="breadcrumb-item text-sm text-dark active text-capitalize" aria-current="page">generate</li>
     </ol>
     <h5 class="font-weight-bolder mb-0 text-capitalize">generate</h5>
 @endsection
 
 @section('content')
-    <main class="main-content position-relative max-height-vh-100 h-100 mt-1 border-radius-lg ">
-        {{-- <div class="col-md-3"><a class="btn btn-primary w-100" role="button" id="generate">Generate
-                Question<i class="" style="text-decoration: none; margin-left: 10px;"></i></a>
-        </div> --}}
+    <main class="main-content position-relative max-height-vh-100 h-100 mt-1 border-radius-lg">
         <div class="container d-flex justify-content-center align-items-center">
             <div class="row d-flex align-items-center justify-content-center">
-                <!-- Bagian untuk tombol generate -->
                 <div class="col-md-6 order-md-1 order-2">
-                    <a class="btn btn-primary w-100" role="button" id="generate">Generate Question<i class=""
-                            style="text-decoration: none; margin-left: 10px;"></i></a>
+                    <button class="btn btn-primary w-100" id="generate">Generate Question</button>
                 </div>
-                <!-- Bagian untuk keterangan -->
                 <div class="col-md-6 order-md-2 order-1">
                     <p class="text-start">Silakan tekan tombol "Generate Question" untuk membuat pertanyaan baru. Anda dapat
                         memilih bahasa, kursus, dan topik yang sesuai untuk pertanyaan yang ingin Anda buat.</p>
@@ -41,31 +54,53 @@
             <div>Loading... <span id="progressPercentage">0%</span></div>
         </div>
         <div id="loadingScreen" style="display: none;">
-            <div id="loadingMessage">Loading...</div>
-            <div id="progressBarContainer">
-                <div id="progressBar"></div>
+            <div id="loadingMessage">Generating Questions...</div>
+            <div id="progressBarContainer"
+                style="background: #e0e0e0; border-radius: 5px; overflow: hidden; width: 100%; height: 25px;">
+                <div id="progressBar" style="background: #007bff; width: 0%; height: 100%; transition: width 0.4s;"></div>
+            </div>
+            <div style="text-align: center; margin-top: 10px;">
+                <span id="progressPercentage">0%</span>
             </div>
         </div>
-        <div class="container-xxl flex-grow-1 container-p-y" id="table-container">
+        <!-- Tambahkan Tombol "Delete Selected" di atas DataTable -->
+        <div class="container-xxl flex-grow-1 container-p-y" id="table-container" style="display: none;">
+            <div class="d-flex mb-3">
+                <!-- Bulk Update Button -->
+                <button type="button" class="btn btn-primary me-2" data-bs-toggle="modal"
+                    data-bs-target="#updateBulkModal">
+                    Update Selected
+                </button>
+
+                <!-- Delete Selected Button -->
+                <button type="button" class="btn btn-danger" id="deleteSelectedRows">Delete Selected</button>
+            </div>
+
             <!-- DataTable with Buttons -->
             <div class="card" id="card-block">
                 <div class="card-datatable table-responsive pt-0">
                     <table class="table" id="table-data">
                         <thead>
                             <tr>
+                                <th><input type="checkbox" id="checkAll"></th>
                                 <th>No</th>
                                 <th>Question</th>
                                 <th>Answer</th>
                                 <th>Category</th>
                                 <th>Page</th>
-                                <th>Cossine Similarity</th>
-                                <th>Action</th>
+                                <th>Noun</th>
+                                <th>Cosine Similarity</th>
+                                <th>Threshold</th>
+                                <th>Weight</th>
                             </tr>
                         </thead>
                     </table>
                 </div>
             </div>
         </div>
+
+
+        <!-- Modal Structure for Generate Question -->
         <div class="modal fade" id="generateQuestionModal" tabindex="-1" aria-labelledby="generateQuestionModalLabel"
             aria-hidden="true">
             <div class="modal-dialog">
@@ -76,48 +111,118 @@
                     </div>
                     <div class="modal-body">
                         <form id="generateQuestionForm">
-                            <div class="mb-3" id="text">
-                                <label for="questionInput" class="form-label">Noun with ","</label>
-                                <input type="text" class="form-control" id="questionInput">
-                            </div>
-                            <div class="mb-3" id="pdf">
-                                <label for="pdfInput" class="form-label">Upload PDF</label>
-                                <input type="file" class="form-control" id="pdfInput" name="pdfInput" accept=".pdf">
-                                <button type="button" class="btn btn-danger mt-2" id="cancelPdf">Cancel</button>
-                            </div>
-                            <div class="mb-3">
-                                <label for="language" class="form-label">Language</label>
-                                <select class="form-select" aria-label="Default select example" id="language">
-                                    <option value="english" selected>English</option>
-                                    <option value="indonesia" selected>Indonesia</option>
-                                </select>
-                            </div>
-
+                            <!-- Pilihan Kursus -->
                             <div class="mb-3">
                                 <label for="courseInput" class="form-label">Course</label>
-                                <select class="form-select" aria-label="Default select example" id="courseInput">
+                                <select class="form-select" id="courseInput" required>
                                     <option value="" selected>Choose Course</option>
                                 </select>
                             </div>
+
+                            <!-- Pilihan Topik -->
                             <div class="mb-3" id="topic">
                                 <label for="topicInput" class="form-label">Topic</label>
-                                <select class="form-select" aria-label="Default select example" id="topicInput" required>
+                                <select class="form-select" id="topicInput" required>
                                     <option value="" selected>Choose Topic</option>
                                 </select>
+                                <div id="filePathDisplay" style="display: flex; align-items: center;">
+                                    <span id="filePath" style="cursor: pointer;"></span>
+                                    <button type="button" class="btn btn-danger mt-2" id="deleteFilePath"
+                                        style="margin-left: 10px;">Delete File</button>
+                                </div>
+                                <div class="mb-3" id="pdfUpload" style="display: none;">
+                                    <label for="pdfInput" class="form-label">Upload PDF</label>
+                                    <input type="file" class="form-control" id="pdfInput" name="pdfInput"
+                                        accept=".pdf">
+                                </div>
                             </div>
-                            <div class="mb-3 form-check" id="skipButton">
-                                <input type="checkbox" class="form-check-input" id="skipPagesCheckbox">
-                                <label class="form-check-label" for="skipPagesCheckbox">Skip Unprocessable Pages</label>
+
+                            <!-- Pilihan Bahasa File -->
+                            <div class="mb-3" id="fileLanguageContainer" style="display: none;">
+                                <label for="fileLanguage" class="form-label">File Language</label>
+                                <select class="form-select" id="fileLanguage" required>
+                                    <option value="english" selected>English</option>
+                                    <option value="indonesia">Indonesia</option>
+                                    <option value="japanese">Japanese</option>
+                                </select>
                             </div>
-                            <!-- Add other input fields as needed -->
+
+                            <!-- Pilihan Bahasa Pertanyaan -->
+                            <div class="mb-3">
+                                <label for="languageCheckboxGroup" class="form-label">Select Languages</label>
+                                <div id="languageCheckboxGroup">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="english"
+                                            id="languageEnglish" name="languages[]">
+                                        <label class="form-check-label" for="languageEnglish">English</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="indonesia"
+                                            id="languageIndonesia" name="languages[]">
+                                        <label class="form-check-label" for="languageIndonesia">Indonesia</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="japanese"
+                                            id="languageJapanese" name="languages[]">
+                                        <label class="form-check-label" for="languageJapanese">Japanese</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Kata Benda -->
+                            <div class="mb-3" id="nounInput">
+                                <label for="questionInput" class="form-label">Noun with ","</label>
+                                <input type="text" class="form-control" id="questionInput" name="questionInput">
+                            </div>
+
+                            <!-- Skip Pages -->
+                            <div class="d-flex align-items-center" id="skipButton" style="display: none;">
+                                <div class="form-check" id="skipButton">
+                                    <input type="checkbox" class="form-check-input" id="skipPagesCheckbox">
+                                    <label class="mt-1 form-check-label" for="skipPagesCheckbox">Skip Unprocessable
+                                        Pages</label>
+                                </div>
+                            </div>
+
                             <button type="submit" class="btn btn-primary">Submit</button>
                         </form>
                     </div>
                 </div>
             </div>
         </div>
+
+
+        <!-- Modal Structure for Bulk Update -->
+        <div class="modal fade" id="updateBulkModal" tabindex="-1" aria-labelledby="updateBulkModalLabel"
+            aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="updateBulkModalLabel">Update Selected Rows</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="bulkWeight" class="form-label">Weight</label>
+                            <input type="number" id="bulkWeight" class="form-control" placeholder="Enter Weight"
+                                min="0">
+                        </div>
+                        <div class="mb-3">
+                            <label for="bulkThreshold" class="form-label">Threshold</label>
+                            <input type="number" id="bulkThreshold" class="form-control" placeholder="Enter Threshold"
+                                min="0" max="100">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" id="updateSelectedRows" class="btn btn-primary">Update Selected</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </main>
 @endsection
+
 @section('vendor-javascript')
     <script src="{{ asset('./assets/dashboard/datatables/jquery.dataTables.js') }}"></script>
     <script src="{{ asset('./assets/dashboard/datatables-bs5/datatables-bootstrap5.js') }}"></script>
@@ -128,948 +233,545 @@
     <script src="{{ asset('./assets/dashboard/datatables-buttons-bs5/buttons.bootstrap5.js') }}"></script>
     <script src="{{ asset('./assets/dashboard/datatables-buttons/buttons.html5.js') }}"></script>
     <script src="{{ asset('./assets/dashboard/datatables-buttons/buttons.print.js') }}"></script>
-    <!-- Row Group JS -->
-    <script src="{{ asset('./assets/dashboard/datatables-rowgroup/datatables.rowgroup.js') }}"></script>
-    <script src="{{ asset('./assets/dashboard/datatables-rowgroup-bs5/rowgroup.bootstrap5.js') }}"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.blockUI/2.70/jquery.blockUI.min.js"></script>
 @endsection
+
 @section('custom-javascript')
-    <script type="text/javascript">
-        $('#table-container').hide();
-        $('#topic').hide();
-
-        $('#cancelPdf').click(function() {
-            $('#pdfInput').val('');
-            $('#text').show();
-        });
-
-        $('#questionInput').on('input', function() {
-            if ($(this).val() !== '') {
-                $('#pdf').hide();
-                $('#skipButton').hide();
-                $('#text').show();
-            } else {
-                $('#pdf').show();
-                $('#skipButton').show();
-            }
-        });
-
-        $('#pdfInput').on('change', function() {
-            if ($(this).prop('files').length > 0) {
-                $('#text').hide();
-            }
-        });
-
+    <script>
         $(document).ready(function() {
+            $('#table-container').hide();
+            $('#topic').hide();
+            $('#filePathDisplay').hide();
+            $('#deleteFilePath').hide();
+
+            // Fungsi untuk handle submit form
+            let completedRequests = 0; // Jumlah operasi yang sudah selesai
+            let totalRequests = 0; // Total operasi yang akan dijalankan
+
+            $('#generateQuestionForm').submit(function(event) {
+                event.preventDefault();
+                $('#table-container').hide();
+                $('#generateQuestionModal').modal('hide');
+
+                const pdfFile = $('#pdfInput')[0].files[0];
+                const topic = $('#topicInput').val();
+
+                // Reset counter sebelum memulai loop baru
+                completedRequests = 0;
+                totalRequests = 0;
+
+                // Ambil bahasa yang dipilih untuk translate
+                const selectedLanguages = [];
+                $('#languageCheckboxGroup input:checked').each(function() {
+                    selectedLanguages.push($(this).val());
+                });
+
+                if (selectedLanguages.length === 0) {
+                    alert('Please select at least one language for translation.');
+                    return;
+                }
+
+                // Set jumlah total operasi berdasarkan bahasa yang dipilih
+                totalRequests = selectedLanguages.length;
+
+                if (cachedFilePath) {
+                    // Jika menggunakan file yang sudah dicache
+                    selectedLanguages.forEach(language => {
+                        sendToTranslateDocument(language, topic);
+                    });
+                } else if (pdfFile) {
+                    // Jika ada file PDF yang diupload
+                    uploadFile(pdfFile, $('#fileLanguage').val(), topic, selectedLanguages);
+                } else {
+                    alert('Please upload a PDF file or select a topic with an existing file.');
+                }
+            });
+
+
+            function uploadFile(file, fileLanguage, topic, languages) {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('language', fileLanguage); // Kirimkan bahasa yang dipilih untuk file
+                formData.append('topic_guid', topic);
+
+                $.blockUI({
+                    message: '<h4>Uploading file...</h4>'
+                });
+
+                $.ajax({
+                    url: "{{ env('URL_API') }}/api/v1/topic/upload-file",
+                    type: "POST",
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    beforeSend: function(request) {
+                        request.setRequestHeader("Authorization", "Bearer {{ $token }}");
+                    },
+                    success: function() {
+                        $.unblockUI();
+                        // alert('File uploaded successfully.');
+
+                        // Lakukan translate untuk setiap bahasa setelah upload berhasil
+                        languages.forEach(language => {
+                            sendToTranslateDocument(language, topic);
+                        });
+                    },
+                    error: function() {
+                        $.unblockUI();
+                        alert('Failed to upload file.');
+                    }
+                });
+            }
+
+
+            function sendToTranslateDocument(language, topic) {
+                $.blockUI({
+                    message: `<h4>Translating document to ${language}...</h4>`
+                });
+                $.ajax({
+                    type: "POST",
+                    url: "{{ env('URL_API') }}/api/v1/question/translate",
+                    data: {
+                        'language': language,
+                        'topic_guid': topic
+                    },
+                    beforeSend: function(request) {
+                        request.setRequestHeader("Authorization", "Bearer {{ $token }}");
+                    },
+                    success: function() {
+                        $.unblockUI();
+                        sendToTfidfDocument(language, topic);
+                    },
+                    error: function() {
+                        $.unblockUI();
+                        alert(`Failed to translate document to ${language}.`);
+                    }
+                });
+            }
+
+            function sendToTfidfDocument(language, topic) {
+                $.blockUI({
+                    message: `<h4>Calculating TF-IDF for ${language}...</h4>`
+                });
+                $.ajax({
+                    type: "POST",
+                    url: "{{ env('URL_API') }}/api/v1/question/tfidf",
+                    data: {
+                        'language': language,
+                        'topic_guid': topic
+                    },
+                    beforeSend: function(request) {
+                        request.setRequestHeader("Authorization", "Bearer {{ $token }}");
+                    },
+                    success: function() {
+                        $.unblockUI();
+                        sendToGenerateData(language, topic);
+                    },
+                    error: function() {
+                        $.unblockUI();
+                        alert(`Failed to calculate TF-IDF for ${language}.`);
+                    }
+                });
+            }
+
+            function sendToGenerateData(language, topic) {
+                $.blockUI({
+                    message: `<h4>Generating questions in ${language}...</h4>`
+                });
+
+                $.ajax({
+                    type: "POST",
+                    url: "{{ env('URL_API') }}/api/v1/question/generate",
+                    data: {
+                        'language': language,
+                        'topic_guid': topic
+                    },
+                    beforeSend: function(request) {
+                        request.setRequestHeader("Authorization", "Bearer {{ $token }}");
+                    },
+                    success: function(response) {
+                        // Tambahkan data ke tabel
+                        loadDataToTable(response.data, language);
+
+                        // Tingkatkan jumlah permintaan yang selesai
+                        checkCompletion();
+                    },
+                    error: function() {
+                        alert(`Failed to generate questions in ${language}.`);
+                        // Tetap tingkatkan jumlah permintaan yang selesai meskipun gagal
+                        checkCompletion();
+                    }
+                });
+            }
+
+            // Fungsi untuk mengecek apakah semua permintaan selesai
+            function checkCompletion() {
+                completedRequests++;
+                if (completedRequests === totalRequests) {
+                    // Jika semua permintaan selesai, hentikan loading
+                    $.unblockUI();
+                }
+            }
+
+
+
+            function loadDataToTable(data, language) {
+                // Tambahkan bahasa ke setiap data
+                data.forEach((item, i) => {
+                    item.index = i + 1; // Nomor urut
+                    item.language = language; // Tambahkan kolom bahasa
+                    item.checkbox = ''; // Checkbox untuk setiap baris
+                    item.threshold = item.threshold || 0;
+                    item.weight = item.weight || 0;
+                });
+
+                // Jika tabel belum ada, buat tabel baru
+                if (!$.fn.DataTable.isDataTable('#table-data')) {
+                    $('#table-container').show(); // Tampilkan container tabel
+                    $('#table-data').DataTable({
+                        data: data,
+                        columns: [{
+                                data: 'checkbox',
+                                title: '<input type="checkbox" id="checkAll">',
+                                orderable: false,
+                                searchable: false,
+                                render: function(data, type, row) {
+                                    return `<input type="checkbox" class="row-checkbox" data-id="${row.guid}" ${data ? 'checked' : ''}>`;
+                                }
+                            },
+                            {
+                                data: 'index',
+                                title: 'No'
+                            },
+                            {
+                                data: 'language',
+                                title: 'Language'
+                            },
+                            {
+                                data: 'question',
+                                title: 'Question',
+                                className: 'text-wrap'
+                            },
+                            {
+                                data: 'answer',
+                                title: 'Answer',
+                                className: 'text-wrap'
+                            },
+                            {
+                                data: 'category',
+                                title: 'Category'
+                            },
+                            {
+                                data: 'page_number',
+                                title: 'Page'
+                            },
+                            {
+                                data: 'cosine_q&d',
+                                title: 'Cosine Similarity'
+                            },
+                            {
+                                data: 'threshold',
+                                title: 'Threshold',
+                                render: function(data) {
+                                    return `<input type="number" class="form-control threshold-input" value="${data || 0}" min="0" max="100">`;
+                                }
+                            },
+                            {
+                                data: 'weight',
+                                title: 'Weight',
+                                render: function(data) {
+                                    return `<input type="number" class="form-control weight-input" value="${data || 0}" min="0">`;
+                                }
+                            }
+                        ],
+                        destroy: true,
+                        scrollX: true,
+                    });
+
+                    $('#checkAll').on('click', function() {
+                        const isChecked = $(this).is(':checked');
+                        const table = $('#table-data').DataTable();
+
+                        // Update semua data di DataTable (termasuk yang tidak terlihat di halaman saat ini)
+                        table.rows().every(function() {
+                            const data = this.data();
+                            data.checkbox = isChecked; // Update status checkbox di data
+                            this.data(data); // Simpan perubahan ke DataTable
+                        });
+
+                        // Perbarui tampilan UI untuk halaman saat ini
+                        table.rows({
+                            search: 'applied'
+                        }).nodes().each(function(row) {
+                            $(row).find('.row-checkbox').prop('checked', isChecked);
+                        });
+                    });
+
+                } else {
+                    // Tambahkan data ke tabel yang sudah ada
+                    const table = $('#table-data').DataTable();
+                    table.rows.add(data).draw(); // Tambahkan baris baru dan perbarui tampilan tabel
+                }
+            }
+
+            $('#table-data').on('change', '.row-checkbox', function() {
+                const table = $('#table-data').DataTable();
+                const row = $(this).closest('tr');
+                const rowIndex = table.row(row).index();
+                const data = table.row(rowIndex).data();
+
+                // Perbarui state checkbox di data
+                data.checkbox = $(this).is(':checked');
+                table.row(rowIndex).data(data);
+
+                // Perbarui status checkbox global
+                const allCheckboxes = table.rows({
+                    search: 'applied'
+                }).data().toArray();
+                const allChecked = allCheckboxes.every(row => row.checkbox);
+
+                $('#checkAll').prop('checked', allChecked);
+            });
+
+
+            // Event listener untuk tombol update di dalam modal
+            // Event listener untuk tombol update di dalam modal
+            $('#updateSelectedRows').on('click', function() {
+                const bulkWeight = $('#bulkWeight').val();
+                const bulkThreshold = $('#bulkThreshold').val();
+
+                // Periksa apakah nilai weight dan threshold diisi
+                if (bulkWeight === '' || bulkThreshold === '') {
+                    alert('Please enter values for both weight and threshold.');
+                    return;
+                }
+
+                // Dapatkan instance dari DataTable
+                const table = $('#table-data').DataTable();
+
+                // Iterasi melalui checkbox yang dicentang
+                $('.row-checkbox:checked').each(function() {
+                    const rowId = $(this).data('id'); // Ambil ID baris dari atribut data-id
+                    const row = $(this).closest('tr'); // Ambil elemen row terkait checkbox
+
+                    // Update nilai dalam DataTable secara langsung
+                    const rowIndex = table.row(row).index(); // Ambil index dari row
+
+                    // Update nilai weight dan threshold pada data row di DataTable
+                    const rowData = table.row(rowIndex).data();
+                    rowData.weight = bulkWeight;
+                    rowData.threshold = bulkThreshold;
+
+                    // Perbarui data di tabel
+                    table.row(rowIndex).data(rowData).draw(false);
+
+                    // Update nilai input di dalam tabel DOM
+                    $(this).closest('tr').find('.weight-input').val(bulkWeight);
+                    $(this).closest('tr').find('.threshold-input').val(bulkThreshold);
+                });
+
+
+                $('#updateBulkModal').modal('hide');
+                alert('Selected rows updated successfully.');
+            });
+
+            $('#deleteSelectedRows').on('click', function() {
+                const table = $('#table-data').DataTable();
+
+                // Ambil semua checkbox yang dicentang
+                const selectedRows = $('.row-checkbox:checked');
+
+                if (selectedRows.length === 0) {
+                    alert('No rows selected.');
+                    return;
+                }
+
+                if (!confirm('Are you sure you want to delete the selected rows?')) {
+                    return;
+                }
+
+                // Loop melalui setiap checkbox yang dipilih dan hapus baris dari DataTable
+                selectedRows.each(function() {
+                    const row = $(this).closest('tr'); // Temukan baris terkait checkbox
+                    table.row(row).remove().draw(
+                        false); // Hapus baris dari DataTable tanpa submit ke backend
+                });
+
+                // Update nomor urut setelah penghapusan
+                updateRowNumbers(table);
+
+                alert('Selected rows deleted successfully.');
+            });
+
+            // Fungsi untuk memperbarui nomor urut setelah penghapusan
+            function updateRowNumbers(table) {
+                table.rows().every(function(rowIdx, tableLoop, rowLoop) {
+                    const data = this.data();
+                    data.index = rowIdx + 1; // Update nomor urut berdasarkan posisi baris
+                    this.data(data); // Update data di DataTable
+                });
+                table.draw(false); // Redraw tabel untuk menampilkan nomor urut yang diperbarui
+            }
+
+
             $('#generate').click(function() {
                 $('#generateQuestionModal').modal('show');
             });
 
+            $('#questionInput').on('input', function() {
+                if ($(this).val() !== '') {
+                    $('#pdfUpload').hide();
+                    $('#skipButton').hide();
+                } else {
+                    $('#pdfUpload').show();
+                    $('#skipButton').show();
+                }
+            });
 
-            $(document).on('click', '.delete-btn', deleteRow);
+            $('#pdfInput').on('change', function() {
+                if ($(this).prop('files').length > 0) {
+                    $('#nounInput').hide();
+                    $('#skipButton').show();
+                } else {
+                    $('#nounInput').show();
+                }
+            });
+
+            $('#skipInfo').tooltip();
 
             $.ajax({
                 type: "GET",
                 url: "{{ env('URL_API') }}/api/v1/user-course/user/{{ $id }}",
-                data: {},
                 beforeSend: function(request) {
-                    request.setRequestHeader("Authorization",
-                        "Bearer {{ $token }}");
+                    request.setRequestHeader("Authorization", "Bearer {{ $token }}");
                 },
                 success: function(response) {
-                    response['data'].forEach(element => {
-                        $('#courseInput').append($("<option />").val(element[
-                            'course_code']).text(element[
-                            'course_code'] + '-' + element['course'][
-                            'name'
-                        ]));
-                    });
+                    if (response.data && response.data.length > 0) {
+                        response.data.forEach(element => {
+                            $('#courseInput').append(
+                                $("<option />").val(element.code).text(element.code + '-' +
+                                    element.name)
+                            );
+                        });
+                    } else {
+                        console.log("No courses available.");
+                    }
                 },
-                error: function(xhr, status, error) {
-                    console.error(xhr.responseText);
-                    errorCount++;
+                error: function(xhr) {
+                    console.error("Error loading courses:", xhr.responseText);
+                    alert("Failed to load courses.");
                 }
             });
 
             $('#courseInput').on('change', function() {
-                var course = $('#courseInput').val();
-                if (course != "") {
+                const course = $('#courseInput').val();
+                if (course) {
                     $('#topic').show();
+
+                    $.ajax({
+                        type: "POST",
+                        url: "{{ env('URL_API') }}/api/v1/topic/filter/course",
+                        data: {
+                            'code': course
+                        },
+                        beforeSend: function(request) {
+                            request.setRequestHeader("Authorization",
+                                "Bearer {{ $token }}");
+                        },
+                        success: function(response) {
+                            $('#topicInput').empty().append(
+                                '<option value="" selected>Choose Topic</option>');
+                            response.data.forEach(element => {
+                                $('#topicInput').append($("<option />").val(element
+                                    .guid).text(element.name));
+                            });
+                        },
+                        error: function(xhr) {
+                            console.error("Error loading topics:", xhr.responseText);
+                        }
+                    });
                 } else {
                     $('#topic').hide();
                 }
+            });
+
+            let cachedFilePath = null;
+            $('#topicInput').on('change', function() {
+                const topic = $(this).val();
+                if (topic) {
+                    $.ajax({
+                        type: "GET",
+                        url: "{{ env('URL_API') }}/api/v1/topic/" + topic,
+                        beforeSend: function(request) {
+                            request.setRequestHeader("Authorization",
+                                "Bearer {{ $token }}");
+                        },
+                        success: function(response) {
+                            cachedFilePath = response['data']['file_path'];
+                            const fileName = cachedFilePath ? cachedFilePath.split('/').pop()
+                                .replace(/^\w+_/, '') : '';
+
+                            if (cachedFilePath) {
+                                $('#filePath').html(
+                                    `<a href="{{ env('URL_API') }}/storage/${cachedFilePath}" target="_blank">${fileName}</a>`
+                                );
+                                $('#filePathDisplay').show();
+                                $('#deleteFilePath').show();
+                                $('#pdfUpload').hide();
+                                $('#nounInput').hide();
+                                $('#skipButton').show();
+                                $('#fileLanguageContainer')
+                                    .hide(); // Hide "File Language" if file exists
+                            } else {
+                                $('#filePathDisplay').hide();
+                                $('#deleteFilePath').hide();
+                                $('#pdfUpload').show();
+                                $('#nounInput').show();
+                                $('#fileLanguageContainer')
+                                    .show(); // Show "File Language" if no file
+                            }
+                        },
+                        error: function(xhr) {
+                            console.error("Error checking topic file path:", xhr.responseText);
+                        }
+                    });
+                } else {
+                    cachedFilePath = null;
+                    $('#filePathDisplay').hide();
+                    $('#deleteFilePath').hide();
+                    $('#pdfUpload').hide();
+                    $('#nounInput').show();
+                    $('#fileLanguageContainer').show(); // Show "File Language" if no topic selected
+                }
+            });
+
+
+            $('#deleteFilePath').click(function() {
+                const topicGuid = $('#topicInput').val();
                 $.ajax({
+                    url: "{{ env('URL_API') }}/api/v1/topic/delete-file",
                     type: "POST",
-                    url: "{{ env('URL_API') }}/api/v1/topic/filter/course",
                     data: {
-                        'code': course
+                        topic_guid: topicGuid
                     },
                     beforeSend: function(request) {
                         request.setRequestHeader("Authorization",
                             "Bearer {{ $token }}");
                     },
-                    success: function(response) {
-
-                        $('#topicInput').empty();
-                        response['data'].forEach(element => {
-                            $('#topicInput').append($("<option />").val(element[
-                                'guid']).text(element[
-                                'name']));
-                        });
+                    success: function() {
+                        $('#filePathDisplay').hide();
+                        $('#deleteFilePath').hide();
+                        $('#pdfUpload').show();
+                        $('#nounInput').show();
+                        $('#fileLanguageContainer').show();
+                        cachedFilePath = null;
+                        alert('File berhasil dihapus');
                     },
-                    error: function(xhr, status, error) {
-                        console.error(xhr.responseText);
-                        errorCount++;
+                    error: function(xhr) {
+                        alert('Gagal menghapus file: ' + xhr.statusText);
                     }
                 });
-
             });
-
-
-            $('#generateQuestionForm').submit(function(event) {
-                $('#generateQuestionModal').modal(
-                    'hide');
-                event.preventDefault();
-
-                var question = $('#questionInput').val();
-                var language = $('#language').val();
-                var pdfFile = $('#pdfInput')[0].files[0];
-                if (!question && !pdfFile) {
-                    alert('Please insert noun or upload PDF.');
-                    return;
-                }
-                var formData = new FormData();
-                formData.append('pdf', pdfFile);
-                formData.append('language', language);
-
-                // generate use pdf
-                if (pdfFile) {
-                    var isChecked = $('#skipPagesCheckbox').is(':checked');
-                    $('#loading').show();
-                    $.ajax({
-                        type: "POST",
-                        url: "{{ env('URL_API') }}/api/v1/question/upload-file",
-                        beforeSend: function(request) {
-                            request.setRequestHeader("Authorization",
-                                "Bearer {{ $token }}");
-                        },
-                        data: formData,
-                        contentType: false,
-                        processData: false,
-                        success: function(response) {
-                            var path = response['data']['path'];
-                            var name = response['data']['name'];
-                            var page = response['data']['page'];
-                            console.log(page);
-                            var allResponses = [];
-                            var completedRequests = 0;
-                            var processedPages = 0;
-
-                            function updateProgressBar() {
-
-                                var progressPercentage = (processedPages / page) * 100;
-                                document.getElementById("progressPercentage").innerText =
-                                    progressPercentage.toFixed(2) + "%";
-
-                            }
-
-
-                            function makeDatatable(response, cossineSimilarity, questionTotal) {
-                                $('#loading').hide();
-                                $('#table-container').show();
-                                cossineSimilarity = cossineSimilarity / questionTotal;
-                                $('#table-data').DataTable({
-                                    "dom": "lrt",
-                                    "bFilter": false,
-                                    "searching": false,
-                                    "keys": true,
-                                    "destroy": true,
-                                    "processing": true,
-                                    "serverSide": false,
-                                    "ajax": {
-                                        "url": "{{ env('URL_API') }}/api/v1/question/convert/datatable",
-                                        "type": "POST",
-                                        'beforeSend': function(
-                                            request) {
-                                            request
-                                                .setRequestHeader(
-                                                    "Authorization",
-                                                    "Bearer {{ $token }}"
-                                                );
-                                        },
-                                        "data": {
-                                            "data": allResponses,
-                                            "path": path,
-                                            "name": name,
-                                        },
-                                    },
-                                    "columns": [{
-                                            data: 'DT_RowIndex',
-                                            orderable: false,
-                                            searchable: false
-                                        },
-                                        {
-                                            data: 'question',
-                                            render: function(
-                                                data,
-                                                type,
-                                                row
-                                            ) {
-                                                return "<div class='text-wrap' contenteditable style='text-align: justify;'>" +
-                                                    data +
-                                                    "</div>"
-                                            }
-                                        },
-                                        {
-                                            data: 'answer',
-                                            render: function(
-                                                data,
-                                                type,
-                                                row
-                                            ) {
-                                                return "<div class='text-wrap' contenteditable style='text-align: justify;'>" +
-                                                    data +
-                                                    "</div>"
-                                            }
-                                        },
-                                        {
-                                            data: 'category',
-                                            render: function(
-                                                data,
-                                                type,
-                                                row
-                                            ) {
-                                                return "<div class='text-wrap' contenteditable>" +
-                                                    data +
-                                                    "</div>"
-                                            }
-                                        },
-                                        {
-                                            data: 'page',
-                                            render: function(data, type, row) {
-                                                if (data) {
-                                                    return "<div class='text-wrap' contenteditable>" +
-                                                        data + "</div>";
-                                                } else {
-                                                    return "<div class='text-wrap'>-</div>";
-                                                }
-                                            }
-                                        },
-                                        {
-                                            data: 'cossine_similarity',
-                                            render: function(
-                                                data,
-                                                type,
-                                                row
-                                            ) {
-                                                return "<div class='text-wrap' contenteditable>" +
-                                                    data +
-                                                    "</div>"
-                                            }
-                                        },
-                                        {
-                                            data: null,
-                                            title: "Actions",
-                                            render: function(
-                                                data,
-                                                type,
-                                                row
-                                            ) {
-                                                return '<a role="button" id="delete" class="delete-btn" style="text-decoration: none;"><i class="fa-solid fa-trash" style="font-size: 15px; color: red;"></i></a>';
-                                            },
-                                            "orderable": false,
-                                            "searchable": false
-
-                                        },
-                                    ],
-                                    "language": {
-                                        "emptyTable": "No data available in table",
-                                        "info": "Showing _START_ to _END_ of _TOTAL_ entries",
-                                        "infoEmpty": "Showing 0 to 0 of 0 entries",
-                                        "lengthMenu": "Show _MENU_ entries",
-                                        "loadingRecords": "Loading...",
-                                        "processing": "Processing...",
-                                        "zeroRecords": "No matching records found",
-                                        "paginate": {
-                                            "first": "<i class='fa-solid fa-angle-double-left'></i>",
-                                            "last": "<i class='fa-solid fa-angle-double-right'></i>",
-                                            "next": "<i class='fa-solid fa-angle-right'></i>",
-                                            "previous": "<i class='fa-solid fa-angle-left'></i>"
-                                        },
-                                        "aria": {
-                                            "sortAscending": ": activate to sort column ascending",
-                                            "sortDescending": ": activate to sort column descending"
-                                        }
-                                    },
-                                    dom: '<"card-header flex-column flex-md-row"<"head-label text-center"><"dt-action-buttons text-end pt-3 pt-md-0"B>><"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6 d-flex justify-content-center justify-content-md-end"f>>t<"row"<"col-sm-12 col-md-6"i><"col-sm-12 col-md-6"p>>',
-                                    displayLength: 10,
-                                    lengthMenu: [7, 10, 25,
-                                        50
-                                    ],
-                                    buttons: [{
-                                        text: '<span class="d-none d-sm-inline-block" id="save-btn">Save</span>',
-                                        className: "create-new btn btn-success",
-                                        action: function(
-                                            e,
-                                            dt,
-                                            node,
-                                            config
-                                        ) {
-                                            saveData
-                                                ();
-                                        }
-                                    }],
-                                    responsive: {
-                                        details: {
-                                            display: $.fn
-                                                .dataTable
-                                                .Responsive
-                                                .display
-                                                .modal({
-                                                    header: function(
-                                                        e
-                                                    ) {
-                                                        return "Details of " +
-                                                            e
-                                                            .data()
-                                                            .full_name
-                                                    }
-                                                }),
-                                            type: "column",
-                                            renderer: function(
-                                                e, t, a
-                                            ) {
-                                                a = $
-                                                    .map(
-                                                        a,
-                                                        function(
-                                                            e,
-                                                            t
-                                                        ) {
-                                                            return "" !==
-                                                                e
-                                                                .title ?
-                                                                '<tr data-dt-row="' +
-                                                                e
-                                                                .rowIndex +
-                                                                '" data-dt-column="' +
-                                                                e
-                                                                .columnIndex +
-                                                                '"><td>' +
-                                                                e
-                                                                .title +
-                                                                ":</td> <td>" +
-                                                                e
-                                                                .data +
-                                                                "</td></tr>" :
-                                                                ""
-                                                        }
-                                                    )
-                                                    .join(
-                                                        ""
-                                                    );
-                                                return !
-                                                    !
-                                                    a &&
-                                                    $(
-                                                        '<table class="table"/><tbody />'
-                                                    )
-                                                    .append(
-                                                        a
-                                                    )
-                                            }
-                                        }
-                                    },
-
-                                }), $("div.head-label").html(
-                                    '<h5 class="card-title mb-0">Generate Question - Average Cosine Similarity: ' +
-                                    cossineSimilarity.toFixed(2) + '</h5>');
-
-                            }
-
-                            let error = 0;
-                            var errorPages = [];
-                            let cossineSimilarity = 0;
-                            let questionTotal = 0;
-
-                            function makeAjaxRequest(i) {
-                                $.ajax({
-                                    type: "GET",
-                                    url: "{{ env('URL_API') }}/api/v1/question/generate",
-                                    beforeSend: function(request) {
-                                        request.setRequestHeader("Authorization",
-                                            "Bearer {{ $token }}");
-                                    },
-                                    data: {
-                                        "path": path,
-                                        "name": name,
-                                        "language": language,
-                                        "page": i
-                                    },
-                                    success: function(response) {
-                                        if (response && Array.isArray(response)) {
-                                            var allRequestsCompleted =
-                                                false;
-                                            let index = 0;
-
-                                            function processItem(item, index) {
-                                                item.page = i + 1;
-
-                                                function makeAjaxRequest(item,
-                                                    index) {
-                                                    $.ajax({
-                                                        type: "GET",
-                                                        url: "{{ env('URL_API') }}/api/v1/question/check-cossine",
-                                                        beforeSend: function(
-                                                            request) {
-                                                            request
-                                                                .setRequestHeader(
-                                                                    "Authorization",
-                                                                    "Bearer {{ $token }}"
-                                                                );
-                                                        },
-                                                        data: {
-                                                            "question": item
-                                                                .question,
-                                                            "answer": item
-                                                                .answer
-                                                        },
-                                                        success: function(
-                                                            response) {
-                                                            let parsedResponse =
-                                                                parseFloat(
-                                                                    response
-                                                                );
-                                                            if (!isNaN(
-                                                                    parsedResponse
-                                                                )) {
-                                                                item.cossine_similarity =
-                                                                    parsedResponse;
-                                                                cossineSimilarity
-                                                                    +=
-                                                                    parsedResponse;
-                                                                questionTotal
-                                                                    +=
-                                                                    1;
-                                                                index =
-                                                                    index +
-                                                                    1;
-                                                                allResponses.push(item);
-                                                                if (index ===
-                                                                    response
-                                                                    .length -
-                                                                    1) {
-                                                                    allRequestsCompleted
-                                                                        =
-                                                                        true;
-                                                                }
-                                                            } else {
-                                                                console
-                                                                    .error(
-                                                                        "Error: Response cannot be parsed to float"
-                                                                    );
-                                                                makeAjaxRequest
-                                                                    (item,
-                                                                        index
-                                                                    );
-                                                            }
-                                                        },
-
-                                                        error: function(xhr,
-                                                            status,
-                                                            error) {
-                                                            console
-                                                                .error(
-                                                                    "Error: ",
-                                                                    error
-                                                                );
-                                                            makeAjaxRequest
-                                                                (item,
-                                                                    index
-                                                                );
-                                                        }
-                                                    });
-                                                }
-
-
-                                                makeAjaxRequest(item, index);
-                                            }
-
-                                            response.forEach(function(item, index) {
-                                                processItem(item, index);
-                                            });
-
-
-                                            var checkCompletionInterval =
-                                                setInterval(function() {
-                                                        if (allRequestsCompleted) {
-                                                            clearInterval(
-                                                                checkCompletionInterval
-                                                            );
-                                                            completedRequests++;
-                                                            processedPages++;
-                                                            updateProgressBar();
-                                                            console
-                                                                .log(
-                                                                    response
-                                                                );
-
-                                                            if (completedRequests ===
-                                                                page) {
-                                                                makeDatatable(
-                                                                    allResponses,
-                                                                    cossineSimilarity,
-                                                                    questionTotal
-                                                                );
-                                                                if (errorPages
-                                                                    .length > 0) {
-                                                                    alert("Pertanyaan berhasil digenerate. Halaman yang mengalami kesalahan: " +
-                                                                        errorPages
-                                                                        .join(
-                                                                            ", "
-                                                                        ));
-                                                                } else {
-                                                                    alert(
-                                                                        "Pertanyaan berhasil digenerate tanpa ada halaman yang mengalami kesalahan."
-                                                                    );
-                                                                }
-                                                            } else {
-                                                                makeAjaxRequest(i +
-                                                                    1);
-                                                            }
-                                                        }
-                                                    },
-                                                    100
-                                                );
-
-
-                                        } else {
-                                            console.log(response);
-                                            error += 1;
-                                            if (error > 1) {
-                                                error = 0;
-                                                if (!isChecked) {
-                                                    var proceed = confirm(
-                                                        'Terjadi kesalahan saat memproses halaman ' +
-                                                        i + 1 +
-                                                        '. Apakah Anda ingin melewati halaman ?'
-                                                    );
-                                                    if (!proceed) {
-                                                        makeDatatable(allResponses,
-                                                            cossineSimilarity,
-                                                            questionTotal);
-                                                        if (errorPages.length > 0) {
-                                                            alert("Pertanyaan berhasil digenerate. Halaman yang mengalami kesalahan: " +
-                                                                errorPages.join(
-                                                                    ", "));
-                                                        } else {
-                                                            alert(
-                                                                "Pertanyaan berhasil digenerate tanpa ada halaman yang mengalami kesalahan."
-                                                            );
-                                                        }
-                                                        return
-                                                    }
-                                                }
-
-                                                completedRequests++;
-                                                processedPages++;
-                                                updateProgressBar();
-                                                errorPages.push(i);
-                                                console.log(errorPages);
-                                                makeAjaxRequest(i + 1);
-                                            } else {
-                                                makeAjaxRequest(i);
-                                            }
-                                        }
-
-                                    },
-                                    error: function(xhr, status, error) {
-                                        if (error > 1) {
-                                            error = 0;
-                                            if (!isChecked) {
-                                                var proceed = confirm(
-                                                    'Terjadi kesalahan saat memproses halaman ' +
-                                                    (i + 1) +
-                                                    '. Apakah Anda ingin melewati halaman ?'
-                                                );
-                                                if (!proceed) {
-                                                    makeDatatable(allResponses,
-                                                        cossineSimilarity,
-                                                        questionTotal);
-                                                    if (errorPages.length > 0) {
-                                                        alert("Pertanyaan berhasil digenerate. Halaman yang mengalami kesalahan: " +
-                                                            errorPages.join(
-                                                                ", "));
-                                                    } else {
-                                                        alert(
-                                                            "Pertanyaan berhasil digenerate tanpa ada halaman yang mengalami kesalahan."
-                                                        );
-                                                    }
-                                                    return
-                                                }
-                                            }
-
-                                            completedRequests++;
-                                            processedPages++;
-                                            updateProgressBar();
-                                            errorPages.push(i);
-                                            console.log(errorPages);
-                                            makeAjaxRequest(i + 1);
-                                        } else {
-                                            makeAjaxRequest(i);
-                                        }
-                                    }
-                                });
-                            }
-                            makeAjaxRequest(0);
-                        },
-                        error: function(xhr, status, error) {
-                            console.error(xhr.responseText);
-                            var errorMessage = "Terjadi kesalahan saat menjalankan URL. ";
-                            if (xhr.status === 0) {
-                                errorMessage += "Koneksi jaringan gagal.";
-                            } else {
-                                errorMessage += "Error: " + xhr.status + " " + error;
-                            }
-                            alert(errorMessage);
-                        }
-                    });
-                } else {
-                    $.ajax({
-                        type: "GET",
-                        url: "{{ env('URL_API') }}/api/v1/question/generate",
-                        beforeSend: function(request) {
-                            request.setRequestHeader("Authorization",
-                                "Bearer {{ $token }}");
-                        },
-                        data: {
-                            "noun": question,
-                            "language": language
-                        },
-                        success: function(response) {
-                            var data = response['data'];
-                            var promises = [];
-                            let cossineSimilarity = 0;
-                            let questionTotal = 0;
-                            data.forEach(function(row) {
-                                var promise = new Promise(function(resolve, reject) {
-                                    $.ajax({
-                                        type: "GET",
-                                        url: "{{ env('URL_API') }}/api/v1/question/check-cossine",
-                                        beforeSend: function(request) {
-                                            request
-                                                .setRequestHeader(
-                                                    "Authorization",
-                                                    "Bearer {{ $token }}"
-                                                );
-                                        },
-                                        data: {
-                                            "question": row.question,
-                                            "answer": row.answer
-                                        },
-                                        success: function(similarity) {
-                                            row.cossine_similarity =
-                                                similarity;
-                                            cossineSimilarity
-                                                +=
-                                                parseFloat(
-                                                    similarity
-                                                );
-                                            questionTotal
-                                                +=
-                                                1;
-                                            resolve
-                                                ();
-                                        },
-                                        error: function(xhr, status,
-                                            error) {
-                                            console.error("Error:",
-                                                error);
-                                            reject(
-                                                error
-                                            );
-                                        }
-                                    });
-                                });
-                                promises.push(promise);
-                            });
-
-                            // Menjalankan semua promises
-                            Promise.all(promises)
-                                .then(function() {
-                                    $('#table-container').show();
-                                    cossineSimilarity = cossineSimilarity / questionTotal;
-                                    $('#table-data').DataTable({
-                                        "dom": "lrt",
-                                        "bFilter": false,
-                                        "searching": false,
-                                        "keys": true,
-                                        "destroy": true,
-                                        "processing": true,
-                                        "serverSide": false,
-                                        "data": data,
-                                        "columns": [{
-                                                data: 'DT_RowIndex',
-                                                orderable: false,
-                                                searchable: false
-                                            }, {
-                                                data: 'question',
-                                                render: function(data, type,
-                                                    row) {
-                                                    return "<div class='text-wrap' style='text-align: justify;'>" +
-                                                        data + "</div>"
-                                                }
-                                            },
-                                            {
-                                                data: 'answer',
-                                                render: function(data, type,
-                                                    row) {
-                                                    return "<div class='text-wrap' style='text-align: justify;'>" +
-                                                        data + "</div>"
-                                                }
-                                            },
-                                            {
-                                                data: 'category',
-                                                render: function(data, type,
-                                                    row) {
-                                                    return "<div class='text-wrap' contenteditable>" +
-                                                        data +
-                                                        "</div>"
-                                                }
-                                            },
-                                            {
-                                                data: 'page',
-                                                render: function(data, type,
-                                                    row) {
-                                                    return "<div class='text-wrap'>-</div>";
-                                                }
-                                            },
-                                            {
-                                                data: 'cossine_similarity',
-                                                render: function(data, type,
-                                                    row) {
-                                                    return "<div class='text-wrap'>" +
-                                                        data +
-                                                        "</div>"
-                                                }
-                                            },
-                                            {
-                                                data: null,
-                                                title: "Actions",
-                                                render: function(data, type,
-                                                    row) {
-                                                    return '<a role="button" id="delete" class="delete-btn" style="text-decoration: none;"><i class="fa-solid fa-trash" style="font-size: 15px; color: red;"></i></a>';
-                                                },
-                                                "orderable": false,
-                                                "searchable": false
-
-                                            },
-                                        ],
-                                        "language": {
-                                            "emptyTable": "No data available in table",
-                                            "info": "Showing _START_ to _END_ of _TOTAL_ entries",
-                                            "infoEmpty": "Showing 0 to 0 of 0 entries",
-                                            "lengthMenu": "Show _MENU_ entries",
-                                            "loadingRecords": "Loading...",
-                                            "processing": "Processing...",
-                                            "zeroRecords": "No matching records found",
-                                            "paginate": {
-                                                "first": "<i class='fa-solid fa-angle-double-left'></i>",
-                                                "last": "<i class='fa-solid fa-angle-double-right'></i>",
-                                                "next": "<i class='fa-solid fa-angle-right'></i>",
-                                                "previous": "<i class='fa-solid fa-angle-left'></i>"
-                                            },
-                                            "aria": {
-                                                "sortAscending": ": activate to sort column ascending",
-                                                "sortDescending": ": activate to sort column descending"
-                                            }
-                                        },
-                                        dom: '<"card-header flex-column flex-md-row"<"head-label text-center"><"dt-action-buttons text-end pt-3 pt-md-0"B>><"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6 d-flex justify-content-center justify-content-md-end"f>>t<"row"<"col-sm-12 col-md-6"i><"col-sm-12 col-md-6"p>>',
-                                        displayLength: 10,
-                                        lengthMenu: [7, 10, 25, 50],
-                                        buttons: [{
-                                            text: '<span class="d-none d-sm-inline-block" id="save-btn">Save</span>',
-                                            className: "create-new btn btn-success",
-                                            action: function(e, dt, node,
-                                                config) {
-                                                saveData();
-                                            }
-
-                                        }],
-                                        responsive: {
-                                            details: {
-                                                display: $.fn.dataTable.Responsive
-                                                    .display
-                                                    .modal({
-                                                        header: function(e) {
-                                                            return "Details of " +
-                                                                e
-                                                                .data()
-                                                                .full_name
-                                                        }
-                                                    }),
-                                                type: "column",
-                                                renderer: function(e, t, a) {
-                                                    a = $.map(a, function(e,
-                                                        t) {
-                                                        return "" !== e
-                                                            .title ?
-                                                            '<tr data-dt-row="' +
-                                                            e
-                                                            .rowIndex +
-                                                            '" data-dt-column="' +
-                                                            e
-                                                            .columnIndex +
-                                                            '"><td>' + e
-                                                            .title +
-                                                            ":</td> <td>" +
-                                                            e.data +
-                                                            "</td></tr>" :
-                                                            ""
-                                                    }).join("");
-                                                    return !!a && $(
-                                                        '<table class="table"/><tbody />'
-                                                    ).append(a)
-                                                }
-                                            }
-                                        },
-
-                                    }), $("div.head-label").html(
-                                        '<h5 class="card-title mb-0">Generate Question - Average Cosine Similarity: ' +
-                                        cossineSimilarity.toFixed(2) + '</h5>');
-
-                                })
-                                .catch(function(error) {
-                                    console.error("Error:", error);
-                                });
-
-
-                        },
-                        error: function(xhr, status, error) {
-                            console.error("Error:", error);
-                        }
-                    });
-                }
-                $('#table-data').on('blur', 'tbody td div.text-wrap[contenteditable]', function() {
-                    var table = $('#table-data').DataTable();
-                    var cell = table.cell($(this).closest('td'));
-                    var newValue = $(this).text();
-                    cell.data(newValue).draw();
-                });
-
-
-            });
-
-            function deleteRow() {
-                var table = $('#table-data').DataTable();
-                var row = $(this).closest('tr');
-                table.row(row).remove().draw();
-                updateRowIndex();
-            };
-
-            function updateRowIndex() {
-                var table = $('#table-data').DataTable();
-                table.rows().every(function(rowIdx, tableLoop, rowLoop) {
-                    var rowData = this.data();
-                    rowData['DT_RowIndex'] = rowIdx +
-                        1;
-                    this.data(rowData);
-                });
-                table.draw();
-            }
-
-            function saveData() {
-                {
-                    $('#loadingScreen').show();
-                    var table = $('#table-data').DataTable();
-                    var tableData = table.rows().data();
-                    var numRows = tableData.length;
-                    var weight = 100;
-                    var successCount = 0;
-                    var errorCount = 0;
-                    var topic = $('#topicInput').val();
-                    $.ajax({
-                        type: "GET",
-                        url: "{{ env('URL_API') }}/api/v1/topic/" + topic,
-                        data: {},
-                        beforeSend: function(request) {
-                            request.setRequestHeader("Authorization",
-                                "Bearer {{ $token }}");
-                        },
-                        success: function(response) {
-                            console.log(response['data']['totalWeight']);
-                            weight = (weight - response['data']['totalWeight']) / numRows;
-                            console.log(weight);
-                            let index = 0
-                            let rowData = tableData[index];
-                            sendRequest(rowData, 0);
-                        },
-                        error: function(xhr, status, error) {
-                            console.error(xhr.responseText);
-                        }
-
-                    });
-
-                    function updateProgressBar(percentage) {
-                        $('#progressBar').css('width', percentage + '%');
-                    }
-
-
-                    function sendRequest(rowData, index) {
-                        $.ajax({
-                            type: "POST",
-                            url: "{{ env('URL_API') }}/api/v1/question",
-                            data: {
-                                'question_ai': rowData.question,
-                                'answer_ai': rowData.answer,
-                                'question_fix': rowData.question,
-                                'answer_fix': rowData.answer,
-                                'category': rowData.category,
-                                'weight': weight,
-                                'topic_guid': topic,
-                                'page': rowData.page,
-                                'cossine_similarity': rowData.cossine_similarity,
-                                ...(rowData.page && rowData.page !== '-' ? {
-                                    'page': rowData.page
-                                } : {})
-                            },
-                            beforeSend: function(request) {
-                                request.setRequestHeader("Authorization",
-                                    "Bearer {{ $token }}");
-                            },
-                            success: function(response) {
-                                console.log(response);
-                                successCount++;
-                                var percentage = Math.floor((successCount + errorCount) /
-                                    numRows * 100);
-                                updateProgressBar(percentage);
-                                if ((index + 1) < tableData.length) {
-                                    let rowData = tableData[index];
-                                    sendRequest(rowData, index + 1);
-                                } else {
-                                    var course = $('#courseInput').val();
-                                    if (successCount + errorCount === numRows) {
-                                        alert("Success to save data!");
-                                        window.location = "/question/" + course + "/" + topic;
-                                    } else {
-                                        alert("Terjadi kesalahan saat menyimpan data.");
-                                    }
-                                }
-                            },
-                            error: function(xhr, status, error) {
-                                console.error(error);
-                                errorCount++;
-                                reject(xhr.responseText);
-                            }
-                        });
-                    }
-
-
-
-                };
-
-
-
-            };
         });
     </script>
 @endsection

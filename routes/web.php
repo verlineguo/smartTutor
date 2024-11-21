@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AnswerController;
 use App\Http\Controllers\AssistantController;
+use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GradeController;
@@ -50,6 +51,7 @@ Route::group([
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/question', [QuestionController::class, 'generate'])->name('question-generate')->middleware('role:admin,lecturer');
     Route::get('/course', [CourseController::class, 'index'])->name('course');
+    Route::get('/chatbot', [ChatbotController::class, 'index'])->name('chatbot');
     Route::get('/topic/{code}', [TopicController::class, 'index'])->name('topic');
     Route::get('/student/{code}', [StudentController::class, 'index'])->name('student')->middleware('role:admin,lecturer,assistant');
     Route::get('/assistant/{code}', [AssistantController::class, 'index'])->name('assistant')->middleware('role:admin,lecturer');

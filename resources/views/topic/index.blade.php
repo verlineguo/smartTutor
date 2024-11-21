@@ -27,12 +27,14 @@
                                 @isRole(['admin', 'lecturer', 'assistant'], $code)
                                     <th>No</th>
                                     <th>Name</th>
+                                    <th>File</th>
                                     <th>Description</th>
                                     <th>Start Time</th>
                                     <th>End Time</th>
                                 @else
                                     <th>No</th>
                                     <th>Name</th>
+                                    <th>File</th>
                                     <th>Description</th>
                                     <th>Start Time</th>
                                     <th>End Time</th>
@@ -148,6 +150,37 @@
                             </div>
                         </div>
                     </div>
+                    <!-- Modal for Uploading File -->
+                    <div class="modal fade" id="modalUploadFile" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Upload File</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                        aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <form id="upload-file-form" enctype="multipart/form-data">
+                                        <input type="hidden" id="upload-guid" name="guid">
+                                        <div class="mb-3">
+                                            <label for="file-input" class="form-label">Choose File (PDF only)</label>
+                                            <input type="file" class="form-control" id="file-input" name="file"
+                                                accept=".pdf" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="file-language" class="form-label">Select File Language</label>
+                                            <select class="form-select" id="file-language" name="language" required>
+                                                <option value="indonesia">Indonesia</option>
+                                                <option value="english">English</option>
+                                                <option value="japanese">Japanese</option>
+                                            </select>
+                                        </div>
+                                        <button type="submit" class="btn btn-primary">Upload</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -217,6 +250,31 @@
                         data: 'name',
                     },
                     {
+                        data: 'file_path',
+                        render: function(data, type, row) {
+                            if (data) {
+                                // Extract the file name from the file path
+                                const fileName = data.split('/')
+                                    .pop(); // Get the last part of the file path
+                                const originalFileName = fileName.substring(fileName.indexOf('_') +
+                                    1); // Remove everything before the first underscore
+
+                                return `
+                                    <span>${originalFileName}</span>
+                                    <i class="fa-solid fa-file view-icon" style="font-size: 15px; color: blue; cursor: pointer;" data-url="{{ env('URL_API') }}/storage/${data}" title="View File"></i>
+                                    <i class="fa-solid fa-trash delete-icon" style="font-size: 15px; color: red; cursor: pointer;" data-guid="${row.guid}" title="Delete File"></i>
+                                `;
+                            } else {
+                                // If no file, show upload icon to trigger modal
+                                return `
+                                    <i class="fa-solid fa-file-upload upload-icon" style="font-size: 15px; color: green; cursor: pointer;" data-guid="${row.guid}" title="Upload File"></i>
+                                `;
+                            }
+                        },
+                        orderable: false,
+                        searchable: false
+                    },
+                    {
                         data: 'description',
                         render: function(data, type, row) {
                             return "<div class='text-wrap'>" + data + "</div>"
@@ -252,34 +310,46 @@
                         title: "Actions",
                         render: function(data, type, row) {
                             @isRole(['admin', 'lecturer', 'assistant'], $code)
-                            return '<a href="/question/{{ $code }}/' + data['guid'] +
-                                '" role="button" class="edit-btn " style="text-decoration: none; margin-right: 10px;"><i class="fa-solid fa-circle-info" style="font-size: 15px; color: blue;"></i></a>' +
-                                '<a href="/grade/{{ $code }}/' + data['guid'] +
-                                '" role="button" class="edit-btn " style="text-decoration: none; margin-right: 10px;"><i class="fa-solid fa fa-percent" style="font-size: 15px; color: yellowgreen;"></i></a>' +
-                                '<a role="button" class="edit-btn open-edit-dialog" style="text-decoration: none; margin-right: 10px;"data-guid="' +
-                                data['guid'] +
-                                '"><i class="fa-solid fa-pen-to-square" style="font-size: 15px; color: yellow;"></i></a>' +
-                                '<a role="button" class="delete-btn open-delete-dialog" style="text-decoration: none;" data-bs-toggle="modal" data-bs-target="#modalDelete" data-guid="' +
-                                data['guid'] +
-                                '"><i class="fa-solid fa-trash" style="font-size: 15px; color: red;"></i></a>';
+                            return `
+        <a href="/question/{{ $code }}/${data['guid']}" role="button" class="edit-btn" style="text-decoration: none; margin-right: 10px;">
+            <i class="fa-solid fa-circle-info" style="font-size: 15px; color: blue;" data-bs-toggle="tooltip" title="View Details"></i>
+        </a>
+        <a href="/grade/{{ $code }}/${data['guid']}" role="button" class="edit-btn" style="text-decoration: none; margin-right: 10px;">
+            <i class="fa-solid fa fa-percent" style="font-size: 15px; color: yellowgreen;" data-bs-toggle="tooltip" title="Grade"></i>
+        </a>
+        <a role="button" class="edit-btn open-edit-dialog" style="text-decoration: none; margin-right: 10px;" data-guid="${data['guid']}">
+            <i class="fa-solid fa-pen-to-square" style="font-size: 15px; color: yellow;" data-bs-toggle="tooltip" title="Edit"></i>
+        </a>
+        <a role="button" class="delete-btn open-delete-dialog" style="text-decoration: none;" data-bs-toggle="modal" data-bs-target="#modalDelete" data-guid="${data['guid']}">
+            <i class="fa-solid fa-trash" style="font-size: 15px; color: red;" data-bs-toggle="tooltip" title="Delete"></i>
+        </a>
+    `;
                             @else
                             var serverTime = new Date();
                             serverTime.setHours(serverTime.getHours() + 7);
                             var startTime = new Date(row.time_start);
                             if (startTime > serverTime) {
-                                return '<i class="fa-solid fa-lock" style="font-size: 15px; color: gray;"></i>';
+                                return `
+            <i class="fa-solid fa-lock" style="font-size: 15px; color: gray;" data-bs-toggle="tooltip" title="Locked"></i>
+        `;
                             } else {
                                 if (data['grade'][0] == null && data['deadline']) {
-                                    return '<a href="/user/answer/' + data['guid'] +
-                                        '" role="button" class="edit-btn" style="text-decoration: none; margin-right: 10px;"><i class="fa-solid fa-pen-to-square" style="font-size: 15px; color: yellow;"></i></a>'
+                                    return `
+                <a href="/user/answer/${data['guid']}" role="button" class="edit-btn" style="text-decoration: none; margin-right: 10px;">
+                    <i class="fa-solid fa-pen-to-square" style="font-size: 15px; color: yellow;" data-bs-toggle="tooltip" title="Answer"></i>
+                </a>
+            `;
                                 } else {
-                                    return '<a href="/user/answer/result/' + data['guid'] +
-                                        '" role="button" class="edit-btn" style="text-decoration: none; margin-right: 10px;"><i class="fa-solid fa fa-eye" style="font-size: 15px; color: blue;"></i></a>';
+                                    return `
+                <a href="/user/answer/result/${data['guid']}" role="button" class="edit-btn" style="text-decoration: none; margin-right: 10px;">
+                    <i class="fa-solid fa fa-eye" style="font-size: 15px; color: blue;" data-bs-toggle="tooltip" title="View Result"></i>
+                </a>
+            `;
                                 }
                             }
                             @endisRole
-
                         },
+
                         "orderable": false,
                         "searchable": false
 
@@ -338,6 +408,11 @@
                     }
                 },
             }), $("div.head-label").html('<h5 class="card-title mb-0">Topic Data</h5>');
+
+            $('[data-bs-toggle="tooltip"]').tooltip();
+            $('#table-data').on('draw.dt', function() {
+                $('[data-bs-toggle="tooltip"]').tooltip();
+            });
 
             $(document).on("click", ".open-delete-dialog", function() {
                 var guid = $(this).data('guid');
@@ -471,6 +546,78 @@
                 });
             });
 
+            // File Topic
+
+            $(document).on('click', '.upload-icon', function() {
+                var guid = $(this).data('guid');
+                $('#upload-guid').val(guid); // Set the guid in hidden input
+                $('#modalUploadFile').modal('show'); // Show upload modal
+            });
+
+            // Handle file upload within the modal
+            // Handle file upload within the modal
+            $('#upload-file-form').on('submit', function(e) {
+                e.preventDefault();
+
+                var guid = $('#upload-guid').val();
+                var fileData = $('#file-input')[0].files[0];
+                var fileLanguage = $('#file-language').val(); // Get selected language
+                var formData = new FormData();
+                formData.append('file', fileData);
+                formData.append('topic_guid', guid);
+                formData.append('language', fileLanguage); // Add language to FormData
+
+                $.ajax({
+                    url: "{{ env('URL_API') }}/api/v1/topic/upload-file",
+                    type: "POST",
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    beforeSend: function(request) {
+                        request.setRequestHeader("Authorization",
+                            "Bearer {{ $token }}");
+                    },
+                    success: function(response) {
+                        $('#modalUploadFile').modal('hide'); // Hide modal on success
+                        $('#table-data').DataTable().ajax
+                            .reload(); // Refresh table to show updated file
+                        alert('File uploaded successfully.');
+                    },
+                    error: function(xhr) {
+                        alert('File upload failed: ' + xhr.statusText);
+                    }
+                });
+            });
+            // Handle view file icon click
+            $(document).on('click', '.view-icon', function() {
+                var fileURL = $(this).data('url');
+                window.open(fileURL, '_blank');
+            });
+
+            // Handle delete file icon click
+            $(document).on('click', '.delete-icon', function() {
+                var guid = $(this).data('guid');
+
+                $.ajax({
+                    url: "{{ env('URL_API') }}/api/v1/topic/delete-file",
+                    type: "POST",
+                    data: {
+                        topic_guid: guid
+                    },
+                    beforeSend: function(request) {
+                        request.setRequestHeader("Authorization",
+                            "Bearer {{ $token }}");
+                    },
+                    success: function() {
+                        $('#table-data').DataTable().ajax
+                            .reload(); // Refresh tabel setelah file dihapus
+                        alert('File berhasil dihapus');
+                    },
+                    error: function(xhr) {
+                        alert('Gagal menghapus file: ' + xhr.statusText);
+                    }
+                });
+            });
 
 
         });

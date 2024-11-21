@@ -55,7 +55,7 @@
     <!-- themify -->
     <link href="https://cdn.jsdelivr.net/npm/@icon/themify-icons@1.0.1-alpha.3/themify-icons.min.css" rel="stylesheet">
 </head>
-
+@yield('add-css')
 <style>
     /* Tampilan responsif untuk tombol toggle */
     @media (max-width: 991.98px) {
@@ -77,7 +77,6 @@
             height: 24px;
         }
     }
-    
 </style>
 
 <body class="g-sidenav-show  bg-gray-100 ">

@@ -24,10 +24,10 @@
                     <table class="table" id="table-data">
                         <thead>
                             <tr>
-                                <th >Code</th>
-                                <th >Name</th>
-                                <th >Description</th>
-                                <th >Action</th>
+                                <th>Code</th>
+                                <th>Name</th>
+                                <th>Description</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
                     </table>
@@ -178,22 +178,25 @@
                         data: null,
                         title: "Actions",
                         render: function(data, type, row) {
-                            return '<a href="/topic/' + data['code'] +
-                                '" role="button" style="text-decoration: none; margin-right: 10px;"><i class="fa-solid fa-circle-info" style="font-size: 15px; color: blue;"></i></a>'
-                            @isRole(['admin', 'lecturer', 'assistant']) +
-                                '<a href = "/student/' +
-                                data['code'] +
-                                '" role="button" style="text-decoration: none; margin-right: 10px;"><i class="fa-solid fa fa-users" style="font-size: 15px; color: purple;"></i></a>' +
-                                '<a href="/assistant/' + data['code'] +
-                                '" role="button" style="text-decoration: none; margin-right: 10px;"><i class="fa-solid fa fa-handshake-o" style="font-size: 15px; color: orange;"></i></a>' +
-
-                                '<a role="button" class="edit-btn open-edit-dialog" style="text-decoration: none; margin-right: 10px;"data-code="' +
-                                data['code'] +
-                                '"><i class="fa-solid fa-pen-to-square" style="font-size: 15px; color: yellow;"></i></a>' +
-                                '<a role="button" class="delete-btn open-delete-dialog" style="text-decoration: none;" data-bs-toggle="modal" data-bs-target="#modalDelete" data-code="' +
-                                data['code'] +
-                                '"><i class="fa-solid fa-trash" style="font-size: 15px; color: red;"></i></a>';
-                            @endisRole
+                            return `
+        <a href="/topic/${data['code']}" role="button" style="text-decoration: none; margin-right: 10px;">
+            <i class="fa-solid fa-circle-info" style="font-size: 15px; color: blue;" data-bs-toggle="tooltip" title="View Topic"></i>
+        </a>
+        @isRole(['admin', 'lecturer', 'assistant'])
+<a href="/student/${data['code']}" role="button" style="text-decoration: none; margin-right: 10px;">
+            <i class="fa-solid fa fa-users" style="font-size: 15px; color: purple;" data-bs-toggle="tooltip" title="View Students"></i>
+        </a>
+        <a href="/assistant/${data['code']}" role="button" style="text-decoration: none; margin-right: 10px;">
+            <i class="fa-solid fa fa-handshake-o" style="font-size: 15px; color: orange;" data-bs-toggle="tooltip" title="View Assistants"></i>
+        </a>
+        <a role="button" class="edit-btn open-edit-dialog" style="text-decoration: none; margin-right: 10px;" data-code="${data['code']}">
+            <i class="fa-solid fa-pen-to-square" style="font-size: 15px; color: yellow;" data-bs-toggle="tooltip" title="Edit Course"></i>
+        </a>
+        <a role="button" class="delete-btn open-delete-dialog" style="text-decoration: none;" data-bs-toggle="modal" data-bs-target="#modalDelete" data-code="${data['code']}">
+            <i class="fa-solid fa-trash" style="font-size: 15px; color: red;" data-bs-toggle="tooltip" title="Delete Course"></i>
+        </a>
+@endisRole
+    `;
                         },
                         "orderable": false,
                         "searchable": false
@@ -250,7 +253,12 @@
                     }
                 },
             }), $("div.head-label").html('<h5 class="card-title mb-0">Course Data</h5>');
+            $('[data-bs-toggle="tooltip"]').tooltip();
 
+            // Re-initialize tooltips after any AJAX content load, e.g., when reloading the table
+            $('#table-data').on('draw.dt', function() {
+                $('[data-bs-toggle="tooltip"]').tooltip();
+            });
             $(document).on("click", ".open-delete-dialog", function() {
                 var code = $(this).data('code');
                 $("#delete-id").val(code);

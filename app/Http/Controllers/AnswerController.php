@@ -33,7 +33,7 @@ class AnswerController extends Controller
         if ($topic['data']) {
             $name = $topic['data']['name'];
             $code = $topic['data']['course_code'];
-            return view('answer.user-answer', compact('token', 'guid', 'name', 'id', 'code', 'session'));
+            return view('chatbot.index2', compact('token', 'guid', 'name', 'id', 'code', 'session'));
         } else {
             return redirect('/dashboard');
         }
