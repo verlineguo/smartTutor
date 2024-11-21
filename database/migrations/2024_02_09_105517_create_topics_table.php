@@ -18,6 +18,9 @@ return new class extends Migration
             $table->dateTime('time_start')->nullable();
             $table->dateTime('time_end')->nullable();
             $table->char('course_code', 10);
+            $table->longText('file_path')->nullable();
+            $table->string('file_language', 50)->nullable(); // Bahasa file asli
+            $table->json('translation_metadata')->nullable(); // Metadata hasil terjemahan
             $table->foreign('course_code')->references('code')->on('courses')->onDelete('cascade');
             $table->timestamps();
         });
@@ -28,6 +31,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('materi');
+        Schema::dropIfExists('topics');
     }
 };

@@ -173,6 +173,111 @@ class TopicController extends Controller
 
         return ResponseController::getResponse($data, 200, 'Success');
     }
+    public function uploadFile(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'topic_guid' => 'required|string|max:36', // Identifier for the topic
+            'file' => 'required|file|mimes:pdf|max:10048', // Only PDF files with a max size of 10MB
+            'language' => 'required|string|max:10', // File language is required
+        ], MessagesController::messages());
+
+        if ($validator->fails()) {
+            return ResponseController::getResponse(null, 422, $validator->errors()->first());
+        }
+
+        // Find topic by topic_guid
+        $topic = Topic::where('guid', $request->input('topic_guid'))->first();
+        if (!$topic) {
+            return ResponseController::getResponse(null, 400, 'Topic not found');
+        }
+
+        // Delete existing file in storage if exists
+        if ($topic->file_path) {
+            $existingFilePath = storage_path('app/public/' . $topic->file_path);
+            if (file_exists($existingFilePath)) {
+                unlink($existingFilePath); // Delete the old file from storage
+            }
+        }
+
+        // Save new file
+        if ($request->hasFile('file')) {
+            $file = $request->file('file');
+
+            // Get original filename with a unique identifier for uniqueness
+            $originalName = $file->getClientOriginalName();
+            $uniqueFileName = uniqid() . '_' . $originalName;
+
+            // Save file to 'uploads/topics' with the original name
+            $filePath = $file->storeAs('uploads/topics', $uniqueFileName, 'public');
+
+            // Update database with new file path and language
+            $topic->file_path = $filePath;
+            $topic->file_language = $request->input('language');
+
+            // Update translation metadata with original file
+            $translationMetadata = json_decode($topic->translation_metadata, true) ?? [];
+            $translationMetadata[] = [
+                'language' => $request->input('language'),
+                'path' => $filePath
+            ];
+            $topic->translation_metadata = json_encode($translationMetadata);
+
+            $topic->save();
+
+            return ResponseController::getResponse(['file_path' => $filePath], 200, 'PDF file uploaded and saved successfully');
+        }
+
+        return ResponseController::getResponse(null, 400, 'Failed to upload file');
+    }
+    public function deleteFile(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'topic_guid' => 'required|string|max:36', // Verifikasi topic_guid
+        ], MessagesController::messages());
+
+        if ($validator->fails()) {
+            return ResponseController::getResponse(null, 422, $validator->errors()->first());
+        }
+
+        // Cari topik berdasarkan topic_guid
+        $topic = Topic::where('guid', $request->input('topic_guid'))->first();
+        if (!$topic) {
+            return ResponseController::getResponse(null, 400, 'Topic tidak ditemukan');
+        }
+
+        $existingFilePath = $topic->file_path; // Ambil path file utama dari database
+        $translationMetadata = json_decode($topic->translation_metadata, true) ?? []; // Decode metadata
+
+        // Hapus file utama jika ada
+        if ($existingFilePath) {
+            $fullFilePath = storage_path('app/public/' . $existingFilePath);
+
+            // Cek apakah file utama ada di storage lokal
+            if (file_exists($fullFilePath)) {
+                unlink($fullFilePath); // Hapus file utama dari storage lokal
+            }
+        }
+
+        // Hapus semua file dalam translation_metadata
+        foreach ($translationMetadata as $metadata) {
+            if (isset($metadata['path'])) {
+                $translationFilePath = storage_path('app/public/' . $metadata['path']);
+
+                // Cek apakah file metadata ada di storage lokal
+                if (file_exists($translationFilePath)) {
+                    unlink($translationFilePath); // Hapus file metadata dari storage lokal
+                }
+            }
+        }
+
+        // Reset file_path dan translation_metadata di database
+        $topic->file_path = null;
+        $topic->translation_metadata = json_encode([]);
+        $topic->save();
+
+        return ResponseController::getResponse(null, 200, 'File dan terjemahan berhasil dihapus');
+    }
+
     public function deleteData($guid)
     {
         $data = Topic::where('guid', '=', $guid)->first();
@@ -181,8 +286,25 @@ class TopicController extends Controller
             return ResponseController::getResponse(null, 400, "Data not found");
         }
 
+        // Hapus semua file dari storage yang terkait dengan metadata terjemahan
+        $translationMetadata = json_decode($data->translation_metadata, true) ?? [];
+        foreach ($translationMetadata as $metadata) {
+            $filePath = storage_path('app/public/' . $metadata['path']);
+            if (file_exists($filePath)) {
+                unlink($filePath); // Hapus file dari storage
+            }
+        }
+
+        // Hapus file utama
+        if ($data->file_path) {
+            $filePath = storage_path('app/public/' . $data->file_path);
+            if (file_exists($filePath)) {
+                unlink($filePath); // Hapus file utama
+            }
+        }
+
         $data->delete();
 
-        return ResponseController::getResponse(null, 200, 'Success');
+        return ResponseController::getResponse(null, 200, 'Topic and all associated files deleted successfully');
     }
 }

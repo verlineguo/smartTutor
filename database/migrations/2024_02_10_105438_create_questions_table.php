@@ -20,9 +20,15 @@ return new class extends Migration
             $table->float('weight');
             $table->char('category', 30);
             $table->char('topic_guid', 36);
-            $table->string('page')->nullable();
+            $table->float('threshold');
+            $table->string('language', 10);
+            $table->char('user_id', 50)->nullable();
+            $table->json('question_nouns')->nullable();
+            $table->integer('page')->nullable();
+            $table->integer('attempt')->nullable();
             $table->float('cossine_similarity')->nullable();
             $table->foreign('topic_guid')->references('guid')->on('topics')->onDelete('cascade');
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
             $table->timestamps();
         });
     }

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Traits\Uuid;
 
-class Topic extends Model
+class ChatHistory extends Model
 {
     use HasFactory, Uuid;
 
@@ -30,14 +30,13 @@ class Topic extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'name',
-        'description',
-        'course_code',
-        'file_path',
-        'file_language',
-        'translation_metadata',
-        'time_start',
-        'time_end'
+        'user_id',
+        'topic_guid',
+        'message',
+        'sender',
+        'page',
+        'cosine_similarity',
+        'question_guid'
     ];
 
     /**
@@ -58,28 +57,21 @@ class Topic extends Model
     protected $casts = [
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
-        'translation_metadata' => 'array',
         // 'status' => StatusEnum::class
     ];
     /**
-     * QUESTION OBJECT
+     * TOPIC OBJECT
      */
-    public function question()
+    public function topic()
     {
-        return $this->hasMany(Question::class);
+        return $this->belongsTo(Topic::class);
     }
+
     /**
-     * COURSE OBJECT
+     * USER OBJECT
      */
-    public function course()
+    public function user()
     {
-        return $this->belongsTo(Course::class);
-    }
-    /**
-     * GRADE OBJECT
-     */
-    public function grade()
-    {
-        return $this->hasMany(Grade::class);
+        return $this->belongsTo(User::class);
     }
 }

@@ -16,7 +16,8 @@ return new class extends Migration
             $table->string('answer')->nullable();
             $table->char('question_guid', 50);
             $table->char('user_id', 10);
-            $table->float('grade')->nullable();
+            $table->float('grade_cosine')->nullable();
+            $table->float('grade_lecturer')->nullable();
             $table->foreign('question_guid')->references('guid')->on('questions')->onDelete('cascade');
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
             $table->timestamps();

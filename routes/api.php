@@ -5,6 +5,8 @@ use App\Http\Controllers\AssistantController;
 use App\Http\Controllers\OtpController;
 use App\Http\Controllers\PasswordController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ChatbotController;
+use App\Http\Controllers\ChatHistoryController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\GradeController;
 use App\Http\Controllers\JawabanController;
@@ -97,6 +99,9 @@ Route::group([
     $router->post('/upload-file', [QuestionController::class, 'uploadFile']);
     $router->get('/generate', [QuestionController::class, 'generateData']);
     $router->get('/check-cossine', [QuestionController::class, 'checkCossine']);
+    $router->post('/translate', [QuestionController::class, 'translateDocument']);
+    $router->post('/tfidf', [QuestionController::class, 'calculateTfidf']);
+    $router->post('/generate', [QuestionController::class, 'generateData']);
     $router->post('/convert/datatable', [QuestionController::class, 'convertDatatable']);
     $router->get('/show/{guid}', [QuestionController::class, 'showData']);
     $router->put('/', [QuestionController::class, 'updateData']);
@@ -104,6 +109,21 @@ Route::group([
     $router->delete('/{guid}', [QuestionController::class, 'deleteData']);
 
     $router->post('/', [QuestionController::class, 'insertData']);
+});
+
+
+/**
+ * CHATBOT
+ */
+Route::group([
+    'prefix' => $url . 'chatbot',
+    'middleware' => 'jwt.verify'
+], function ($router) {
+    $router->get('/question', [ChatbotController::class, 'getQuestion']);
+    $router->post('/answer', [ChatbotController::class, 'answerQuestion']);
+    $router->post('/save', [ChatHistoryController::class, 'saveMessage']);
+    $router->get('/history/{topicGuid}/{userId}', [ChatHistoryController::class, 'getHistory']);
+    $router->get('/status/{topicGuid}/{userId}', [ChatHistoryController::class, 'checkStatus']);
 });
 
 /**
@@ -148,11 +168,13 @@ Route::group([
     $router->put('/', [TopicController::class, 'updateData']);
     $router->get('/{guid}', [TopicController::class, 'getData']);
     $router->get('/deadline/{guid}', [TopicController::class, 'checkDeadline']);
+    $router->post('/delete-file', [TopicController::class, 'deleteFile']);
     $router->delete('/{guid}', [TopicController::class, 'deleteData']);
     $router->post('/', [TopicController::class, 'insertData']);
     $router->post('/filter/course', [TopicController::class, 'topicByCourse']);
     $router->get('/filter/deadline', [TopicController::class, 'topicByDeadline']);
     $router->post('/check/submit', [TopicController::class, 'checkSubmit']);
+    $router->post('/upload-file', [TopicController::class, 'uploadFile']);
 });
 
 /**

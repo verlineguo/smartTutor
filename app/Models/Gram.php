@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Traits\Uuid;
 
-class Topic extends Model
+class Gram extends Model
 {
     use HasFactory, Uuid;
 
@@ -30,14 +30,12 @@ class Topic extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'name',
-        'description',
-        'course_code',
-        'file_path',
-        'file_language',
-        'translation_metadata',
-        'time_start',
-        'time_end'
+        'noun',
+        'topic_guid',
+        'gram_type',
+        'tfidf_val',
+        'cosine_val',
+        'language'
     ];
 
     /**
@@ -58,28 +56,13 @@ class Topic extends Model
     protected $casts = [
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
-        'translation_metadata' => 'array',
         // 'status' => StatusEnum::class
     ];
     /**
-     * QUESTION OBJECT
-     */
-    public function question()
-    {
-        return $this->hasMany(Question::class);
-    }
-    /**
      * COURSE OBJECT
      */
-    public function course()
+    public function topic()
     {
-        return $this->belongsTo(Course::class);
-    }
-    /**
-     * GRADE OBJECT
-     */
-    public function grade()
-    {
-        return $this->hasMany(Grade::class);
+        return $this->belongsTo(Topic::class);
     }
 }

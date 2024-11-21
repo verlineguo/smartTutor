@@ -6,12 +6,15 @@
     "license": "MIT",
     "require": {
         "php": "^8.1",
+        "barryvdh/laravel-cors": "dev-develop",
         "guzzlehttp/guzzle": "^7.4",
         "laravel/framework": "^10.0",
         "laravel/sanctum": "^3.2",
+        "laravel/socialite": "^5.16",
         "laravel/tinker": "^2.6",
         "mailjet/laravel-mailjet": "^3.0",
         "php-open-source-saver/jwt-auth": "^2.1",
+        "pusher/pusher-php-server": "^7.2",
         "realrashid/sweet-alert": "^7.1",
         "symfony/http-foundation": "^6.4",
         "yajra/laravel-datatables": "9.0"

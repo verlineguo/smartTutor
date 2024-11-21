@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Course;
 use App\Models\User;
 use App\Models\UserCourse;
 use Illuminate\Http\Request;
@@ -48,10 +49,24 @@ class UserCourseController extends Controller
 
     public function getDataByUser($id)
     {
-        $data = UserCourse::where('user_id', '=', $id)->with('user', 'course')->get();
+        // Retrieve the role of the currently authenticated user
+        $role_name = auth('api')->user()->role->role_name;
 
+
+        if ($role_name === 'admin') {
+            // If the user is an admin, retrieve all courses without filtering by user ID
+            $data = Course::all();
+        } else {
+            // If the user is not an admin, retrieve only courses associated with the specific user ID
+            $data = Course::whereHas('user_course', function ($query) use ($id) {
+                $query->where('user_id', $id);
+            })->get();
+        }
+
+        // Return the response
         return ResponseController::getResponse($data, 200, 'Success');
     }
+
     public function getUserByCourse($code)
     {
         $data = UserCourse::where('course_code', '=', $code)
