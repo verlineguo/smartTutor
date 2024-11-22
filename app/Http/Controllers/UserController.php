@@ -9,6 +9,7 @@ use App\Models\UserCourse;
 use Illuminate\Support\Facades\Validator;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Hash;
+use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
 
 class UserController extends Controller
 {
@@ -83,6 +84,56 @@ class UserController extends Controller
 
         return ResponseController::getResponse($data, 200, 'Success');
     }
+    public function google(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'id' => 'required|string',
+            'name' => 'required|string',
+            'email' => 'required|string|email',
+        ], MessagesController::messages());
+
+        if ($validator->fails()) {
+            return ResponseController::getResponse(null, 422, $validator->errors()->first());
+        }
+
+        // Cek apakah user dengan ID sudah ada
+        $user = User::where('id', $request->id)
+            ->orWhere('email', $request->email)
+            ->first();
+
+
+        if (!$user) {
+            // Jika belum terdaftar, buat user baru
+            $user = User::create([
+                'id' => $request->id,
+                'name' => $request->name,
+                'username' => $request->name,
+                'email' => $request->email,
+                'role_guid' => 'dc6c6789-122f-40be-9751-f5be0a051b0e'
+            ]);
+            $user = User::where('id', $request->id)
+                ->first();
+        }
+
+        // Buat payload untuk JWT token
+        $payloadable = [
+            'user_id' => $user->id,
+            'name' => $user->name,
+            'username' => $user->username ?? null, // Tambahkan null jika username bisa kosong
+            'email' => $user->email,
+            'role_guid' => $user->role_guid,
+        ];
+
+        // Buat token JWT
+        $token = JWTAuth::fromUser($user, $payloadable);
+
+        // Kembalikan respons dengan token dan data user
+        return ResponseController::getResponse([
+            'user' => $user,
+            'token' => $token
+        ], 200, 'Success');
+    }
+
     public function uploadCSV(Request $request)
     {
         if ($request->hasFile('csv')) {

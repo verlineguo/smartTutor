@@ -84,7 +84,7 @@ class TopicController extends Controller
     public function topicByDeadline(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'id' => 'required|string|max:10',
+            'id' => 'required|string',
         ], MessagesController::messages());
         if ($validator->fails()) {
             return ResponseController::getResponse(null, 422, $validator->errors()->first());
@@ -110,7 +110,7 @@ class TopicController extends Controller
     {
 
         $validator = Validator::make($request->all(), [
-            'user_id' => 'required|string|max:10',
+            'user_id' => 'required|string',
             'topic_guid' => 'required|string|max:36',
 
         ], MessagesController::messages());

@@ -46,6 +46,7 @@ Route::group([
     'middleware' => 'api',
 ], function ($router) {
     $router->post('/login', [AuthController::class, 'login'])->name('login');
+    $router->post('/google', [UserController::class, 'google']);
 });
 
 /**
@@ -86,6 +87,7 @@ Route::group([
     $router->post('/upload-file', [UserController::class, 'uploadCSV']);
     $router->post('/user-course', [UserController::class, 'filterUserCourse']);
     $router->post('/assistant', [UserController::class, 'filterAssistant']);
+    $router->post('/google', [UserController::class, 'google']);
     $router->post('/check/role', [UserController::class, 'checkAssistant']);
 });
 
