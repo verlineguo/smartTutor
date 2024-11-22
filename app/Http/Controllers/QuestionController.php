@@ -143,7 +143,7 @@ class QuestionController extends Controller
 
     public function translateDocument(Request $request)
     {
-        set_time_limit(300);
+        set_time_limit(1500);
 
         $validator = Validator::make($request->all(), [
             'topic_guid' => 'required|string',
@@ -183,8 +183,8 @@ class QuestionController extends Controller
 
         // Proses Translate File
         $response = Http::attach('pdf', file_get_contents($filePath), 'file.pdf')
-            ->timeout(300)
-            ->post('http://127.0.0.1:5000/translate', [
+            ->timeout(1500)
+            ->post(env('FLASK_API_URL') . '/translate', [
                 'language' => $requestedLanguage,
             ]);
 
@@ -213,7 +213,7 @@ class QuestionController extends Controller
 
     public function calculateTfidf(Request $request)
     {
-        set_time_limit(300);
+        set_time_limit(900);
 
         $validator = Validator::make($request->all(), [
             'topic_guid' => 'required|string',
@@ -265,8 +265,8 @@ class QuestionController extends Controller
             'pdf',
             Storage::disk('public')->get($translatedFile['path']),
             'translated_file.pdf'
-        )->timeout(300)
-            ->post('http://127.0.0.1:5000/tfidf', [
+        )->timeout(900)
+            ->post(env('FLASK_API_URL') . '/tfidf', [
                 'language' => $request->get('language'),
             ]);
 
@@ -336,7 +336,7 @@ class QuestionController extends Controller
         // Kirim permintaan ke API Python dengan tfidf_data sebagai parameter
         $generateResponse = Http::attach('pdf', Storage::disk('public')->get($topic->file_path), 'file.pdf')
             ->timeout(2000)
-            ->post('http://127.0.0.1:5000/generate', [
+            ->post(env('FLASK_API_URL') . '/generate', [
                 'language' => $request->get('language'),
                 'tfidf_data' => $tfidfDataJson,
             ]);

@@ -63,7 +63,7 @@ class UserController extends Controller
     public function insertData(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'id' => 'required|string|max:10',
+            'id' => 'required|string',
             'username' => 'required|string',
             'name' => 'required|string',
             'email' => 'required|string',
@@ -175,7 +175,7 @@ class UserController extends Controller
     {
 
         $validator = Validator::make($request->all(), [
-            'user_id' => 'required|string|max:10',
+            'user_id' => 'required|string',
         ], MessagesController::messages());
         if ($validator->fails()) {
             return ResponseController::getResponse(null, 422, $validator->errors()->first());
@@ -206,7 +206,7 @@ class UserController extends Controller
     public function updateData(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'id' => 'required|string|max:10',
+            'id' => 'required|string',
             'username' => 'required|string',
             'name' => 'required|string',
             'email' => 'required|string',
