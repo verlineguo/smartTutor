@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AnswerController;
 use App\Http\Controllers\AssistantController;
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\DashboardController;
@@ -43,6 +44,8 @@ Route::group([
     Route::get('/login', [App\Http\Controllers\AuthController::class, 'index'])->name('login');
     Route::get('password/reset/email', [App\Http\Controllers\PasswordController::class, 'emailOTP'])->name('password.request');
     Route::get('password/reset/password', [App\Http\Controllers\PasswordController::class, 'inputReset'])->name('password.update');
+    Route::get('/auth/google', [AuthController::class, 'redirect'])->name('google-auth');
+    Route::get('/auth/google/call-back', [AuthController::class, 'callbackGoogle']);
 });
 
 Route::group([
