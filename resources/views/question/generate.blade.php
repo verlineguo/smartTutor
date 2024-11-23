@@ -66,6 +66,7 @@
         <!-- Tambahkan Tombol "Delete Selected" di atas DataTable -->
         <div class="container-xxl flex-grow-1 container-p-y" id="table-container" style="display: none;">
             <div class="d-flex mb-3">
+                <button type="button" class="btn btn-success me-2" id="saveQuestions">Save Questions</button>
                 <!-- Bulk Update Button -->
                 <button type="button" class="btn btn-primary me-2" data-bs-toggle="modal"
                     data-bs-target="#updateBulkModal">
@@ -91,7 +92,6 @@
                                 <th>Noun</th>
                                 <th>Cosine Similarity</th>
                                 <th>Threshold</th>
-                                <th>Weight</th>
                             </tr>
                         </thead>
                     </table>
@@ -203,11 +203,6 @@
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label for="bulkWeight" class="form-label">Weight</label>
-                            <input type="number" id="bulkWeight" class="form-control" placeholder="Enter Weight"
-                                min="0">
-                        </div>
-                        <div class="mb-3">
                             <label for="bulkThreshold" class="form-label">Threshold</label>
                             <input type="number" id="bulkThreshold" class="form-control" placeholder="Enter Threshold"
                                 min="0" max="100">
@@ -287,6 +282,34 @@
                 }
             });
 
+            $('#saveQuestions').on('click', function() {
+                const table = $('#table-data').DataTable();
+                const questionsData = table.rows().data().toArray();
+                const topicGuid = $('#topicInput').val();
+                const code = $('#courseInput').val(); // Ambil nilai code dari dropdown kursus
+
+                $.ajax({
+                    type: "POST",
+                    url: "{{ env('URL_API') }}/api/v1/question/save",
+                    data: {
+                        topic_guid: topicGuid,
+                        questions: questionsData
+                    },
+                    beforeSend: function(request) {
+                        request.setRequestHeader("Authorization",
+                            "Bearer {{ $token }}");
+                    },
+                    success: function(response) {
+                        alert("Questions saved successfully.");
+                        // Redirect ke route question setelah sukses
+                        window.location.href = "{{ url('/question') }}/" + code + "/" +
+                            topicGuid;
+                    },
+                    error: function(xhr) {
+                        alert("Failed to save questions: " + xhr.responseText);
+                    }
+                });
+            });
 
             function uploadFile(file, fileLanguage, topic, languages) {
                 const formData = new FormData();
@@ -390,6 +413,7 @@
                         request.setRequestHeader("Authorization", "Bearer {{ $token }}");
                     },
                     success: function(response) {
+                        console.log(response);
                         // Tambahkan data ke tabel
                         loadDataToTable(response.data, language);
 
@@ -407,6 +431,8 @@
             // Fungsi untuk mengecek apakah semua permintaan selesai
             function checkCompletion() {
                 completedRequests++;
+                console.log(completedRequests);
+                console.log(totalRequests);
                 if (completedRequests === totalRequests) {
                     // Jika semua permintaan selesai, hentikan loading
                     $.unblockUI();
@@ -415,10 +441,12 @@
 
 
 
+            let lastIndex = 0; // Variabel untuk menyimpan nomor terakhir
+
             function loadDataToTable(data, language) {
                 // Tambahkan bahasa ke setiap data
                 data.forEach((item, i) => {
-                    item.index = i + 1; // Nomor urut
+                    item.index = lastIndex + i + 1; // Gunakan lastIndex untuk penomoran
                     item.language = language; // Tambahkan kolom bahasa
                     item.checkbox = ''; // Checkbox untuk setiap baris
                     item.threshold = item.threshold || 0;
@@ -476,13 +504,6 @@
                                     return `<input type="number" class="form-control threshold-input" value="${data || 0}" min="0" max="100">`;
                                 }
                             },
-                            {
-                                data: 'weight',
-                                title: 'Weight',
-                                render: function(data) {
-                                    return `<input type="number" class="form-control weight-input" value="${data || 0}" min="0">`;
-                                }
-                            }
                         ],
                         destroy: true,
                         scrollX: true,
@@ -512,6 +533,9 @@
                     const table = $('#table-data').DataTable();
                     table.rows.add(data).draw(); // Tambahkan baris baru dan perbarui tampilan tabel
                 }
+
+                // Update lastIndex untuk penomoran berikutnya
+                lastIndex += data.length; // Tambahkan jumlah data baru ke lastIndex
             }
 
             $('#table-data').on('change', '.row-checkbox', function() {
@@ -537,43 +561,32 @@
             // Event listener untuk tombol update di dalam modal
             // Event listener untuk tombol update di dalam modal
             $('#updateSelectedRows').on('click', function() {
-                const bulkWeight = $('#bulkWeight').val();
                 const bulkThreshold = $('#bulkThreshold').val();
 
-                // Periksa apakah nilai weight dan threshold diisi
-                if (bulkWeight === '' || bulkThreshold === '') {
-                    alert('Please enter values for both weight and threshold.');
+                if (bulkThreshold === '') {
+                    alert('Please enter a value for threshold.');
                     return;
                 }
 
-                // Dapatkan instance dari DataTable
                 const table = $('#table-data').DataTable();
 
-                // Iterasi melalui checkbox yang dicentang
-                $('.row-checkbox:checked').each(function() {
-                    const rowId = $(this).data('id'); // Ambil ID baris dari atribut data-id
-                    const row = $(this).closest('tr'); // Ambil elemen row terkait checkbox
-
-                    // Update nilai dalam DataTable secara langsung
-                    const rowIndex = table.row(row).index(); // Ambil index dari row
-
-                    // Update nilai weight dan threshold pada data row di DataTable
-                    const rowData = table.row(rowIndex).data();
-                    rowData.weight = bulkWeight;
-                    rowData.threshold = bulkThreshold;
-
-                    // Perbarui data di tabel
-                    table.row(rowIndex).data(rowData).draw(false);
-
-                    // Update nilai input di dalam tabel DOM
-                    $(this).closest('tr').find('.weight-input').val(bulkWeight);
-                    $(this).closest('tr').find('.threshold-input').val(bulkThreshold);
+                // Iterasi melalui semua data di DataTable
+                table.rows().every(function() {
+                    const data = this.data();
+                    // Periksa apakah baris ini dicentang
+                    if (data.checkbox) {
+                        data.threshold = bulkThreshold; // Update nilai threshold
+                        this.data(data); // Simpan perubahan ke DataTable
+                    }
                 });
 
+                // Redraw tabel untuk memperbarui tampilan
+                table.draw(false);
 
                 $('#updateBulkModal').modal('hide');
                 alert('Selected rows updated successfully.');
             });
+
 
             $('#deleteSelectedRows').on('click', function() {
                 const table = $('#table-data').DataTable();

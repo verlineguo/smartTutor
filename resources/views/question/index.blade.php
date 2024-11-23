@@ -7,6 +7,7 @@
     <!-- Row Group CSS -->
     <link rel="stylesheet" href="{{ asset('./assets/dashboard/datatables-rowgroup-bs5/rowgroup.bootstrap5.css') }}">
 @endsection
+
 @section('info-page')
     <ol class="breadcrumb bg-transparent mb-0 pb-0 pt-1 px-0 me-sm-6 me-5">
         <li class="breadcrumb-item text-sm"><a class="opacity-5 text-dark" href="javascript:;">Pages</a></li>
@@ -15,6 +16,7 @@
     </ol>
     <h5 class="font-weight-bolder mb-0 text-capitalize">List Question/{{ $name }}</h5>
 @endsection
+
 @section('content')
     <main class="main-content position-relative max-height-vh-100 h-100 mt-1 border-radius-lg ">
         <div class="container-xxl flex-grow-1 container-p-y">
@@ -24,6 +26,7 @@
                     <table class="table" id="table-data">
                         <thead>
                             <tr>
+                                <th class="text-center"><input type="checkbox" id="select-all"></th>
                                 <th class="text-center">No</th>
                                 <th class="text-center">Question AI</th>
                                 <th class="text-center">Answer AI</th>
@@ -31,12 +34,14 @@
                                 <th class="text-center">Answer Fix</th>
                                 <th class="text-center">Category</th>
                                 <th class="text-center">Page</th>
-                                <th class="text-center">Cossine Similarity</th>
-                                <th class="text-center">Weight</th>
+                                <th class="text-center">Cosine Similarity</th>
+                                <th class="text-center">Threshold</th>
+                                <th class="text-center">Language</th>
                                 <th class="text-center">Action</th>
                             </tr>
                         </thead>
                     </table>
+
                     <!-- Modal Add Question -->
                     <div class="modal fade" id="modalAdd" tabindex="-1" aria-hidden="true">
                         <div class="modal-dialog modal-dialog-centered">
@@ -57,17 +62,18 @@
                                             <textarea class="form-control" id="add-answer" name="add-answer" rows="3" required></textarea>
                                         </div>
                                         <div class="mb-3">
-                                            <label for="add-weight" class="form-label">Weight</label>
-                                            <input type="number" class="form-control" id="add-weight" name="add-weight"
-                                                min="0" max="100">
-                                            <div id="add-weight-warning" class="text-danger"></div>
+                                            <label for="add-threshold" class="form-label">Threshold</label>
+                                            <input type="number" class="form-control" id="add-threshold"
+                                                name="add-threshold" min="0" max="100" required>
+                                            <div id="add-threshold-warning" class="text-danger"></div>
                                         </div>
                                         <div class="mb-3">
-                                            <label for="add-category" class="form-label">Category</label>
-                                            <select class="form-select" id="add-category" name="add-category" required>
-                                                <option value="">Pilih Category</option>
-                                                <option value="Understanding">Understanding</option>
-                                                <option value="Remembering">Remembering</option>
+                                            <label for="add-language" class="form-label">Language</label>
+                                            <select class="form-select" id="add-language" name="add-language" required>
+                                                <option value="">Pilih Language</option>
+                                                <option value="English">English</option>
+                                                <option value="Indonesian">Indonesian</option>
+                                                <option value="Japanese">Japanese</option>
                                             </select>
                                         </div>
                                         <button type="submit" id="submit-button-add"
@@ -77,7 +83,30 @@
                             </div>
                         </div>
                     </div>
-                    <!-- Modal Delete-->
+                    <!-- Modal Bulk Update Threshold -->
+                    <div class="modal fade" id="modalBulkUpdate" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Bulk Update Threshold</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                        aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <form id="bulk-update-form">
+                                        <div class="mb-3">
+                                            <label for="bulk-threshold" class="form-label">Threshold Value</label>
+                                            <input type="number" class="form-control" id="bulk-threshold"
+                                                name="bulk-threshold" min="0" max="100" required>
+                                            <div id="bulk-threshold-warning" class="text-danger"></div>
+                                        </div>
+                                        <button type="submit" class="btn btn-primary">Update</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Modal Delete -->
                     <div class="modal fade" id="modalDelete" tabindex="-1" aria-hidden="true">
                         <div class="modal-dialog modal-dialog-centered" role="document">
                             <div class="modal-content">
@@ -105,7 +134,8 @@
                             </div>
                         </div>
                     </div>
-                    <!-- Modal Edit-->
+
+                    <!-- Modal Edit -->
                     <div class="modal fade" id="modalEdit" tabindex="-1" aria-hidden="true">
                         <div class="modal-dialog modal-dialog-centered">
                             <div class="modal-content">
@@ -117,7 +147,7 @@
                                 <div class="modal-body">
                                     <form id="edit-form">
                                         <div class="mb-3">
-                                            <label for="guid" class="form-label">guid</label>
+                                            <label for="guid" class="form-label">GUID</label>
                                             <input type="text" class="form-control" id="guid" name="guid"
                                                 required readonly>
                                         </div>
@@ -125,7 +155,6 @@
                                             <label for="question" class="form-label">Question AI</label>
                                             <textarea class="form-control" id="question" name="question" rows="3" required readonly></textarea>
                                         </div>
-
                                         <div class="mb-3">
                                             <label for="answer" class="form-label">Answer AI</label>
                                             <textarea class="form-control" id="answer" name="answer" rows="3" required readonly></textarea>
@@ -134,23 +163,33 @@
                                             <label for="edit-question" class="form-label">Question Fix</label>
                                             <textarea class="form-control" id="edit-question" name="edit-question" rows="3" required></textarea>
                                         </div>
-
                                         <div class="mb-3">
                                             <label for="edit-answer" class="form-label">Answer Fix</label>
                                             <textarea class="form-control" id="edit-answer" name="edit-answer" rows="3" required></textarea>
                                         </div>
                                         <div class="mb-3">
-                                            <label for="edit-weight" class="form-label">Weight</label>
-                                            <input type="number" class="form-control" id="edit-weight"
-                                                name="edit-weight" min="0" max="100" step="0.001">
-                                            <div id="edit-weight-warning" class="text-danger"></div>
+                                            <label for="edit-threshold" class="form-label">Threshold</label>
+                                            <input type="number" class="form-control" id="edit-threshold"
+                                                name="edit-threshold" min="0" max="100" required>
+                                            <div id="edit-threshold-warning" class="text-danger"></div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="edit-language" class="form-label">Language</label>
+                                            <select class="form-select" id="edit-language" name="edit-language" required>
+                                                <option value="">Select Language</option>
+                                                <option value="english">English</option>
+                                                <option value="indonesian">Indonesian</option>
+                                                <option value="japanese">Japanese</option>
+                                            </select>
                                         </div>
                                         <div class="mb-3">
                                             <label for="edit-category" class="form-label">Category</label>
-                                            <input type="text" class="form-control" id="edit-category"
-                                                name="edit-category" required>
+                                            <select class="form-select" id="edit-category" name="edit-category" required>
+                                                <option value="">Select Category</option>
+                                                <option value="remembering">Remembering</option>
+                                                <option value="understanding">Understanding</option>
+                                            </select>
                                         </div>
-                                        <!-- Add other input fields as needed -->
                                         <button type="submit" id="submit-button-edit"
                                             class="btn btn-primary">Submit</button>
                                     </form>
@@ -161,7 +200,6 @@
                 </div>
             </div>
         </div>
-
     </main>
 @endsection
 @section('vendor-javascript')
@@ -182,102 +220,80 @@
 @section('custom-javascript')
     <script type="text/javascript">
         $(document).ready(function() {
-            var weightTemp;
-
-            $('#table-data').DataTable({
-                // "destroy": true,
+            var table = $('#table-data').DataTable({
                 "processing": true,
-                // "serverSide": true,
                 "ajax": {
                     "url": "{{ env('URL_API') }}/api/v1/question/show/{{ $guid }}",
                     "type": "GET",
-                    'beforeSend': function(request) {
-                        request.setRequestHeader("Authorization",
-                            "Bearer {{ $token }}");
+                    "beforeSend": function(request) {
+                        request.setRequestHeader("Authorization", "Bearer {{ $token }}");
                     },
-                    "data": {},
                 },
                 "columns": [{
+                        data: null,
+                        orderable: false,
+                        searchable: false,
+                        render: function(data, type, row) {
+                            return `<input type="checkbox" class="row-checkbox" value="${row.guid}">`;
+                        },
+                    },
+                    {
                         data: 'DT_RowIndex',
                         orderable: false,
                         searchable: false
                     },
                     {
                         data: 'question_ai',
-                        render: function(data, type, row) {
-                            return "<div class='text-wrap' style='text-align: justify;'>" + data +
-                                "</div>"
-                        }
+                        render: wrapText
                     },
                     {
                         data: 'answer_ai',
-                        render: function(data, type, row) {
-                            return "<div class='text-wrap' style='text-align: justify;'>" + data +
-                                "</div>"
-                        }
+                        render: wrapText
                     },
                     {
                         data: 'question_fix',
-                        render: function(data, type, row) {
-                            return "<div class='text-wrap' style='text-align: justify;'>" + data +
-                                "</div>"
-                        }
+                        render: wrapText
                     },
                     {
                         data: 'answer_fix',
-                        render: function(data, type, row) {
-                            return "<div class='text-wrap' style='text-align: justify;'>" + data +
-                                "</div>"
-                        }
+                        render: wrapText
                     },
                     {
                         data: 'category',
-                        render: function(data, type, row) {
-                            return "<div class='text-wrap'>" + data + "</div>"
-                        }
+                        render: wrapText
                     },
                     {
                         data: 'page',
-                        render: function(data, type, row) {
-                            if (data) {
-                                return "<div class='text-wrap'>" + data + "</div>";
-                            } else {
-                                return "<div class='text-wrap'>-</div>";
-                            }
-                        }
+                        render: wrapNullable
                     },
                     {
                         data: 'cossine_similarity',
-                        render: function(data, type, row) {
-                            if (data) {
-                                return "<div class='text-wrap'>" + data + "</div>";
-                            } else {
-                                return "<div class='text-wrap'>-</div>";
-                            }
-                        }
+                        render: wrapNullable
                     },
                     {
-                        data: 'weight',
-                        render: function(data, type, row) {
-                            return "<div class='text-wrap'>" + data + "</div>"
-                        }
+                        data: 'threshold',
+                        render: wrapText
+                    },
+                    {
+                        data: 'language',
+                        render: wrapText
                     },
                     {
                         data: null,
-                        render: function(data, type, row) {
-                            return '<a role="button" class="edit-btn open-edit-dialog" style="text-decoration: none; margin-right: 10px;"data-guid="' +
-                                data['guid'] +
-                                '"><i class="fa-solid fa-pen-to-square" style="font-size: 15px; color: yellow;"></i></a>' +
-                                '<a role="button" class="delete-btn open-delete-dialog" style="text-decoration: none;" data-bs-toggle="modal" data-bs-target="#modalDelete" data-guid="' +
-                                data['guid'] +
-                                '"><i class="fa-solid fa-trash" style="font-size: 15px; color: red;"></i></a>';
+                        render: function(data) {
+                            return `
+                        <a role="button" class="edit-btn open-edit-dialog" data-guid="${data.guid}">
+                            <i class="fa-solid fa-pen-to-square" style="font-size: 15px; color: yellow;"></i>
+                        </a>
+                        <a role="button" class="delete-btn open-delete-dialog" data-bs-toggle="modal" data-bs-target="#modalDelete" data-guid="${data.guid}">
+                            <i class="fa-solid fa-trash" style="font-size: 15px; color: red;"></i>
+                        </a>`;
                         },
-                        "orderable": false,
-                        "searchable": false
-
+                        orderable: false,
+                        searchable: false,
                     },
                 ],
-                "scrollX": true, // Enable horizontal scrolling
+                "scrollX": true,
                 "scrollCollapse": true,
                 "language": {
                     "emptyTable": "No data available in table",
@@ -291,40 +307,187 @@
                         "first": "<i class='fa-solid fa-angle-double-left'></i>",
                         "last": "<i class='fa-solid fa-angle-double-right'></i>",
                         "next": "<i class='fa-solid fa-angle-right'></i>",
-                        "previous": "<i class='fa-solid fa-angle-left'></i>"
+                        "previous": "<i class='fa-solid fa-angle-left'></i>",
                     },
-                    "aria": {
-                        "sortAscending": ": activate to sort column ascending",
-                        "sortDescending": ": activate to sort column descending"
-                    }
                 },
                 dom: '<"card-header flex-column flex-md-row"<"head-label text-center"><"dt-action-buttons text-end pt-3 pt-md-0"B>><"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6 d-flex justify-content-center justify-content-md-end"f>>t<"row"<"col-sm-12 col-md-6"i><"col-sm-12 col-md-6"p>>',
                 displayLength: 10,
                 lengthMenu: [
                     [7, 10, 25, 50, -1],
-                    [7, 10, 25, 50, "All"]
+                    [7, 10, 25, 50, "All"],
                 ],
                 buttons: [{
-                    text: '<i class="fa-solid fa-plus me-sm-1"></i> <span class="d-none d-sm-inline-block">Add Question</span>',
-                    className: "create-new btn btn-primary",
-                    action: function(e, dt, node, config) {
-                        $('#modalAdd').modal('show');
+                        text: '<i class="fa-solid fa-wrench me-sm-1"></i> <span class="d-none d-sm-inline-block">Bulk Update Threshold</span>',
+                        className: "btn btn-warning",
+                        action: function() {
+                            // Logika untuk membuka modal Bulk Update Threshold
+                            $('#modalBulkUpdate').modal('show');
+                        },
+                    },
+                    {
+                        text: '<i class="fa-solid fa-trash me-sm-1"></i> <span class="d-none d-sm-inline-block">Bulk Delete</span>',
+                        className: "btn btn-danger",
+                        action: function() {
+                            var selectedRows = getSelectedRows();
+                            if (selectedRows.length === 0) {
+                                alert('No rows selected.');
+                                return;
+                            }
+                            if (confirm('Are you sure you want to delete the selected rows?')) {
+                                $.ajax({
+                                    url: "{{ env('URL_API') }}/api/v1/question/bulk-delete",
+                                    type: "POST",
+                                    contentType: "application/json",
+                                    data: JSON.stringify({
+                                        guids: selectedRows,
+                                    }),
+                                    beforeSend: function(request) {
+                                        request.setRequestHeader("Authorization",
+                                            "Bearer {{ $token }}");
+                                    },
+                                    success: function(response) {
+                                        alert(response.message ||
+                                            'Rows deleted successfully.');
+                                        table.ajax.reload();
+                                    },
+                                    error: function(xhr) {
+                                        alert('Error deleting rows: ' + xhr
+                                            .responseText);
+                                    },
+                                });
+                            }
+                        },
+                    },
+                    {
+                        text: '<i class="fa-solid fa-plus me-sm-1"></i> <span class="d-none d-sm-inline-block">Add Question</span>',
+                        className: "create-new btn btn-primary",
+                        action: function() {
+                            $('#modalAdd').modal('show');
+                        },
+                    },
+                    {
+                        extend: 'excelHtml5',
+                        text: '<i class="fa-solid fa-download me-sm-1"></i> <span class="d-none d-sm-inline-block">Download Excel</span>',
+                        className: "btn btn-success",
+                        exportOptions: {
+                            columns: [0, 1, 2, 3, 4, 5, 6, 7, 8],
+                        },
+                    },
+                ],
+            });
+
+            // Fungsi pembantu untuk render data
+            function wrapText(data) {
+                return `<div class='text-wrap' style='text-align: justify;'>${data}</div>`;
+            }
+
+            function wrapNullable(data) {
+                return `<div class='text-wrap'>${data ? data : '-'}</div>`;
+            }
+
+            // Handle "Select All" Checkbox
+            $('#select-all').on('click', function() {
+                var rows = table.rows({
+                    search: 'applied'
+                }).nodes();
+                $('input.row-checkbox', rows).prop('checked', this.checked);
+            });
+
+            // Tangani perubahan checkbox individu
+            $('#table-data tbody').on('change', 'input.row-checkbox', function() {
+                if (!this.checked) {
+                    $('#select-all').prop('indeterminate', true);
+                }
+            });
+
+            // Fungsi untuk mendapatkan GUID dari semua baris terpilih
+            function getSelectedRows() {
+                var selected = [];
+                table.rows({
+                    search: 'applied'
+                }).every(function() {
+                    var row = $(this.node());
+                    if ($('input.row-checkbox', row).prop('checked')) {
+                        selected.push(this.data().guid);
                     }
-                }, {
+                });
+                return selected;
+            }
 
-                    extend: 'excelHtml5',
-                    text: '<i class="fa-solid fa-download me-sm-1"></i> <span class="d-none d-sm-inline-block">Download Excel</span>',
-                    titleAttr: 'Download Excel File',
-                    className: "btn btn-success",
-                    exportOptions: {
-                        columns: [0, 1, 2, 3, 4, 5, 6, 7, 8]
-                    }
-                }],
-            }), $("div.head-label").html('<h5 class="card-title mb-0">List Question</h5>');
+            // Bulk Update Threshold
+            $('#bulk-update-threshold').click(function() {
+                var selectedRows = getSelectedRows();
+                if (selectedRows.length === 0) {
+                    alert('No rows selected.');
+                    return;
+                }
+                $('#modalBulkUpdate').modal('show');
+            });
 
+            // Submit Bulk Update Form
+            $('#bulk-update-form').on('submit', function(e) {
+                e.preventDefault();
+                var selectedRows = getSelectedRows();
+                var newThreshold = parseFloat($('#bulk-threshold').val());
+                if (!newThreshold || isNaN(newThreshold)) {
+                    $('#bulk-threshold-warning').text('Invalid threshold value.');
+                    return;
+                }
 
+                $.ajax({
+                    url: "{{ env('URL_API') }}/api/v1/question/bulk-update-threshold",
+                    type: "POST",
+                    contentType: "application/json",
+                    data: JSON.stringify({
+                        guids: selectedRows,
+                        threshold: newThreshold,
+                    }),
+                    beforeSend: function(request) {
+                        request.setRequestHeader("Authorization",
+                            "Bearer {{ $token }}");
+                    },
+                    success: function(response) {
+                        alert(response.message || 'Threshold updated successfully.');
+                        $('#modalBulkUpdate').modal('hide');
+                        table.ajax.reload();
+                    },
+                    error: function(xhr) {
+                        alert('Error updating threshold: ' + xhr.responseText);
+                    },
+                });
+            });
 
+            // Bulk Delete
+            $('#bulk-delete').click(function() {
+                var selectedRows = getSelectedRows();
+                if (selectedRows.length === 0) {
+                    alert('No rows selected.');
+                    return;
+                }
+                if (!confirm('Are you sure you want to delete the selected rows?')) {
+                    return;
+                }
 
+                $.ajax({
+                    url: "{{ env('URL_API') }}/api/v1/question/bulk-delete",
+                    type: "POST",
+                    contentType: "application/json",
+                    data: JSON.stringify({
+                        guids: selectedRows,
+                    }),
+                    beforeSend: function(request) {
+                        request.setRequestHeader("Authorization",
+                            "Bearer {{ $token }}");
+                    },
+                    success: function(response) {
+                        alert(response.message || 'Rows deleted successfully.');
+                        table.ajax.reload();
+                    },
+                    error: function(xhr) {
+                        alert('Error deleting rows: ' + xhr.responseText);
+                    },
+                });
+            });
 
             $(document).on("click", ".open-delete-dialog", function() {
                 var guid = $(this).data('guid');
@@ -379,8 +542,9 @@
                         $('#edit-question').val(result['data']['question_fix']);
                         $('#edit-answer').val(result['data']['answer_fix']);
                         $('#edit-category').val(result['data']['category']);
-                        $('#edit-weight').val(result['data']['weight']);
-                        weightTemp = parseFloat(result['data']['weight']);
+                        $('#edit-threshold').val(result['data']['threshold']);
+                        $('#edit-language').val(result['data']['language']).trigger('change');
+                        $('#edit-category').val(result['data']['category']).trigger('change');
                         $('#modalEdit').modal('show');
                     },
                     error: function(xhr, status, error) {
@@ -390,48 +554,14 @@
                 });
 
             });
-            var totalWeight = ({{ $total_weight }});
-            $("#edit-weight").on("change", function() {
-                var weight = parseFloat($("#edit-weight").val());
-                totalWeight = totalWeight - weightTemp + weight
-                weightTemp = weight;
-                if (totalWeight > 100) {
-                    $('#edit-weight-warning').text(
-                        'Total weight exceeds 100. Please reduce the weight value.');
-                    $("#submit-button-edit").prop("disabled",
-                        true);
-                } else if (totalWeight < 100) {
-                    $('#edit-weight-warning').text('Total weight less than 100');
-                    $("#submit-button-edit").prop("disabled", false);
-                } else {
-                    $('#edit-weight-warning').text('');
-                    $("#submit-button-edit").prop("disabled", false);
-                }
-            });
-            $("#add-weight").on("change", function() {
-                var weight = parseFloat($("#add-weight").val());
-                var totalNewWeight = {{ $total_weight }} + weight
-                if (totalNewWeight > 100) {
-                    $('#add-weight-warning').text(
-                        'Total weight exceeds 100. Please reduce the weight value.');
-                    $("#submit-button-add").prop("disabled",
-                        true);
-                } else if (totalNewWeight < 100) {
-                    $('#add-weight-warning').text('Total weight less than 100');
-                    $("#submit-button-add").prop("disabled", false);
-                } else {
-                    $('#add-weight-warning').text('');
-                    $("#submit-button-add").prop("disabled", false);
-                }
-            });
             $('#edit-form').on('submit', function(e) {
                 e.preventDefault();
-
                 var guid = $('#guid').val();
                 var question = $('#edit-question').val();
                 var answer = $('#edit-answer').val();
                 var category = $('#edit-category').val();
-                var weight = $('#edit-weight').val();
+                var threshold = $('#edit-threshold').val();
+                var language = $('#edit-language').val();
 
                 $.ajax({
                     type: "PUT",
@@ -441,7 +571,8 @@
                         "question_fix": question,
                         "answer_fix": answer,
                         "category": category,
-                        "weight": weight,
+                        "threshold": threshold,
+                        "language": language,
                         "topic_guid": "{{ $guid }}"
                     },
                     beforeSend: function(request) {
@@ -465,11 +596,11 @@
 
             $('#add-form').on('submit', function(e) {
                 e.preventDefault();
-
                 var question = $('#add-question').val();
                 var answer = $('#add-answer').val();
                 var category = $('#add-category').val();
-                var weight = $('#add-weight').val();
+                var threshold = $('#add-threshold').val();
+                var language = $('#add-language').val();
 
                 $.ajax({
                     type: "POST",
@@ -480,7 +611,8 @@
                         question_fix: question,
                         answer_fix: answer,
                         category: category,
-                        weight: weight,
+                        threshold: threshold,
+                        language: language,
                         topic_guid: "{{ $guid }}"
                     },
                     beforeSend: function(request) {
@@ -498,9 +630,6 @@
                     }
                 });
             });
-
-
-
         });
     </script>
 @endsection

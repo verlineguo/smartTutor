@@ -18,7 +18,7 @@ class AnswerController extends Controller
         ])->get(env("URL_API", "http://example.com") . '/api/v1/topic/' . $guid);
         $topic = json_decode($responseTopic, true);
         $name = $topic['data']['name'];
-        return view('answer.answer-detail', compact('token', 'code', 'name', 'id', 'guid', 'session'));
+        return view('answer.index2', compact('token', 'code', 'name', 'id', 'guid', 'session'));
     }
     public function fill($guid)
     {

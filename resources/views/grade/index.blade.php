@@ -98,35 +98,33 @@
 
                 },
                 "columns": [{
-                        data: 'user',
+                        data: 'user_id',
+                        title: "User ID",
                         render: function(data, type, full, meta) {
-                            return data['id'];
+                            return data ? data : '-';
                         }
                     },
                     {
-                        data: 'user',
+                        data: 'name',
+                        title: "Name",
                         render: function(data, type, full, meta) {
-                            return data['name'];
+                            return data ? data : '-';
                         }
                     },
                     {
-                        data: 'user',
+                        data: 'status',
+                        title: "Status",
                         render: function(data, type, full, meta) {
-                            if (data['grade'][0] == null) {
-                                return 'not submitted';
-                            } else {
-                                return 'submitted';
-                            }
+                            return data === 'submitted' ?
+                                '<span class="badge bg-success">Submitted</span>' :
+                                '<span class="badge bg-danger">Not Submitted</span>';
                         }
                     },
                     {
-                        data: 'user',
+                        data: 'grade',
+                        title: "Grade",
                         render: function(data, type, full, meta) {
-                            if (data['grade'][0] == null) {
-                                return '<span>-</span>';
-                            } else {
-                                return data['grade'][0]['grade'];
-                            }
+                            return data !== null ? data : '<span>-</span>';
                         }
                     },
                     {
@@ -134,13 +132,13 @@
                         title: "Actions",
                         render: function(data, type, row) {
                             return '<a href="/answer/detail/{{ $code }}/{{ $guid }}/' +
-                                data['user_id'] +
-                                '" role="button" class="edit-btn" style="text-decoration: none; margin-right: 10px;"><i class="fa-solid fa-circle-info" style="font-size: 15px; color: blue;"></i></a>'
+                                row['user_id'] +
+                                '" role="button" class="edit-btn" style="text-decoration: none; margin-right: 10px;">' +
+                                '<i class="fa-solid fa-circle-info" style="font-size: 15px; color: blue;"></i></a>';
                         },
                         "orderable": false,
                         "searchable": false
-
-                    },
+                    }
                 ],
                 "language": {
                     "emptyTable": "No data available in table",
