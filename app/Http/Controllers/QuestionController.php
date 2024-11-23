@@ -113,32 +113,28 @@ class QuestionController extends Controller
             'answer_ai' => 'required|string',
             'question_fix' => 'required|string',
             'answer_fix' => 'required|string',
-            'weight' => 'required|numeric',
+            'threshold' => 'required|numeric',
             'category' => 'required|string|max:40',
-            'cossine_similarity' => 'required|numeric',
-            'page' => 'nullable|string',
+            'language' => 'required|string|max:40',
             'topic_guid' => 'required|string|max:40',
-        ], MessagesController::messages());
+        ]);
 
         if ($validator->fails()) {
-            return ResponseController::getResponse(null, 422, $validator->errors()->first());
+            return response()->json(['error' => $validator->errors()->first()], 422);
         }
+
         $data = Question::create([
             'question_ai' => $request['question_ai'],
             'answer_ai' => $request['answer_ai'],
             'question_fix' => $request['question_fix'],
             'answer_fix' => $request['answer_fix'],
             'category' => $request['category'],
-            'weight' => $request['weight'],
+            'threshold' => $request['threshold'],
             'topic_guid' => $request['topic_guid'],
-            'cossine_similarity' => $request['cossine_similarity'],
-            'page' => $request['page']
+            'language' => $request['language'],
         ]);
-        if ($request['page']) {
-            $data->page = $request['page'];
-        }
 
-        return ResponseController::getResponse($data, 200, 'Success');
+        return response()->json(['data' => $data, 'message' => 'Success'], 200);
     }
 
     public function translateDocument(Request $request)
@@ -293,6 +289,40 @@ class QuestionController extends Controller
         return ResponseController::getResponse(['tfidf_data' => $data], 200, 'TF-IDF berhasil dihitung.');
     }
 
+    public function saveQuestions(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'topic_guid' => 'required|string',
+            'questions' => 'required|array',
+            'questions.*.question' => 'required|string',
+            'questions.*.answer' => 'required|string',
+            'questions.*.category' => 'required|string',
+            'questions.*.language' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return ResponseController::getResponse(null, 422, $validator->errors()->first());
+        }
+
+        foreach ($request->questions as $questionData) {
+            Question::create([
+                'question_ai' => $questionData['question'],
+                'answer_ai' => $questionData['answer'],
+                'question_fix' => $questionData['question'],
+                'answer_fix' => $questionData['answer'],
+                'threshold' => $questionData['threshold'], // Default value
+                'weight' => 1.0, // Default value
+                'category' => $questionData['category'],
+                'topic_guid' => $request->topic_guid,
+                'language' => $questionData['language'],
+                'question_nouns' => json_encode($questionData['question_nouns'] ?? []),
+                'page' => $questionData['page_number'] ?? null,
+                'cossine_similarity' => $questionData['cosine_q&d'] ?? 0.0,
+            ]);
+        }
+
+        return ResponseController::getResponse(null, 200, 'Questions saved successfully.');
+    }
 
 
     public function generateData(Request $request)
@@ -346,30 +376,65 @@ class QuestionController extends Controller
         }
 
         $questionsData = $generateResponse->json();
-        foreach ($questionsData as $questionData) {
-            Question::create([
-                'question_ai' => (string) ($questionData['question'] ?? ''), // Cast to string
-                'answer_ai' => (string) ($questionData['answer'] ?? ''), // Cast to string
-                'question_fix' => (string) ($questionData['question'] ?? ''), // Cast to string
-                'answer_fix' => (string) ($questionData['answer'] ?? ''), // Cast to string
-                'threshold' => (float) 70.0, // Cast to float
-                'weight' => (float) 1.0, // Cast to float
-                'category' => (string) ($questionData['category'] ?? 'general'), // Cast to string
-                'topic_guid' => (string) $request->get('topic_guid'), // Cast to string
-                'language' => (string) $request->get('language'), // Cast to string
-                'question_nouns' => json_encode($questionData['question_nouns'] ?? []),
-                'page' => isset($questionData['page_number']) ? (int) $questionData['page_number'] : null, // Cast to integer
-                'cossine_similarity' => (float) ($questionData['cosine_q&d'] ?? 0.0), // Cast to float
-            ]);
-        }
+        // foreach ($questionsData as $questionData) {
+        //     Question::create([
+        //         'question_ai' => (string) ($questionData['question'] ?? ''), // Cast to string
+        //         'answer_ai' => (string) ($questionData['answer'] ?? ''), // Cast to string
+        //         'question_fix' => (string) ($questionData['question'] ?? ''), // Cast to string
+        //         'answer_fix' => (string) ($questionData['answer'] ?? ''), // Cast to string
+        //         'threshold' => (float) 70.0, // Cast to float
+        //         'weight' => (float) 1.0, // Cast to float
+        //         'category' => (string) ($questionData['category'] ?? 'general'), // Cast to string
+        //         'topic_guid' => (string) $request->get('topic_guid'), // Cast to string
+        //         'language' => (string) $request->get('language'), // Cast to string
+        //         'question_nouns' => json_encode($questionData['question_nouns'] ?? []),
+        //         'page' => isset($questionData['page_number']) ? (int) $questionData['page_number'] : null, // Cast to integer
+        //         'cossine_similarity' => (float) ($questionData['cosine_q&d'] ?? 0.0), // Cast to float
+        //     ]);
+        // }
 
         return ResponseController::getResponse($questionsData, 200, 'Pertanyaan berhasil dihasilkan.');
         // return ResponseController::getResponse(null, 200, 'Pertanyaan berhasil dihasilkan.');
     }
 
+    public function bulkUpdateThreshold(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'guids' => 'required|array',
+            'threshold' => 'required|numeric|min:0|max:100',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['error' => $validator->errors()->first()], 422);
+        }
+
+        $updatedCount = Question::whereIn('guid', $request->guids)
+            ->update(['threshold' => $request->threshold]);
+
+        return response()->json([
+            'message' => "$updatedCount questions updated successfully.",
+        ], 200);
+    }
+
+    public function bulkDeleteQuestions(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'guids' => 'required|array',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['error' => $validator->errors()->first()], 422);
+        }
+
+        $deletedCount = Question::whereIn('guid', $request->guids)->delete();
+
+        return response()->json([
+            'message' => "$deletedCount questions deleted successfully.",
+        ], 200);
+    }
 
 
-    public function showData($guid, Request $request)
+    public function showData($guid, $language, Request $request)
     {
         if ($request['user_id']) {
             $userId = $request['user_id'];
@@ -377,23 +442,27 @@ class QuestionController extends Controller
                 $query->where('user_id', '=', $userId);
             }])
                 ->where('topic_guid', '=', $guid)
+                ->where('language', '=', $language) // Filter berdasarkan bahasa
                 ->orderByRaw('cast(page as unsigned) asc')
                 ->get();
         } else {
             $data = Question::where('topic_guid', '=', $guid)
+                ->where('language', '=', $language) // Filter berdasarkan bahasa
                 ->orderByRaw('cast(page as unsigned) asc')
                 ->get();
         }
 
-        if (!isset($data)) {
+        if (!isset($data) || $data->isEmpty()) {
             return ResponseController::getResponse(null, 400, "Data not found");
         }
+
         $dataTable = DataTables::of($data)
             ->addIndexColumn()
             ->make(true);
 
         return $dataTable;
     }
+
     public function getData($guid)
     {
         $data = Question::where('guid', '=', $guid)->first();
@@ -403,31 +472,32 @@ class QuestionController extends Controller
     public function updateData(Request $request)
     {
         $validator = Validator::make($request->all(), [
+            'guid' => 'required|string',
             'question_fix' => 'required|string',
             'answer_fix' => 'required|string',
-            'weight' => 'required|numeric',
+            'threshold' => 'required|numeric',
             'category' => 'required|string|max:40',
-            'topic_guid' => 'required|string|max:40',
-        ], MessagesController::messages());
+            'language' => 'required|string|max:40',
+        ]);
 
         if ($validator->fails()) {
-            return ResponseController::getResponse(null, 422, $validator->errors()->first());
+            return response()->json(['error' => $validator->errors()->first()], 422);
         }
-        /// GET DATA
-        $data = Question::where('guid', '=', $request['guid'])->first();
 
-        if (!isset($data)) {
-            return ResponseController::getResponse(null, 400, "Data not found");
+        $data = Question::where('guid', $request['guid'])->first();
+
+        if (!$data) {
+            return response()->json(['error' => 'Data not found'], 404);
         }
-        /// UPDATE DATA
+
         $data->question_fix = $request['question_fix'];
         $data->answer_fix = $request['answer_fix'];
-        $data->weight = $request['weight'];
+        $data->threshold = $request['threshold'];
         $data->category = $request['category'];
-        $data->topic_guid = $request['topic_guid'];
+        $data->language = $request['language'];
         $data->save();
 
-        return ResponseController::getResponse($data, 200, 'Success');
+        return response()->json(['data' => $data, 'message' => 'Success'], 200);
     }
     public function deleteData($guid)
     {

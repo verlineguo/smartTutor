@@ -74,4 +74,11 @@ class ChatHistory extends Model
     {
         return $this->belongsTo(User::class);
     }
+    /**
+     * Question OBJECT
+     */
+    public function question()
+    {
+        return $this->belongsTo(Question::class);
+    }
 }

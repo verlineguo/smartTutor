@@ -19,6 +19,7 @@ use App\Http\Controllers\TopicController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserCourseController;
 use App\Http\Controllers\UserMataKuliahController;
+use App\Models\ChatHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -103,9 +104,12 @@ Route::group([
     $router->get('/check-cossine', [QuestionController::class, 'checkCossine']);
     $router->post('/translate', [QuestionController::class, 'translateDocument']);
     $router->post('/tfidf', [QuestionController::class, 'calculateTfidf']);
+    $router->post('/save', [QuestionController::class, 'saveQuestions']);
     $router->post('/generate', [QuestionController::class, 'generateData']);
     $router->post('/convert/datatable', [QuestionController::class, 'convertDatatable']);
-    $router->get('/show/{guid}', [QuestionController::class, 'showData']);
+    $router->post('/bulk-update-threshold', [QuestionController::class, 'bulkUpdateThreshold'])->name('bulkUpdateThreshold');
+    $router->post('/bulk-delete', [QuestionController::class, 'bulkDeleteQuestions'])->name('bulkDeleteQuestions');
+    $router->get('/show/{guid}/{language}', [QuestionController::class, 'showData']);
     $router->put('/', [QuestionController::class, 'updateData']);
     $router->get('/{guid}', [QuestionController::class, 'getData']);
     $router->delete('/{guid}', [QuestionController::class, 'deleteData']);
@@ -126,6 +130,7 @@ Route::group([
     $router->post('/save', [ChatHistoryController::class, 'saveMessage']);
     $router->get('/history/{topicGuid}/{userId}', [ChatHistoryController::class, 'getHistory']);
     $router->get('/status/{topicGuid}/{userId}', [ChatHistoryController::class, 'checkStatus']);
+    $router->get('/languages/{topicGuid}', [ChatHistoryController::class, 'getAvailableLanguages']);
 });
 
 /**

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Grade;
+use App\Models\Question;
 use App\Models\Role;
 use App\Models\UserCourse;
 use Illuminate\Http\Request;
@@ -37,19 +38,94 @@ class GradeController extends Controller
     public function getDataByTopic($code, $guid)
     {
         $role = Role::where('role_name', '=', 'student')->pluck('guid');
+
+        // Ambil data user dengan relasi grade dan status dari chathistories
         $data = UserCourse::whereHas('user', function ($query) use ($guid, $role) {
             $query->where('role_guid', '=', $role);
         })
             ->with(['user' => function ($query) use ($guid) {
                 $query->with(['grade' => function ($query) use ($guid) {
                     $query->where('topic_guid', '=', $guid);
-                }]);
+                }])
+                    ->with(['chathistories' => function ($query) use ($guid) {
+                        $query->where('topic_guid', '=', $guid)->orderBy('created_at', 'desc');
+                    }]);
             }])
-            ->where('course_code', '=', $code)->get();
-        if (!isset($data)) {
+            ->where('course_code', '=', $code)
+            ->get();
+        $data = UserCourse::whereHas('user', function ($query) use ($guid, $role) {
+            $query->where('role_guid', '=', $role);
+        })
+            ->with(['user' => function ($query) use ($guid) {
+                $query->with(['grade' => function ($query) use ($guid) {
+                    $query->where('topic_guid', '=', $guid);
+                }])
+                    ->with(['chathistories' => function ($query) use ($guid) {
+                        $query->where('topic_guid', '=', $guid)
+                            ->orderBy('created_at', 'desc');
+                    }])
+                    ->with(['chathistories.question' => function ($query) {
+                        $query->select('user_id', 'language', 'topic_guid', 'page');
+                    }]); // Relasi ke pertanyaan terkait
+            }])
+            ->where('course_code', '=', $code)
+            ->get();
+
+        // Ambil data untuk menentukan status dan grade
+        $processedData = $data->map(function ($item) use ($guid) {
+            $user = $item->user;
+
+            // Ambil record terakhir dari chathistories
+            $lastChatHistory = $user->chathistories()->latest('created_at')->first();
+            $language = $lastChatHistory && $lastChatHistory->question ? $lastChatHistory->question->language : null;
+
+            // Cari page terakhir berdasarkan topic_guid dan language
+            $highestPage = null;
+            if ($language) {
+                $highestPage = Question::where('topic_guid', $guid)
+                    ->where('language', $language)
+                    ->max('page');
+            }
+
+            // Tentukan status
+            $status = 'not submitted';
+            if ($lastChatHistory) {
+                $lastPage = $lastChatHistory->page;
+                $lastSender = $lastChatHistory->sender;
+
+                if ($lastPage == $highestPage && $lastSender === 'cosine') {
+                    $status = 'submitted';
+                }
+            }
+
+            // Hitung rata-rata cosine_similarity dari chathistories dengan sender 'user'
+            $userCosineSimilarity = $user->chathistories
+                ->where('sender', 'user') // Filter hanya sender 'user'
+                ->pluck('cosine_similarity') // Ambil cosine_similarity
+                ->filter(); // Hilangkan null values
+
+            $grade = $userCosineSimilarity->count() > 0
+                ? round($userCosineSimilarity->avg(), 2) // Rata-rata dan dibulatkan ke 2 desimal
+                : null;
+
+            return [
+                'user_id' => $user->id,
+                'name' => $user->name,
+                'language' => $language,
+                'last_page' => $lastChatHistory ? $lastChatHistory->page : null,
+                'last_sender' => $lastChatHistory ? $lastChatHistory->sender : null,
+                'highest_page' => $highestPage,
+                'status' => $status,
+                'grade' => $grade, // Tambahkan grade ke hasil akhir
+            ];
+        });
+
+        // Return data processedData dalam format DataTable
+        if ($processedData->isEmpty()) {
             return ResponseController::getResponse(null, 400, "Data not found");
         }
-        $dataTable = DataTables::of($data)
+
+        $dataTable = DataTables::of($processedData)
             ->addIndexColumn()
             ->make(true);
 

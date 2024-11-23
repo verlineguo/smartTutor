@@ -18,18 +18,19 @@ class ChatHistoryController extends Controller
             'user_id' => 'required|integer',
             'topic_guid' => 'required|string',
             'message' => 'required|string',
-            'sender' => 'required|in:user,bot',
+            'sender' => 'required|in:user,bot,cosine',
             'page' => 'required|integer',
             'question_guid' => 'required|string',
         ]);
 
         usleep(1000000); // Delay for 1 second
 
-        if ($validated['sender'] === 'bot') {
-            // Save bot's question to chat history
+        if (in_array($validated['sender'], ['bot', 'cosine'])) {
+            // Save bot's or cosine's message to chat history
             ChatHistory::create($validated);
             return response()->json(['status' => 'question_saved']);
         }
+
 
         // For user sender, proceed with saving the user's response
         $chatHistory = ChatHistory::create(array_merge($validated, ['cosine_similarity' => null]));
@@ -63,7 +64,7 @@ class ChatHistoryController extends Controller
      */
     protected function calculateCosineSimilarity($user_answer, $actual_answer)
     {
-        $flask_url = 'http://127.0.0.1:5000/cosine_similarity';
+        $flask_url = env('FLASK_API_URL') . '/cosine_similarity';
         $response = Http::post($flask_url, [
             'user_answer' => $user_answer,
             'actual_answer' => $actual_answer
@@ -115,15 +116,28 @@ class ChatHistoryController extends Controller
 
         // Pick a random question from the remaining questions
         $nextQuestion = $remainingQuestions->random();
+
+        // Save the retry question to ChatHistory
+        ChatHistory::create([
+            'user_id' => $validated['user_id'],
+            'topic_guid' => $validated['topic_guid'],
+            'message' => $nextQuestion->question_fix,
+            'sender' => 'bot',
+            'page' => $validated['page'],
+            'question_guid' => $nextQuestion->guid,
+            'cosine_similarity' => null, // Retry questions do not have cosine similarity
+        ]);
+
         return response()->json([
             'status' => 'retry',
             'nextQuestion' => $nextQuestion->question_fix,
             'nextQuestionGuid' => $nextQuestion->guid,
             'similarityMessage' => $similarityMessage,
             'similarity_score' => $similarity_score,
-            'threshold' => $threshold
+            'threshold' => $threshold,
         ]);
     }
+
 
 
 
@@ -159,5 +173,15 @@ class ChatHistoryController extends Controller
         return response()->json(['data' => [
             'is_read_only' => $isReadOnly,
         ]]);
+    }
+    public function getAvailableLanguages($topicGuid)
+    {
+        // Ambil bahasa unik dari tabel pertanyaan berdasarkan topik
+        $languages = Question::where('topic_guid', $topicGuid)
+            ->select('language')
+            ->distinct()
+            ->pluck('language');
+
+        return response()->json(['data' => $languages]);
     }
 }
