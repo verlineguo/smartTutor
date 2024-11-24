@@ -394,11 +394,15 @@
 
 
             $("#user-input").on("keypress", function(e) {
-                if (e.which === 13 && !e.shiftKey) { // Enter tanpa Shift
-                    e.preventDefault(); // Cegah default behavior (menambah baris)
-                    $("#send-button").trigger("click"); // Panggil klik tombol Send
+                if (e.which === 13) { // Deteksi tombol Enter
+                    if (!e.shiftKey) { // Jika Shift tidak ditekan
+                        e.preventDefault(); // Cegah default behavior (menambah baris)
+                        $("#send-button").trigger("click"); // Panggil klik tombol Send
+                    }
+                    // Jika Shift ditekan, biarkan default behavior untuk menambah baris
                 }
             });
+
 
             // Fungsi untuk menangani klik tombol Send
             $("#send-button").on("click", function() {
@@ -453,6 +457,8 @@
 
                         if (response.status === 'success') {
                             currentPage = response.nextPage;
+                            saveMessageToHistory(similarityMessage, "cosine", currentPage,
+                                currentQuestionGuid);
                             askQuestion(questionsGroupedByPage);
                         } else if (response.status === 'retry') {
                             const retryMessage = `

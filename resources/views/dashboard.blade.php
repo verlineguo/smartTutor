@@ -6,7 +6,6 @@
     <link rel="stylesheet" href="{{ asset('./assets/dashboard/datatables-buttons-bs5/buttons.bootstrap5.css') }}">
     <!-- Row Group CSS -->
     <link rel="stylesheet" href="{{ asset('./assets/dashboard/datatables-rowgroup-bs5/rowgroup.bootstrap5.css') }}">
-    
 @endsection
 @section('info-page')
     <ol class="breadcrumb bg-transparent mb-0 pb-0 pt-1 px-0 me-sm-6 me-5">
@@ -62,6 +61,7 @@
                 "destroy": true,
                 "processing": true,
                 "serverSide": true,
+                "scrollX": true,
                 "ajax": {
                     "url": "{{ env('URL_API') }}/api/v1/topic/filter/deadline",
                     "type": "GET",
@@ -82,8 +82,9 @@
                     {
                         data: null,
                         render: function(data, type, row) {
-                            return "<div class='W-100 '>" + data['course_code'] + " - " + data['course']['name'] + "</div>"
-              
+                            return "<div class='W-100 '>" + data['course_code'] + " - " + data[
+                                'course']['name'] + "</div>"
+
                         }
                     },
                     {
@@ -172,25 +173,6 @@
                         enabled: false
                     }
                 ],
-
-                responsive: {
-                    details: {
-                        display: $.fn.dataTable.Responsive.display.modal({
-                            header: function(e) {
-                                return "Details of " + e.data().name
-                            }
-                        }),
-                        type: "column",
-                        renderer: function(e, t, a) {
-                            a = $.map(a, function(e, t) {
-                                return "" !== e.title ? '<tr data-dt-row="' + e.rowIndex +
-                                    '" data-dt-column="' + e.columnIndex + '"><td>' + e.title +
-                                    ":</td> <td>" + e.data + "</td></tr>" : ""
-                            }).join("");
-                            return !!a && $('<table class="table"/><tbody />').append(a)
-                        }
-                    }
-                },
             }), $("div.head-label").html('<h5 class="card-title mb-0">Active Quiz</h5>');
         });
     </script>

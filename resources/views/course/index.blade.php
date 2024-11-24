@@ -163,6 +163,7 @@
                 "destroy": true,
                 "processing": true,
                 "serverSide": true,
+                "scrollX": true,
                 "ajax": {
                     "url": "{{ env('URL_API') }}/api/v1/course",
                     "type": "GET",
@@ -247,24 +248,6 @@
                     }
                     @endisRole
                 ],
-                responsive: {
-                    details: {
-                        display: $.fn.dataTable.Responsive.display.modal({
-                            header: function(e) {
-                                return "Details of " + e.data().name
-                            }
-                        }),
-                        type: "column",
-                        renderer: function(e, t, a) {
-                            a = $.map(a, function(e, t) {
-                                return "" !== e.title ? '<tr data-dt-row="' + e.rowIndex +
-                                    '" data-dt-column="' + e.columnIndex + '"><td>' + e.title +
-                                    ":</td> <td>" + e.data + "</td></tr>" : ""
-                            }).join("");
-                            return !!a && $('<table class="table"/><tbody />').append(a)
-                        }
-                    }
-                },
             }), $("div.head-label").html('<h5 class="card-title mb-0">Course Data</h5>');
             $('[data-bs-toggle="tooltip"]').tooltip();
 
@@ -318,7 +301,7 @@
                         $('#edit-name').val(result['data']['name']);
                         $('#edit-description').val(result['data']['description']);
                         $('#edit-status').val(result['data']['status']).trigger(
-                        'change'); // Set status dari response
+                            'change'); // Set status dari response
                         $('#modalEdit').modal('show');
                     },
                     error: function(xhr, status, error) {

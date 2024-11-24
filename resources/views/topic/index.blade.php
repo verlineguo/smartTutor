@@ -305,17 +305,11 @@
                     @else {
                         data: 'grade',
                         render: function(data, type, row) {
-                            if (data[0]) {
-                                if (data[0]['grade']) {
-                                    return data[0]['grade']
-                                } else {
-                                    return "ungrade"
-                                }
-
+                            if (data !== null && data !== undefined) {
+                                return data; // Tampilkan nilai grade yang dikirim dari backend
                             } else {
-                                return "-"
+                                return "Not Graded"; // Jika grade null atau undefined
                             }
-
                         }
                     },
                     @endisRole
