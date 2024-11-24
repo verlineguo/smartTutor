@@ -85,13 +85,21 @@
                                             <label for="add-description" class="form-label">Description</label>
                                             <textarea class="form-control" id="add-description" name="add-description" rows="3" required></textarea>
                                         </div>
+                                        <div class="mb-3">
+                                            <label for="add-status" class="form-label">Status</label>
+                                            <select class="form-control" id="add-status" name="add-status" required>
+                                                <option value="private" selected>Private</option>
+                                                <option value="public">Public</option>
+                                            </select>
+                                        </div>
                                         <button type="submit" class="btn btn-primary">Submit</button>
                                     </form>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <!-- Modal Edit Kuliah -->
+
+                    <!-- Modal Edit Course -->
                     <div class="modal fade" id="modalEdit" tabindex="-1" aria-hidden="true">
                         <div class="modal-dialog modal-dialog-centered">
                             <div class="modal-content">
@@ -112,12 +120,17 @@
                                             <input type="text" class="form-control" id="edit-name" name="edit-name"
                                                 required>
                                         </div>
-
                                         <div class="mb-3">
                                             <label for="edit-description" class="form-label">Description</label>
                                             <textarea class="form-control" id="edit-description" name="edit-description" rows="3" required></textarea>
                                         </div>
-                                        <!-- Add other input fields as needed -->
+                                        <div class="mb-3">
+                                            <label for="edit-status" class="form-label">Status</label>
+                                            <select class="form-control" id="edit-status" name="edit-status" required>
+                                                <option value="private">Private</option>
+                                                <option value="public">Public</option>
+                                            </select>
+                                        </div>
                                         <button type="submit" class="btn btn-primary">Submit</button>
                                     </form>
                                 </div>
@@ -296,9 +309,6 @@
                 $.ajax({
                     type: "GET",
                     url: "{{ env('URL_API') }}/api/v1/course/" + code,
-                    data: {
-
-                    },
                     beforeSend: function(request) {
                         request.setRequestHeader("Authorization",
                             "Bearer {{ $token }}");
@@ -307,6 +317,8 @@
                         $('#edit-code').val(result['data']['code']);
                         $('#edit-name').val(result['data']['name']);
                         $('#edit-description').val(result['data']['description']);
+                        $('#edit-status').val(result['data']['status']).trigger(
+                        'change'); // Set status dari response
                         $('#modalEdit').modal('show');
                     },
                     error: function(xhr, status, error) {
@@ -314,7 +326,6 @@
                         alert('Terjadi kesalahan: ' + errorMessage);
                     }
                 });
-
             });
 
             $('#edit-form').on('submit', function(e) {
@@ -323,6 +334,7 @@
                 var code = $('#edit-code').val();
                 var name = $('#edit-name').val();
                 var description = $('#edit-description').val();
+                var status = $('#edit-status').val(); // Ambil status dari input select
 
                 $.ajax({
                     type: "PUT",
@@ -332,6 +344,7 @@
                         "code_new": code,
                         "name": name,
                         "description": description,
+                        "status": status // Tambahkan status ke data yang dikirim
                     },
                     beforeSend: function(request) {
                         request.setRequestHeader("Authorization",
@@ -354,15 +367,17 @@
                 var code = $('#add-code').val();
                 var name = $('#add-name').val();
                 var description = $('#add-description').val();
+                var status = $('#add-status').val(); // Ambil status dari input select
 
                 $.ajax({
                     type: "POST",
                     url: "{{ env('URL_API') }}/api/v1/course",
                     data: {
-                        code: code,
-                        name: name,
-                        description: description,
-                        user_id: "{{ $id }}"
+                        "code": code,
+                        "name": name,
+                        "description": description,
+                        "status": status, // Tambahkan status ke data yang dikirim
+                        "user_id": "{{ $id }}"
                     },
                     beforeSend: function(request) {
                         request.setRequestHeader("Authorization",
@@ -378,6 +393,7 @@
                     }
                 });
             });
+
 
 
 

@@ -65,6 +65,11 @@
                                             <textarea class="form-control" id="add-description" name="add-description" rows="3" required></textarea>
                                         </div>
                                         <div class="mb-3">
+                                            <label for="add-max-attempt" class="form-label">Max Attempt GPT</label>
+                                            <input type="number" class="form-control" id="add-max-attempt"
+                                                name="add-max-attempt" required>
+                                        </div>
+                                        <div class="mb-3">
                                             <label for="add-start-time" class="form-label">Start Time</label>
                                             <input type="datetime-local" class="form-control" id="add-start-time"
                                                 name="add-start-time" required>
@@ -129,10 +134,14 @@
                                             <input type="text" class="form-control" id="edit-name" name="edit-name"
                                                 required>
                                         </div>
-
                                         <div class="mb-3">
                                             <label for="edit-description" class="form-label">Description</label>
                                             <textarea class="form-control" id="edit-description" name="edit-description" rows="3" required></textarea>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="edit-max-attempt" class="form-label">Max Attempt GPT</label>
+                                            <input type="number" class="form-control" id="edit-max-attempt"
+                                                name="edit-max-attempt" required>
                                         </div>
                                         <div class="mb-3">
                                             <label for="edit-start-time" class="form-label">Start Time</label>
@@ -229,6 +238,7 @@
                 "destroy": true,
                 "processing": true,
                 "serverSide": true,
+                "scrollX": true,
                 "ajax": {
                     "url": "{{ env('URL_API') }}/api/v1/topic/filter/course",
                     "type": "POST",
@@ -261,13 +271,17 @@
 
                                 return `
                                     <span>${originalFileName}</span>
-                                    <i class="fa-solid fa-file view-icon" style="font-size: 15px; color: blue; cursor: pointer;" data-url="{{ env('URL_API') }}/storage/${data}" title="View File"></i>
-                                    <i class="fa-solid fa-trash delete-icon" style="font-size: 15px; color: red; cursor: pointer;" data-guid="${row.guid}" title="Delete File"></i>
-                                `;
+<i class="fa-solid fa-file view-icon" style="font-size: 15px; color: blue; cursor: pointer;" data-url="{{ env('URL_API') }}/storage/${data}" title="View File"></i>
+ @isRole(['admin', 'lecturer', 'assistant'], $code)
+<i class="fa-solid fa-trash delete-icon" style="font-size: 15px; color: red; cursor: pointer;" data-guid="${row.guid}" title="Delete File"></i>
+@endisRole
+                                    `;
                             } else {
                                 // If no file, show upload icon to trigger modal
                                 return `
-                                    <i class="fa-solid fa-file-upload upload-icon" style="font-size: 15px; color: green; cursor: pointer;" data-guid="${row.guid}" title="Upload File"></i>
+                                 @isRole(['admin', 'lecturer', 'assistant'], $code)
+<i class="fa-solid fa-file-upload upload-icon" style="font-size: 15px; color: green; cursor: pointer;" data-guid="${row.guid}" title="Upload File"></i>
+@endisRole
                                 `;
                             }
                         },
@@ -340,11 +354,8 @@
                 </a>
             `;
                                 } else {
-                                    return `
-                <a href="/user/answer/result/${data['guid']}" role="button" class="edit-btn" style="text-decoration: none; margin-right: 10px;">
-                    <i class="fa-solid fa fa-eye" style="font-size: 15px; color: blue;" data-bs-toggle="tooltip" title="View Result"></i>
-                </a>
-            `;
+                                    return `<a href="/answer/detail/{{ $code }}/${data['guid']}/{{ $id }} " role="button" class="edit-btn" style="text-decoration: none; margin-right: 10px;">
+                                    <i class="fa-solid fa-eye" style="font-size: 15px; color: blue;"></i></a>`;
                                 }
                             }
                             @endisRole
@@ -387,26 +398,6 @@
                     }
                     @endisRole
                 ],
-                responsive: {
-                    details: {
-                        display: $.fn.dataTable.Responsive.display.modal({
-                            header: function(e) {
-                                return "Details of " + e.data().name
-                            }
-                        }),
-                        type: "column",
-                        renderer: function(e, t, a) {
-                            a = $.map(a, function(e, t) {
-                                return "" !== e.title ? '<tr data-dt-row="' + e
-                                    .rowIndex +
-                                    '" data-dt-column="' + e.columnIndex + '"><td>' + e
-                                    .title +
-                                    ":</td> <td>" + e.data + "</td></tr>" : ""
-                            }).join("");
-                            return !!a && $('<table class="table"/><tbody />').append(a)
-                        }
-                    }
-                },
             }), $("div.head-label").html('<h5 class="card-title mb-0">Topic Data</h5>');
 
             $('[data-bs-toggle="tooltip"]').tooltip();
@@ -461,6 +452,7 @@
                     success: function(result) {
                         $('#edit-name').val(result['data']['name']);
                         $('#edit-description').val(result['data']['description']);
+                        $('#edit-max-attempt').val(result['data']['max_attempt_gpt']);
                         $('#edit-start-time').val(result['data']['time_start']);
                         $('#edit-end-time').val(result['data']['time_end']);
                         $('#modalEdit').modal('show');
@@ -479,6 +471,7 @@
                 var guid = $('#guid').val();
                 var name = $('#edit-name').val();
                 var description = $('#edit-description').val();
+                var max_attempt = $('#edit-max-attempt').val();
                 var startTime = $('#edit-start-time').val();
                 var endTime = $('#edit-end-time').val();
 
@@ -490,6 +483,7 @@
                         "guid": guid,
                         "name": name,
                         "description": description,
+                        "max_attempt_gpt": max_attempt,
                         "course_code": "{{ $code }}",
                         "time_start": startTime,
                         "time_end": endTime
@@ -517,6 +511,7 @@
 
                 var name = $('#add-name').val();
                 var description = $('#add-description').val();
+                var max_attempt = $('#add-max-attempt').val();
                 var startTime = $('#add-start-time').val();
                 var endTime = $('#add-end-time').val();
                 console.log(startTime);
@@ -527,6 +522,7 @@
                     data: {
                         name: name,
                         description: description,
+                        max_attempt_gpt: max_attempt,
                         course_code: "{{ $code }}",
                         time_start: startTime,
                         time_end: endTime

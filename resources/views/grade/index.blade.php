@@ -82,11 +82,37 @@
 @endsection
 @section('custom-javascript')
     <script type="text/javascript">
+        function resetHistories(userId, topicGuid) {
+            if (confirm("Are you sure you want to reset this user's chat histories for this topic?")) {
+                $.ajax({
+                    url: "{{ env('URL_API') }}/api/v1/chatbot/reset-histories", // Endpoint backend untuk reset histories
+                    type: "POST",
+                    data: {
+                        user_id: userId,
+                        topic_guid: topicGuid,
+                    },
+                    beforeSend: function(request) {
+                        request.setRequestHeader("Authorization",
+                            "Bearer {{ $token }}");
+                    },
+                    success: function(response) {
+                        alert("Chat histories have been successfully reset!");
+                        // Refresh data table atau halaman jika perlu
+                        $('#dataTable').DataTable().ajax.reload();
+                    },
+                    error: function(xhr) {
+                        alert("Failed to reset chat histories. Please try again.");
+                        console.error(xhr.responseText);
+                    }
+                });
+            }
+        }
         $(document).ready(function() {
 
             $('#table-data').DataTable({
                 "destroy": true,
                 "processing": true,
+                "scrollX": true,
                 "ajax": {
                     "url": "{{ env('URL_API') }}/api/v1/grade/topic/{{ $code }}/{{ $guid }}",
                     "type": "GET",
@@ -112,12 +138,22 @@
                         }
                     },
                     {
-                        data: 'status',
-                        title: "Status",
+                        data: 'progress',
+                        title: "Progress",
                         render: function(data, type, full, meta) {
-                            return data === 'submitted' ?
-                                '<span class="badge bg-success">Submitted</span>' :
-                                '<span class="badge bg-danger">Not Submitted</span>';
+                            if (data) {
+                                const [completed, total] = data.split('/');
+                                const percentage = Math.round((completed / total) * 100);
+                                return `<div style="display: flex; align-items: center;">
+                            <div style="width: 100px; height: 10px; background-color: #e9ecef; margin-right: 10px; border-radius: 5px;">
+                                <div style="width: ${percentage}%; height: 100%; background-color: ${
+                                    percentage === 100 ? '#28a745' : '#ffc107'
+                                }; border-radius: 5px;"></div>
+                            </div>
+                            <span>${data}</span>
+                        </div>`;
+                            }
+                            return '<span class="badge bg-danger">No Progress</span>';
                         }
                     },
                     {
@@ -131,14 +167,33 @@
                         data: null,
                         title: "Actions",
                         render: function(data, type, row) {
-                            return '<a href="/answer/detail/{{ $code }}/{{ $guid }}/' +
-                                row['user_id'] +
-                                '" role="button" class="edit-btn" style="text-decoration: none; margin-right: 10px;">' +
-                                '<i class="fa-solid fa-circle-info" style="font-size: 15px; color: blue;"></i></a>';
+                            return `
+            <a href="/answer/detail/{{ $code }}/{{ $guid }}/` + row['user_id'] + `" 
+               role="button" 
+               class="edit-btn" 
+               style="text-decoration: none; margin-right: 10px;" 
+               data-bs-toggle="tooltip" 
+               data-bs-placement="top" 
+               title="View details of user's answers">
+                <i class="fa-solid fa-circle-info" style="font-size: 15px; color: blue;"></i>
+            </a>
+            <a href="javascript:void(0);" 
+               onclick="resetHistories('${row['user_id']}', '{{ $guid }}')" 
+               role="button" 
+               class="reset-btn" 
+               style="text-decoration: none;" 
+               data-bs-toggle="tooltip" 
+               data-bs-placement="top" 
+               title="Reset chat histories for this user">
+                <i class="fa-solid fa-rotate-left" style="font-size: 15px; color: red;"></i>
+            </a>
+        `;
                         },
                         "orderable": false,
                         "searchable": false
                     }
+
+
                 ],
                 "language": {
                     "emptyTable": "No data available in table",
@@ -189,25 +244,12 @@
                         enabled: false
                     }
                 ],
-                responsive: {
-                    details: {
-                        display: $.fn.dataTable.Responsive.display.modal({
-                            header: function(e) {
-                                return "Details of " + e.data().user.id
-                            }
-                        }),
-                        type: "column",
-                        renderer: function(e, t, a) {
-                            a = $.map(a, function(e, t) {
-                                return "" !== e.title ? '<tr data-dt-row="' + e.rowIndex +
-                                    '" data-dt-column="' + e.columnIndex + '"><td>' + e.title +
-                                    ":</td> <td>" + e.data + "</td></tr>" : ""
-                            }).join("");
-                            return !!a && $('<table class="table"/><tbody />').append(a)
-                        }
-                    }
-                },
             }), $("div.head-label").html('<h5 class="card-title mb-0">Grade Data</h5>');
+
+
+
+
+
             $(document).on("click", ".open-edit-dialog", function() {
                 var id = $(this).data('user-id');
                 $('#id').val(id);

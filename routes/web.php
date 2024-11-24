@@ -60,7 +60,7 @@ Route::group([
     Route::get('/assistant/{code}', [AssistantController::class, 'index'])->name('assistant')->middleware('role:admin,lecturer');
     Route::get('/question/{code}/{guid}', [QuestionController::class, 'index'])->name('question')->middleware('role:admin,lecturer,assistant');
     Route::get('/grade/{code}/{guid}', [GradeController::class, 'index'])->name('grade')->middleware('role:admin,lecturer,assistant');
-    Route::get('/answer/detail/{code}/{guid}/{id}', [AnswerController::class, 'index'])->name('answer')->middleware('role:admin,lecturer,assistant');
+    Route::get('/answer/detail/{code}/{guid}/{id}', [AnswerController::class, 'index'])->name('answer');
     Route::get('/user', [UserController::class, 'index'])->name('index-user')->middleware('role:admin,lecturer');
     Route::get('/user/create', [UserController::class, 'create'])->name('create-user')->middleware('role:admin,lecturer');
     Route::get('/user/create-csv', [UserController::class, 'createCSV'])->name('create-user-csv')->middleware('role:admin,lecturer');

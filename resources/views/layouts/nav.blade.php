@@ -1,25 +1,30 @@
 <!-- Navbar -->
-<nav class="navbar navbar-main navbar-expand-lg px-0 mx-4 shadow-none border-radius-xl" id="navbarBlur" navbar-scroll="true">
+<nav class="navbar navbar-main navbar-expand-lg px-0 mx-4 shadow-none border-radius-xl" id="navbarBlur"
+    navbar-scroll="true">
     <div class="container-fluid py-1 px-3">
         <nav aria-label="breadcrumb">
             @yield('info-page')
         </nav>
-        <a class="btn btn-primary d-lg-none" data-bs-toggle="offcanvas" href="#offcanvasExample" role="button" aria-controls="offcanvasExample">
+        <a class="btn btn-primary d-lg-none" data-bs-toggle="offcanvas" href="#offcanvasExample" role="button"
+            aria-controls="offcanvasExample">
             <i class="fa-solid fa-bars"></i>
         </a>
     </div>
-    <div class="offcanvas offcanvas-start w-100" tabindex="-1" id="offcanvasExample" aria-labelledby="offcanvasExampleLabel">
+    <div class="offcanvas offcanvas-start w-100" tabindex="-1" id="offcanvasExample"
+        aria-labelledby="offcanvasExampleLabel">
 
         <div class="offcanvas-header">
             <a class="align-items-center d-flex  navbar-brand text-wrap" href="{{ route('dashboard') }}">
                 <img src="{{ asset('assets/img/logofakultas.png') }}" class="w-75" alt="...">
             </a>
-            <button type="button" class=" btn btn-transparent" data-bs-dismiss="offcanvas" aria-label="Close">Close</button>
-          </div>
+            <button type="button" class=" btn btn-transparent" data-bs-dismiss="offcanvas"
+                aria-label="Close">Close</button>
+        </div>
         <div class="offcanvas-body">
             <ul class="text-decoration-none list-unstyled">
                 <li class="nav-item">
-                    <a class=" d-flex  nav-link {{ Request::is('dashboard') ? 'active' : '' }}" href="{{ url('dashboard') }}">
+                    <a class=" d-flex  nav-link {{ Request::is('dashboard') ? 'active' : '' }}"
+                        href="{{ url('dashboard') }}">
                         <div
                             class="icon icon-shape icon-sm shadow border-radius-md bg-white text-center me-2 d-flex align-items-center justify-content-center">
                             <img src="{{ asset('assets/img/quiz.png') }}" width="11px" height="11px"
@@ -63,7 +68,8 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="d-flex  nav-link {{ Request::is('question') ? 'active' : '' }}  " href="{{ url('question') }}">
+                        <a class="d-flex  nav-link {{ Request::is('question') ? 'active' : '' }}  "
+                            href="{{ url('question') }}">
                             <div
                                 class="icon icon-shape icon-sm shadow border-radius-md bg-white text-center me-2 d-flex align-items-center justify-content-center">
                                 <img src="{{ asset('assets/img/question.png') }}" width="14px" height="14px"
@@ -91,7 +97,7 @@
                 </li>
 
                 <li class="nav-item">
-                    <a class="d-flex  nav-link " role="button" id="logout">
+                    <a class="d-flex  nav-link " role="button" id="logout-nav">
                         <div
                             class="icon icon-shape icon-sm shadow border-radius-md bg-white text-center me-2 d-flex align-items-center justify-content-center">
                             <img src="{{ asset('assets/img/icon-logout.png') }}" width="12px" height="12px"
@@ -105,5 +111,5 @@
                 </li>
             </ul>
         </div>
-      </div>
+    </div>
 </nav>

@@ -125,7 +125,7 @@
     <script type="text/javascript">
         $(document).ready(function() {
 
-            $("#logout").click(function(e) {
+            $("#logout, #logout-nav").click(function(e) {
                 e.preventDefault();
 
                 var token = "{{ $token }}";

@@ -48,48 +48,96 @@
             margin-left: auto;
         }
 
+        .input-group textarea {
+            resize: none;
+            /* Disable manual resizing */
+            overflow-y: auto;
+            /* Sembunyikan scrollbar vertikal */
+            max-height: 150px;
+            /* Batasi tinggi maksimum */
+            min-height: 50px;
+            /* Tetapkan tinggi minimum */
+            border: none;
+            /* border-radius: 20px; */
+            padding: 10px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        * {
+            box-sizing: border-box;
+            /* Pastikan padding dan border diperhitungkan */
+        }
+
         .input-group {
             display: flex;
+            /* Gunakan flexbox */
             align-items: stretch;
-            margin-top: 15px;
+            /* Semua elemen akan memenuhi tinggi yang sama */
             border: 1px solid #ddd;
             border-radius: 20px;
             overflow: hidden;
-            height: 50px;
+            /* Hilangkan elemen yang keluar */
+            background-color: #fff;
         }
 
-        .input-group input {
-            flex-grow: 1;
-            padding: 0 12px;
+        .input-group textarea {
+            resize: none;
+            /* Nonaktifkan resize manual */
+            overflow-y: auto;
+            /* Aktifkan scrollbar vertikal jika diperlukan */
+            height: auto;
+            /* Sesuaikan tinggi berdasarkan konten */
+            min-height: 50px;
+            /* Tetapkan tinggi minimum */
+            max-height: 150px;
+            /* Tetapkan tinggi maksimum */
             border: none;
+            padding: 10px;
             font-size: 14px;
-            height: 100%;
-            line-height: 50px;
-            box-sizing: border-box;
-        }
-
-        .input-group input:focus {
-            outline: none;
+            line-height: 1.5;
+            flex-grow: 1;
+            /* Biarkan textarea mengambil ruang yang tersedia */
         }
 
         .input-group button {
             background-color: #00796b;
+            /* Warna tombol */
             color: #fff;
-            padding: 0 20px;
             border: none;
-            cursor: pointer;
             font-size: 14px;
-            height: 100%;
-            line-height: 50px;
+            cursor: pointer;
             display: flex;
             align-items: center;
+            /* Pusatkan konten secara vertikal */
             justify-content: center;
-            transition: background-color 0.3s;
+            /* Pusatkan konten secara horizontal */
+            padding: 0 20px;
+            /* Tambahkan jarak horizontal */
+            height: auto;
+            /* Sesuaikan tinggi tombol dengan textarea */
+            min-height: 50px;
+            /* Tinggi minimum */
+            border-left: 1px solid #ddd;
+            /* Tambahkan pembatas di sebelah kiri */
+            transition: background-color 0.3s ease;
+            /* Efek hover */
         }
 
         .input-group button:hover {
             background-color: #004d40;
+            /* Warna tombol saat di-hover */
         }
+
+        .input-group textarea,
+        .input-group button {
+            margin: 0;
+            /* Hapus margin tambahan */
+            outline: none;
+            /* Hapus outline bawaan */
+        }
+
+
 
         .language-selection {
             margin-bottom: 20px;
@@ -111,15 +159,15 @@
         <select id="language" class="form-control">
             <option value="">Select Language</option>
         </select>
-        <button id="start-quiz" class="btn btn-primary mt-2" disabled>Mulai Kuis</button>
+        <button id="start-quiz" class="btn btn-primary mt-2" disabled>Start Quiz</button>
     </div>
 
     <div class="chatbot-container" id="chatbot-container">
         <!-- Chatbot history will load here -->
     </div>
 
-    <div class="input-group mt-2">
-        <input type="text" id="user-input" class="form-control" placeholder="Type your answer here..." disabled>
+    <div class="input-group">
+        <textarea id="user-input" class="form-control" rows="1" placeholder="Type your answer here..." disabled></textarea>
         <button id="send-button" class="btn">Send</button>
     </div>
 @endsection
@@ -280,7 +328,11 @@
 
                 const question = questionsOnPage[Math.floor(Math.random() * questionsOnPage.length)];
                 currentQuestionGuid = question.guid;
-                const formattedQuestion = `Page ${currentPage}: ${question.question_fix}`;
+
+                // Tambahkan threshold ke dalam formattedQuestion
+                const formattedQuestion =
+                    `Page ${currentPage}: ${question.question_fix} (Threshold: ${question.threshold})`;
+
                 const lastBotMessage = $("#chatbot-container").find(".bot-message").last().text();
                 if (lastBotMessage === formattedQuestion) {
                     console.log("Duplicate question detected.");
@@ -292,6 +344,7 @@
                 scrollToBottom();
                 $("#user-input").prop("disabled", false).focus();
             }
+
 
             function moveToNextPage() {
                 currentPage++;
@@ -324,6 +377,12 @@
                     },
                     beforeSend: function(request) {
                         request.setRequestHeader("Authorization", `Bearer ${token}`);
+                    },
+                    success: function(response) {
+                        console.log(response);
+                    },
+                    error: function(xhr) {
+                        console.error(`Error saving message: ${xhr.statusText}`);
                     }
                 });
             }
@@ -335,17 +394,32 @@
 
 
             $("#user-input").on("keypress", function(e) {
-                if (e.which === 13 && !$(this).prop("disabled")) {
-                    e.preventDefault();
-                    const answer = $(this).val().trim();
-                    if (answer) {
-                        $("#chatbot-container").append(`<div class="user-message">${answer}</div>`);
-                        scrollToBottom();
-                        $(this).val("");
-                        submitAnswer(answer);
-                    }
+                if (e.which === 13 && !e.shiftKey) { // Enter tanpa Shift
+                    e.preventDefault(); // Cegah default behavior (menambah baris)
+                    $("#send-button").trigger("click"); // Panggil klik tombol Send
                 }
             });
+
+            // Fungsi untuk menangani klik tombol Send
+            $("#send-button").on("click", function() {
+                const answer = $("#user-input").val().trim(); // Ambil nilai dari textarea
+                if (answer) {
+                    // Tampilkan jawaban pengguna di chatbox
+                    $("#chatbot-container").append(`<div class="user-message">${answer}</div>`);
+                    scrollToBottom(); // Gulir ke bawah chatbox
+                    $("#user-input").val(""); // Kosongkan textarea
+                    $("#user-input").css("height", "50px"); // Reset tinggi textarea
+                    submitAnswer(answer); // Kirim jawaban ke server
+                }
+            });
+
+            // Sesuaikan tinggi textarea saat pengguna mengetik
+            $("#user-input").on("input", function() {
+                this.style.height = "auto"; // Reset tinggi agar bisa dihitung ulang
+                this.style.height = `${this.scrollHeight}px`; // Atur tinggi sesuai konten
+            });
+
+
 
             function submitAnswer(answer) {
                 if (isSubmitting) return;
@@ -371,8 +445,7 @@
                         isSubmitting = false;
 
                         const similarityMessage = response.similarityMessage;
-                        saveMessageToHistory(similarityMessage, "cosine", currentPage,
-                            currentQuestionGuid);
+
                         $("#chatbot-container").append(
                             `<div class="bot-message">${similarityMessage}</div>`
                         );
@@ -382,13 +455,20 @@
                             currentPage = response.nextPage;
                             askQuestion(questionsGroupedByPage);
                         } else if (response.status === 'retry') {
-                            $("#chatbot-container").append(
-                                `<div class="bot-message">${response.nextQuestion}</div>`
-                            );
+                            const retryMessage = `
+        <div class="bot-message">
+            Retry required! <br>
+            <strong>Page:</strong> ${currentPage} <br>
+            <strong>Threshold:</strong> ${response.threshold || "N/A"} <br>
+            <strong>Message:</strong> ${response.nextQuestion}
+        </div>`;
+
+                            $("#chatbot-container").append(retryMessage);
                             scrollToBottom();
                             $("#user-input").prop("disabled", false).focus();
                             currentQuestionGuid = response.nextQuestionGuid;
                         }
+
                     },
                     error: function(xhr) {
                         isSubmitting = false;
