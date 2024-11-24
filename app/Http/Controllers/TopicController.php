@@ -2,13 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ChatHistory;
 use App\Models\Course;
 use App\Models\Grade;
+use App\Models\Question;
 use App\Models\Topic;
 use App\Models\User;
 use App\Models\UserCourse;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Session\Session;
 use Yajra\DataTables\Facades\DataTables;
@@ -65,26 +68,66 @@ class TopicController extends Controller
     }
     public function topicByCourse(Request $request)
     {
+        // Ambil semua topik berdasarkan course_code
         $data = Topic::where('course_code', '=', $request['code'])
             ->with('course')
-            ->with(['grade' => function ($query) use ($request) {
-                $query->where('user_id', '=', $request['user_id']);
-            }])
             ->get();
+
         $currentDateTime = Carbon::now('Asia/Jakarta');
+
+        // Iterasi setiap topik
         foreach ($data as $topic) {
+            // Cek apakah deadline sudah lewat
             if ($topic->time_end < $currentDateTime) {
                 $topic->deadline = false;
             } else {
                 $topic->deadline = true;
             }
+
+            // Hitung grade user berdasarkan cosine similarity
+            $topic->grade = $this->calculateGradeByTopic($request['user_id'], $topic->guid);
         }
+        // Log::info($data);
+        // Format data sebagai DataTables
         $dataTable = DataTables::of($data)
             ->addIndexColumn()
             ->make(true);
 
         return $dataTable;
     }
+
+    /**
+     * Hitung nilai grade berdasarkan cosine similarity.
+     */
+    private function calculateGradeByTopic($userId, $topicGuid)
+    {
+        // Ambil chat history untuk user dan topic tertentu
+        $chatHistories = ChatHistory::where('topic_guid', $topicGuid)
+            ->where('user_id', $userId)
+            ->orderBy('page', 'asc') // Urutkan berdasarkan halaman
+            ->get();
+
+        // Ambil jumlah halaman dari tabel questions
+        $totalPages = Question::where('topic_guid', $topicGuid)->max('page');
+
+        // Hitung cosine tertinggi per halaman
+        $cosinePerPage = $chatHistories->groupBy('page')->map(function ($chats) {
+            return $chats->max('cosine_similarity'); // Nilai cosine tertinggi di setiap halaman
+        });
+
+        // Hitung total nilai cosine tertinggi
+        $totalCosine = $cosinePerPage->sum();
+
+        // Jika tidak ada halaman atau cosine tertinggi, grade = 0
+        if ($totalPages == 0 || $totalCosine == 0) {
+            return 0;
+        }
+
+        // Hitung grade
+        $grade = round($totalCosine / $totalPages, 2); // Rata-rata cosine, dibulatkan 2 desimal
+        return $grade;
+    }
+
     public function topicByDeadline(Request $request)
     {
         $validator = Validator::make($request->all(), [
