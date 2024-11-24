@@ -109,7 +109,8 @@ Route::group([
     $router->post('/convert/datatable', [QuestionController::class, 'convertDatatable']);
     $router->post('/bulk-update-threshold', [QuestionController::class, 'bulkUpdateThreshold'])->name('bulkUpdateThreshold');
     $router->post('/bulk-delete', [QuestionController::class, 'bulkDeleteQuestions'])->name('bulkDeleteQuestions');
-    $router->get('/show/{guid}/{language}', [QuestionController::class, 'showData']);
+    $router->get('/show/{guid}', [QuestionController::class, 'showData']);
+    $router->get('/show/{guid}/{language}', [QuestionController::class, 'showDataLanguage']);
     $router->put('/', [QuestionController::class, 'updateData']);
     $router->get('/{guid}', [QuestionController::class, 'getData']);
     $router->delete('/{guid}', [QuestionController::class, 'deleteData']);

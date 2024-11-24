@@ -434,7 +434,7 @@ class QuestionController extends Controller
     }
 
 
-    public function showData($guid, $language, Request $request)
+    public function showDataLanguage($guid, $language, Request $request)
     {
         if ($request['user_id']) {
             $userId = $request['user_id'];
@@ -448,6 +448,33 @@ class QuestionController extends Controller
         } else {
             $data = Question::where('topic_guid', '=', $guid)
                 ->where('language', '=', $language) // Filter berdasarkan bahasa
+                ->orderByRaw('cast(page as unsigned) asc')
+                ->get();
+        }
+
+        if (!isset($data) || $data->isEmpty()) {
+            return ResponseController::getResponse(null, 400, "Data not found");
+        }
+
+        $dataTable = DataTables::of($data)
+            ->addIndexColumn()
+            ->make(true);
+
+        return $dataTable;
+    }
+
+    public function showData($guid, Request $request)
+    {
+        if ($request['user_id']) {
+            $userId = $request['user_id'];
+            $data = Question::with(['user_answer' => function ($query) use ($userId) {
+                $query->where('user_id', '=', $userId);
+            }])
+                ->where('topic_guid', '=', $guid)
+                ->orderByRaw('cast(page as unsigned) asc')
+                ->get();
+        } else {
+            $data = Question::where('topic_guid', '=', $guid)
                 ->orderByRaw('cast(page as unsigned) asc')
                 ->get();
         }
