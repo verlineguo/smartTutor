@@ -48,19 +48,6 @@ class GradeController extends Controller
                     $query->where('topic_guid', '=', $guid);
                 }])
                     ->with(['chathistories' => function ($query) use ($guid) {
-                        $query->where('topic_guid', '=', $guid)->orderBy('created_at', 'desc');
-                    }]);
-            }])
-            ->where('course_code', '=', $code)
-            ->get();
-        $data = UserCourse::whereHas('user', function ($query) use ($guid, $role) {
-            $query->where('role_guid', '=', $role);
-        })
-            ->with(['user' => function ($query) use ($guid) {
-                $query->with(['grade' => function ($query) use ($guid) {
-                    $query->where('topic_guid', '=', $guid);
-                }])
-                    ->with(['chathistories' => function ($query) use ($guid) {
                         $query->where('topic_guid', '=', $guid)
                             ->orderBy('created_at', 'desc');
                     }])
@@ -87,16 +74,19 @@ class GradeController extends Controller
                     ->max('page');
             }
 
-            // Tentukan status
-            $status = 'not submitted';
-            if ($lastChatHistory) {
-                $lastPage = $lastChatHistory->page;
-                $lastSender = $lastChatHistory->sender;
+            // Hitung jumlah halaman yang telah selesai (sender 'cosine')
+            $completedPages = $user->chathistories
+                ->groupBy('page') // Grupkan berdasarkan page
+                ->filter(function ($chats, $page) {
+                    // Ambil chat terakhir berdasarkan created_at
+                    $lastChat = $chats->sortByDesc('created_at')->first();
+                    return $lastChat && $lastChat->sender === 'cosine'; // Periksa jika sender adalah 'cosine'
+                })
+                ->count(); // Hitung jumlah halaman selesai
 
-                if ($lastPage == $highestPage && $lastSender === 'cosine') {
-                    $status = 'submitted';
-                }
-            }
+
+            // Tentukan progres dalam format "x/y"
+            $progress = "{$completedPages}/" . ($highestPage ?? 0);
 
             // Hitung rata-rata cosine_similarity dari chathistories dengan sender 'user'
             $userCosineSimilarity = $user->chathistories
@@ -115,7 +105,7 @@ class GradeController extends Controller
                 'last_page' => $lastChatHistory ? $lastChatHistory->page : null,
                 'last_sender' => $lastChatHistory ? $lastChatHistory->sender : null,
                 'highest_page' => $highestPage,
-                'status' => $status,
+                'progress' => $progress, // Progres "x/y"
                 'grade' => $grade, // Tambahkan grade ke hasil akhir
             ];
         });
@@ -131,6 +121,7 @@ class GradeController extends Controller
 
         return $dataTable;
     }
+
 
     /**
      * Store a newly created resource in storage.

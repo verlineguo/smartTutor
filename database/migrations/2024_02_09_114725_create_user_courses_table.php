@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('user_courses', function (Blueprint $table) {
             $table->uuid('guid')->primary();
             $table->char('course_code', 10);
-            $table->char('user_id', 10);
+            $table->char('user_id', 50);
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
             $table->foreign('course_code')->references('code')->on('courses')->onDelete('cascade');
             $table->timestamps();

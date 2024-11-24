@@ -36,6 +36,7 @@ class Topic extends Model
         'file_path',
         'file_language',
         'translation_metadata',
+        'max_attempt_gpt',
         'time_start',
         'time_end'
     ];

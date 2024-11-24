@@ -15,7 +15,7 @@ class ChatHistoryController extends Controller
     {
         // Validate the request
         $validated = $request->validate([
-            'user_id' => 'required|integer',
+            'user_id' => 'required|string',
             'topic_guid' => 'required|string',
             'message' => 'required|string',
             'sender' => 'required|in:user,bot,cosine',
@@ -56,7 +56,7 @@ class ChatHistoryController extends Controller
         }
 
         // Otherwise, check for remaining questions on the current page
-        return $this->responseForRetry($validated, $similarityMessage, $similarity_score, $question->threshold);
+        return $this->responseForRetry($validated, $similarityMessage, $similarity_score, $question->threshold, $question->language);
     }
 
     /**
@@ -94,7 +94,7 @@ class ChatHistoryController extends Controller
     /**
      * Prepare retry response for when the similarity score is below the threshold.
      */
-    protected function responseForRetry($validated, $similarityMessage, $similarity_score, $threshold)
+    protected function responseForRetry($validated, $similarityMessage, $similarity_score, $threshold, $language)
     {
         // Get already asked questions for this topic and page
         $askedQuestions = ChatHistory::where('user_id', $validated['user_id'])
@@ -106,6 +106,7 @@ class ChatHistoryController extends Controller
         // Find remaining questions for this topic and page
         $remainingQuestions = Question::where('topic_guid', $validated['topic_guid'])
             ->where('page', $validated['page'])
+            ->where('language', $language)
             ->whereNotIn('guid', $askedQuestions)
             ->get();
 
@@ -116,6 +117,17 @@ class ChatHistoryController extends Controller
 
         // Pick a random question from the remaining questions
         $nextQuestion = $remainingQuestions->random();
+        ChatHistory::create([
+            'user_id' => $validated['user_id'],
+            'topic_guid' => $validated['topic_guid'],
+            'message' => $similarityMessage,
+            'sender' => 'cosine',
+            'page' => $validated['page'],
+            'question_guid' => $nextQuestion->guid,
+            'cosine_similarity' => null,
+        ]);
+
+        usleep(1000000);
 
         // Save the retry question to ChatHistory
         ChatHistory::create([
@@ -138,6 +150,98 @@ class ChatHistoryController extends Controller
         ]);
     }
 
+    // protected function responseForRetry($validated, $similarityMessage, $similarity_score, $threshold, $language)
+    // {
+    //     // Cari pertanyaan yang sudah diajukan
+    //     $askedQuestions = ChatHistory::where('user_id', $validated['user_id'])
+    //         ->where('topic_guid', $validated['topic_guid'])
+    //         ->where('page', $validated['page'])
+    //         ->pluck('question_guid')
+    //         ->toArray();
+
+    //     // Cari pertanyaan yang belum diajukan
+    //     $remainingQuestions = Question::where('topic_guid', $validated['topic_guid'])
+    //         ->where('page', $validated['page'])
+    //         ->where('language', $language)
+    //         ->whereNotIn('guid', $askedQuestions)
+    //         ->get();
+
+    //     if ($remainingQuestions->isEmpty()) {
+    //         // Jika stok pertanyaan habis, ambil informasi topik
+    //         $topic = Topic::where('guid', $validated['topic_guid'])->first();
+
+    //         if (!$topic) {
+    //             return response()->json(['error' => 'Topic not found'], 404);
+    //         }
+
+    //         // Panggil Flask API untuk menghasilkan pertanyaan baru
+    //         $flask_url = env('FLASK_API_URL') . '/generate_question';
+
+    //         // Ambil semua pertanyaan yang telah dibuat
+    //         $generatedQuestions = ChatHistory::where('topic_guid', $validated['topic_guid'])
+    //             ->where('page', $validated['page'])
+    //             ->where('sender', 'bot')
+    //             ->pluck('message')
+    //             ->toArray();
+
+    //         // Kirim permintaan ke Flask API
+    //         $response = Http::attach('pdf', file_get_contents($topic->pdf_path), basename($topic->pdf_path))
+    //             ->post($flask_url, [
+    //                 'language' => $language,
+    //                 'page' => $validated['page'],
+    //                 'generated_questions' => $generatedQuestions,
+    //             ]);
+
+    //         if ($response->failed()) {
+    //             return response()->json(['error' => 'Failed to generate new question from Flask API'], 500);
+    //         }
+
+    //         $newQuestion = $response->json()['question'];
+
+    //         // Simpan pertanyaan baru ke dalam ChatHistory
+    //         ChatHistory::create([
+    //             'user_id' => $validated['user_id'],
+    //             'topic_guid' => $validated['topic_guid'],
+    //             'message' => $newQuestion,
+    //             'sender' => 'bot',
+    //             'page' => $validated['page'],
+    //             'question_guid' => null, // Karena pertanyaan dihasilkan oleh Flask
+    //             'cosine_similarity' => null,
+    //         ]);
+
+    //         return response()->json([
+    //             'status' => 'retry',
+    //             'nextQuestion' => $newQuestion,
+    //             'nextQuestionGuid' => null,
+    //             'similarityMessage' => $similarityMessage,
+    //             'similarity_score' => $similarity_score,
+    //             'threshold' => $threshold,
+    //         ]);
+    //     }
+
+    //     // Jika masih ada pertanyaan yang tersisa, pilih satu secara acak
+    //     $nextQuestion = $remainingQuestions->random();
+
+    //     // Simpan ke dalam ChatHistory
+    //     ChatHistory::create([
+    //         'user_id' => $validated['user_id'],
+    //         'topic_guid' => $validated['topic_guid'],
+    //         'message' => $nextQuestion->question_fix,
+    //         'sender' => 'bot',
+    //         'page' => $validated['page'],
+    //         'question_guid' => $nextQuestion->guid,
+    //         'cosine_similarity' => null,
+    //     ]);
+
+    //     return response()->json([
+    //         'status' => 'retry',
+    //         'nextQuestion' => $nextQuestion->question_fix,
+    //         'nextQuestionGuid' => $nextQuestion->guid,
+    //         'similarityMessage' => $similarityMessage,
+    //         'similarity_score' => $similarity_score,
+    //         'threshold' => $threshold,
+    //     ]);
+    // }
 
 
 
@@ -183,5 +287,30 @@ class ChatHistoryController extends Controller
             ->pluck('language');
 
         return response()->json(['data' => $languages]);
+    }
+
+    public function resetHistories(Request $request)
+    {
+        // Validasi input untuk memastikan user_id dan topic_guid diberikan
+        $validated = $request->validate([
+            'user_id' => 'required|string',
+            'topic_guid' => 'required|string',
+        ]);
+
+        // Hapus semua chat histories berdasarkan user_id dan topic_guid
+        $deleted = ChatHistory::where('user_id', $validated['user_id'])
+            ->where('topic_guid', $validated['topic_guid'])
+            ->delete();
+
+        // Periksa apakah ada data yang dihapus
+        if ($deleted) {
+            return response()->json([
+                'message' => 'Chat histories have been successfully reset.',
+            ], 200); // Respon sukses
+        } else {
+            return response()->json([
+                'message' => 'No chat histories found for the given user and topic.',
+            ], 404); // Respon jika tidak ada data ditemukan
+        }
     }
 }

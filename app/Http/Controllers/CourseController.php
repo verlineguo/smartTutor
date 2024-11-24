@@ -20,6 +20,7 @@ class CourseController extends Controller
             'code' => 'required|string|max:10',
             'user_id' => 'required|string|max:10',
             'description' => 'required|string',
+            'status' => 'required|string',
         ], MessagesController::messages());
 
         if ($validator->fails()) {
@@ -29,6 +30,7 @@ class CourseController extends Controller
             'code' => $request['code'],
             'name' => $request['name'],
             'description' => $request['description'],
+            'status' => $request['status'],
         ]);
         $data = UserCourse::create([
             'course_code' => $request['code'],
@@ -40,7 +42,7 @@ class CourseController extends Controller
     public function showData(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'user_id' => 'required|string|max:10',
+            'user_id' => 'required|string',
             'role_name' => 'required|string|max:10',
         ], MessagesController::messages());
 
@@ -48,11 +50,36 @@ class CourseController extends Controller
             return ResponseController::getResponse(null, 422, $validator->errors()->first());
         }
 
-        if ($request['role_name'] == "admin") {
+        $userId = $request['user_id'];
+        $roleName = $request['role_name'];
+
+        if ($roleName == "admin") {
+            // Jika admin, tampilkan semua data
             $data = Course::all();
+        } else if ($roleName == "student") {
+            // Ambil semua course public
+            $publicCourses = Course::where('status', 'public')->pluck('code')->toArray();
+
+            // Ambil daftar course_code yang sudah diikuti oleh user
+            $userCourses = UserCourse::where('user_id', '=', $userId)->pluck('course_code')->toArray();
+
+            // Cari kursus public yang belum di-enroll
+            $unenrolledCourses = array_diff($publicCourses, $userCourses);
+
+            // Enroll user ke setiap kursus public yang belum diikuti
+            foreach ($unenrolledCourses as $courseCode) {
+                UserCourse::create([
+                    'user_id' => $userId,
+                    'course_code' => $courseCode,
+                ]);
+            }
+
+            // Ambil semua kursus yang sudah di-enroll oleh user
+            $data = Course::whereIn('code', $userCourses)->orWhereIn('code', $unenrolledCourses)->get();
         } else {
-            $userCourse = UserCourse::where('user_id', '=', $request['user_id'])->pluck('course_code')->toArray();
-            $assistant = Assistant::where('user_id', '=', $request['user_id'])->pluck('course_code')->toArray();
+            // Jika bukan admin atau student, cek berdasarkan user_id + assistant role
+            $userCourse = UserCourse::where('user_id', '=', $userId)->pluck('course_code')->toArray();
+            $assistant = Assistant::where('user_id', '=', $userId)->pluck('course_code')->toArray();
 
             $combinedCodes = array_merge($userCourse, $assistant);
 
@@ -62,12 +89,14 @@ class CourseController extends Controller
         if (!isset($data)) {
             return ResponseController::getResponse(null, 400, "Data not found");
         }
+
         $dataTable = DataTables::of($data)
             ->addIndexColumn()
             ->make(true);
 
         return $dataTable;
     }
+
     public function getData($code)
     {
         $data = Course::where('code', '=', $code)->first();
@@ -81,6 +110,7 @@ class CourseController extends Controller
             'code_old' => 'required|string|max:10',
             'code_new' => 'required|string|max:10',
             'description' => 'required|string',
+            'status' => 'required|string',
         ], MessagesController::messages());
 
         if ($validator->fails()) {
@@ -96,6 +126,7 @@ class CourseController extends Controller
         $data->code = $request['code_new'];
         $data->name = $request['name'];
         $data->description = $request['description'];
+        $data->status = $request['status'];
         $data->save();
 
         return ResponseController::getResponse($data, 200, 'Success');

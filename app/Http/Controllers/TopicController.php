@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Course;
 use App\Models\Grade;
 use App\Models\Topic;
+use App\Models\User;
 use App\Models\UserCourse;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -19,6 +21,7 @@ class TopicController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:100',
             'description' => 'required|string',
+            'max_attempt_gpt' => 'required|int',
             'course_code' => 'required|string|max:10',
             'time_start' => 'required|date_format:Y-m-d\TH:i',
             'time_end' => 'required|date_format:Y-m-d\TH:i|after:' . $request['time_start'],
@@ -31,6 +34,7 @@ class TopicController extends Controller
             'name' => $request['name'],
             'description' => $request['description'],
             'course_code' => $request['course_code'],
+            'max_attempt_gpt' => $request['max_attempt_gpt'],
             'time_start' => $request['time_start'],
             'time_end' => $request['time_end'],
         ]);
@@ -90,6 +94,23 @@ class TopicController extends Controller
             return ResponseController::getResponse(null, 422, $validator->errors()->first());
         }
         $id = $request['id'];
+        // Ambil role_name dari user
+        $user = User::with('role')->where('id', $id)->first();
+
+        // Periksa apakah user memiliki role dan apakah role_name adalah 'student'
+        if ($user && $user->role->role_name === 'student') {
+            $publicCourses = Course::where('status', 'public')->pluck('code')->toArray(); // Semua kursus public
+            $userCourses = UserCourse::where('user_id', '=', $id)->pluck('course_code')->toArray(); // Kursus yang sudah diikuti
+            $unenrolledCourses = array_diff($publicCourses, $userCourses); // Kursus yang belum diikuti
+
+            foreach ($unenrolledCourses as $courseCode) {
+                UserCourse::create([
+                    'user_id' => $id,
+                    'course_code' => $courseCode,
+                ]);
+            }
+        }
+
         $course = UserCourse::where('user_id', '=', $id)->pluck('course_code');
         $currentDateTime = Carbon::now('Asia/Jakarta');
         $topic = Topic::with('course')
@@ -150,6 +171,7 @@ class TopicController extends Controller
             'guid' => 'required|string|max:36',
             'description' => 'required|string',
             'course_code' => 'required|string|max:10',
+            'max_attempt_gpt' => 'required|int',
             'time_start' => 'required|date_format:Y-m-d\TH:i',
             'time_end' => 'required|date_format:Y-m-d\TH:i|after:' . $request['time_start'],
         ], MessagesController::messages());
@@ -167,6 +189,7 @@ class TopicController extends Controller
         $data->name = $request['name'];
         $data->description = $request['description'];
         $data->course_code = $request['course_code'];
+        $data->max_attempt_gpt = $request['max_attempt_gpt'];
         $data->time_start = $request['time_start'];
         $data->time_end = $request['time_end'];
         $data->save();

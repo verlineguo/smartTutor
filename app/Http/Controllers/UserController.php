@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Assistant;
+use App\Models\Course;
 use App\Models\User;
 use Illuminate\Http\Request;
 use App\Models\UserCourse;
@@ -19,6 +20,24 @@ class UserController extends Controller
             ->where('id', auth('api')->user()->id)
             ->first();
 
+        if ($user->role->role_name === 'student') {
+            // Ambil semua kursus public
+            $publicCourses = Course::where('status', 'public')->pluck('code')->toArray();
+
+            // Ambil semua course_code yang sudah di-enroll oleh user
+            $userCourses = UserCourse::where('user_id', $user->id)->pluck('course_code')->toArray();
+
+            // Cari kursus public yang belum di-enroll
+            $unenrolledCourses = array_diff($publicCourses, $userCourses);
+
+            // Enroll user ke kursus public yang belum diikuti
+            foreach ($unenrolledCourses as $courseCode) {
+                UserCourse::create([
+                    'user_id' => $user->id,
+                    'course_code' => $courseCode,
+                ]);
+            }
+        }
         return ResponseController::getResponse($user, 200, 'Get Profile User Success');
     }
     public function filterUserCourse(Request $request)

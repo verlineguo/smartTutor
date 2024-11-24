@@ -15,6 +15,7 @@ return new class extends Migration
             $table->char('code', 10)->primary();
             $table->char('name', 100);
             $table->string('description')->nullable();
+            $table->enum('status', ['public', 'private'])->default('private');
             $table->timestamps();
         });
     }

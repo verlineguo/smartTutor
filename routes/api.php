@@ -129,6 +129,7 @@ Route::group([
     $router->get('/question', [ChatbotController::class, 'getQuestion']);
     $router->post('/answer', [ChatbotController::class, 'answerQuestion']);
     $router->post('/save', [ChatHistoryController::class, 'saveMessage']);
+    $router->post('/reset-histories', [ChatHistoryController::class, 'resetHistories']);
     $router->get('/history/{topicGuid}/{userId}', [ChatHistoryController::class, 'getHistory']);
     $router->get('/status/{topicGuid}/{userId}', [ChatHistoryController::class, 'checkStatus']);
     $router->get('/languages/{topicGuid}', [ChatHistoryController::class, 'getAvailableLanguages']);
