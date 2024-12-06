@@ -473,8 +473,10 @@
                             scrollToBottom();
                             $("#user-input").prop("disabled", false).focus();
                             currentQuestionGuid = response.nextQuestionGuid;
+                        } else if (response.status === 'no_questions_left') {
+                            // Jika tidak ada pertanyaan tersisa, tampilkan konfirmasi untuk regenerasi
+                            showRegenerateConfirmation();
                         }
-
                     },
                     error: function(xhr) {
                         isSubmitting = false;
@@ -482,6 +484,62 @@
                     }
                 });
             }
+
+            function showRegenerateConfirmation() {
+                // Tampilkan pesan konfirmasi kepada pengguna
+                const confirmationMessage = `
+        <div class="bot-message">
+            All questions for page ${currentPage} have been asked, and you have not yet reached the threshold. Would you like to regenerate with GPT?
+            <br><br>
+            <button id="regenerate-yes" class="btn btn-success">Ya</button>
+            <button id="regenerate-no" class="btn btn-danger">Tidak</button>
+        </div>
+    `;
+                $("#chatbot-container").append(confirmationMessage);
+                scrollToBottom();
+
+                // Tangani pilihan pengguna
+                $("#regenerate-yes").on("click", function() {
+                    handleRegenerateResponse(true);
+                });
+
+                $("#regenerate-no").on("click", function() {
+                    askQuestion(questionsGroupedByPage);
+                });
+            }
+
+            function handleRegenerateResponse(isRegenerate) {
+                $.ajax({
+                    type: "POST",
+                    url: "{{ env('URL_API') }}/api/v1/chatbot/regenerate", // API endpoint untuk handle regenerasi
+                    data: {
+                        user_id: userId,
+                        topic_guid: topicGuid,
+                        page: currentPage,
+                        regenerate: isRegenerate, // true jika pengguna ingin regenerasi, false jika tidak
+                    },
+                    beforeSend: function(request) {
+                        request.setRequestHeader("Authorization", `Bearer ${token}`);
+                    },
+                    success: function(response) {
+                        console.log(response);
+                        const retryMessage = `
+        <div class="bot-message">
+            Retry required! <br>
+            <strong>Page:</strong> ${currentPage} <br>
+            <strong>Threshold:</strong> ${response.newQuestion.threshold || "N/A"} <br>
+            <strong>Message:</strong> ${response.newQuestion.question_fix}
+        </div>`;
+
+                        $("#chatbot-container").append(retryMessage);
+                        scrollToBottom();
+                    },
+                    error: function(xhr) {
+                        console.error(`Error sending regenerate response: ${xhr.statusText}`);
+                    }
+                });
+            }
+
         });
     </script>
 @endsection
