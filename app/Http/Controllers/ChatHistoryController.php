@@ -7,7 +7,10 @@ use App\Models\Question;
 use App\Models\Topic;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class ChatHistoryController extends Controller
 {
@@ -110,22 +113,29 @@ class ChatHistoryController extends Controller
             ->whereNotIn('guid', $askedQuestions)
             ->get();
 
-        if ($remainingQuestions->isEmpty()) {
-            // If no remaining questions, proceed to next page
-            return $this->responseForSuccess($validated['page'], $similarityMessage, $similarity_score, $threshold);
-        }
-
-        // Pick a random question from the remaining questions
-        $nextQuestion = $remainingQuestions->random();
         ChatHistory::create([
             'user_id' => $validated['user_id'],
             'topic_guid' => $validated['topic_guid'],
             'message' => $similarityMessage,
             'sender' => 'cosine',
             'page' => $validated['page'],
-            'question_guid' => $nextQuestion->guid,
+            'question_guid' => $validated['question_guid'],
             'cosine_similarity' => null,
         ]);
+        // If no remaining questions, ask if the user wants to generate new questions
+        if ($remainingQuestions->isEmpty()) {
+            // Respond with a message to the frontend asking if the user wants to regenerate questions
+            return response()->json([
+                'status' => 'no_questions_left',
+                'message' => 'No remaining questions. Would you like to regenerate questions?',
+                'similarityMessage' => $similarityMessage,
+                'similarity_score' => $similarity_score,
+            ]);
+        }
+
+        // If there are remaining questions, select the next question and continue
+        $nextQuestion = $remainingQuestions->random();
+
 
         usleep(1000000);
 
@@ -150,98 +160,144 @@ class ChatHistoryController extends Controller
         ]);
     }
 
-    // protected function responseForRetry($validated, $similarityMessage, $similarity_score, $threshold, $language)
-    // {
-    //     // Cari pertanyaan yang sudah diajukan
-    //     $askedQuestions = ChatHistory::where('user_id', $validated['user_id'])
-    //         ->where('topic_guid', $validated['topic_guid'])
-    //         ->where('page', $validated['page'])
-    //         ->pluck('question_guid')
-    //         ->toArray();
 
-    //     // Cari pertanyaan yang belum diajukan
-    //     $remainingQuestions = Question::where('topic_guid', $validated['topic_guid'])
-    //         ->where('page', $validated['page'])
-    //         ->where('language', $language)
-    //         ->whereNotIn('guid', $askedQuestions)
-    //         ->get();
+    public function regenerateQuestions(Request $request)
+    {
+        set_time_limit(2000);
 
-    //     if ($remainingQuestions->isEmpty()) {
-    //         // Jika stok pertanyaan habis, ambil informasi topik
-    //         $topic = Topic::where('guid', $validated['topic_guid'])->first();
+        // Validasi input dari pengguna
+        $validated = $request->validate([
+            'user_id' => 'required|string',
+            'topic_guid' => 'required|string',
+            'page' => 'required|integer',
+            'regenerate' => 'required|string',  // Validate regenerate as string ('true' or 'false')
+        ]);
 
-    //         if (!$topic) {
-    //             return response()->json(['error' => 'Topic not found'], 404);
-    //         }
+        // Convert regenerate string ('true'/'false') to boolean
+        $isRegenerate = filter_var($validated['regenerate'], FILTER_VALIDATE_BOOLEAN);
 
-    //         // Panggil Flask API untuk menghasilkan pertanyaan baru
-    //         $flask_url = env('FLASK_API_URL') . '/generate_question';
+        // Ambil topik berdasarkan topic_guid
+        $topic = Topic::where('guid', $validated['topic_guid'])->first();
+        if (!$topic) {
+            return response()->json(['status' => 'error', 'message' => 'Topic not found.']);
+        }
 
-    //         // Ambil semua pertanyaan yang telah dibuat
-    //         $generatedQuestions = ChatHistory::where('topic_guid', $validated['topic_guid'])
-    //             ->where('page', $validated['page'])
-    //             ->where('sender', 'bot')
-    //             ->pluck('message')
-    //             ->toArray();
+        // Ambil attempt terakhir yang digunakan oleh user_id untuk topik ini
+        $userLastAttempt = Question::where('user_id', $validated['user_id'])
+            ->where('topic_guid', $validated['topic_guid'])
+            ->max('attempt'); // Cari nilai attempt tertinggi
 
-    //         // Kirim permintaan ke Flask API
-    //         $response = Http::attach('pdf', file_get_contents($topic->pdf_path), basename($topic->pdf_path))
-    //             ->post($flask_url, [
-    //                 'language' => $language,
-    //                 'page' => $validated['page'],
-    //                 'generated_questions' => $generatedQuestions,
-    //             ]);
+        // Tentukan attempt saat ini
+        $currentAttempt = $userLastAttempt ? $userLastAttempt + 1 : 1;
 
-    //         if ($response->failed()) {
-    //             return response()->json(['error' => 'Failed to generate new question from Flask API'], 500);
-    //         }
+        // Cek apakah attempt yang diizinkan masih ada
+        if ($currentAttempt > $topic->max_attempt_gpt) {
+            return response()->json([
+                'status' => 'no_attempts_left',
+                'message' => 'You have reached the maximum attempts for this topic. Proceeding without regeneration.',
+            ]);
+        }
 
-    //         $newQuestion = $response->json()['question'];
+        // Jika regenerasi diinginkan dan masih ada sisa attempt
+        if ($isRegenerate) {
+            // Proses regenerasi pertanyaan
+            $askedQuestions = ChatHistory::where('user_id', $validated['user_id'])
+                ->where('topic_guid', $validated['topic_guid'])
+                ->where('page', $validated['page'])
+                ->pluck('question_guid')
+                ->toArray();
 
-    //         // Simpan pertanyaan baru ke dalam ChatHistory
-    //         ChatHistory::create([
-    //             'user_id' => $validated['user_id'],
-    //             'topic_guid' => $validated['topic_guid'],
-    //             'message' => $newQuestion,
-    //             'sender' => 'bot',
-    //             'page' => $validated['page'],
-    //             'question_guid' => null, // Karena pertanyaan dihasilkan oleh Flask
-    //             'cosine_similarity' => null,
-    //         ]);
+            // Ambil pertanyaan yang sudah diajukan berdasarkan GUID
+            $existingQuestions = Question::whereIn('guid', $askedQuestions)
+                ->pluck('question_fix')
+                ->toArray();
 
-    //         return response()->json([
-    //             'status' => 'retry',
-    //             'nextQuestion' => $newQuestion,
-    //             'nextQuestionGuid' => null,
-    //             'similarityMessage' => $similarityMessage,
-    //             'similarity_score' => $similarity_score,
-    //             'threshold' => $threshold,
-    //         ]);
-    //     }
+            // Ambil path file PDF dari topik
+            $pdf_file_path = $topic->file_path;
 
-    //     // Jika masih ada pertanyaan yang tersisa, pilih satu secara acak
-    //     $nextQuestion = $remainingQuestions->random();
+            // Menentukan path lengkap menggunakan storage_path
+            $full_pdf_path = storage_path('app/public/' . $pdf_file_path);
 
-    //     // Simpan ke dalam ChatHistory
-    //     ChatHistory::create([
-    //         'user_id' => $validated['user_id'],
-    //         'topic_guid' => $validated['topic_guid'],
-    //         'message' => $nextQuestion->question_fix,
-    //         'sender' => 'bot',
-    //         'page' => $validated['page'],
-    //         'question_guid' => $nextQuestion->guid,
-    //         'cosine_similarity' => null,
-    //     ]);
+            // Memeriksa apakah file PDF ada
+            if (!file_exists($full_pdf_path)) {
+                // Mengembalikan response error jika file tidak ditemukan
+                return response()->json(['status' => 'error', 'message' => 'PDF file not found at ' . $full_pdf_path]);
+            }
 
-    //     return response()->json([
-    //         'status' => 'retry',
-    //         'nextQuestion' => $nextQuestion->question_fix,
-    //         'nextQuestionGuid' => $nextQuestion->guid,
-    //         'similarityMessage' => $similarityMessage,
-    //         'similarity_score' => $similarity_score,
-    //         'threshold' => $threshold,
-    //     ]);
-    // }
+            // Mengambil konten file PDF
+
+            // Ambil data terakhir dari tabel chathistory untuk user_id dan topic_guid yang sesuai
+            $lastChatHistory = ChatHistory::where('user_id', $validated['user_id'])
+                ->where('topic_guid', $validated['topic_guid'])
+                ->orderBy('created_at', 'desc')
+                ->first();
+
+            // Jika ada record chathistory terakhir, ambil question_guid-nya
+            if ($lastChatHistory) {
+                $questionGuidFromHistory = $lastChatHistory->question_guid;
+
+                // Cari threshold berdasarkan question_guid dari tabel question
+                $lastQuestion = Question::where('guid', $questionGuidFromHistory)->first();
+                $language = $lastQuestion->language;
+
+                // Tentukan nilai threshold dari pertanyaan terakhir
+                $threshold = $lastQuestion ? $lastQuestion->threshold : null;
+            } else {
+                // Jika tidak ada record chathistory, threshold bisa null atau nilai default lainnya
+                $threshold = null;
+            }
+
+            // Kirim file PDF ke Flask untuk mendapatkan pertanyaan baru
+            $response = Http::attach('pdf', file_get_contents($full_pdf_path), 'file.pdf')
+                ->timeout(1500)
+                ->post(env('FLASK_API_URL') . '/regenerate', [
+                    'page' => $validated['page'],
+                    'language' => $language,
+                    'existing_questions' => json_encode($existingQuestions), // Encode array to JSON
+                ]);
+
+
+
+            Log::info('Flask API Response:', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+                'json' => $response->json() // Bisa dicatat dalam format JSON jika diperlukan
+            ]);
+
+            // Periksa apakah API Flask berhasil
+            if ($response->failed()) {
+                return response()->json(['status' => 'error', 'message' => 'Failed to regenerate questions.']);
+            }
+
+            // Ambil pertanyaan baru dari response Flask
+            $newQuestion = $response->json()['data']['questions'][0];
+
+            // Simpan pertanyaan baru ke database dengan increment attempt
+
+            $question = Question::create([
+                'question_ai' => $newQuestion['question'],
+                'question_fix' => $newQuestion['question'],
+                'answer_ai' => $newQuestion['answer'],
+                'answer_fix' => $newQuestion['answer'],
+                'topic_guid' => $validated['topic_guid'],
+                'category' => $newQuestion['category'],
+                'user_id' => $validated['user_id'],
+                'attempt' => $currentAttempt, // Increment attempt untuk setiap user
+                'language' => $language,
+                'weight' => 0,
+                'threshold' => $threshold, // Menggunakan threshold dari pertanyaan terakhir
+            ]);
+
+
+            // Kirim respons sukses dengan pertanyaan baru
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Questions have been regenerated successfully.',
+                'newQuestion' => $question,  // Pertanyaan baru dari Flask
+            ]);
+        }
+    }
+
 
 
 

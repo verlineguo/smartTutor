@@ -99,9 +99,9 @@ Route::group([
     'prefix' => $url . 'question',
     'middleware' => 'jwt.verify'
 ], function ($router) {
-    $router->post('/upload-file', [QuestionController::class, 'uploadFile']);
-    $router->get('/generate', [QuestionController::class, 'generateData']);
-    $router->get('/check-cossine', [QuestionController::class, 'checkCossine']);
+    // $router->post('/upload-file', [QuestionController::class, 'uploadFile']);
+    // $router->get('/generate', [QuestionController::class, 'generateData']);
+    // $router->get('/check-cossine', [QuestionController::class, 'checkCossine']);
     $router->post('/translate', [QuestionController::class, 'translateDocument']);
     $router->post('/tfidf', [QuestionController::class, 'calculateTfidf']);
     $router->post('/save', [QuestionController::class, 'saveQuestions']);
@@ -126,10 +126,11 @@ Route::group([
     'prefix' => $url . 'chatbot',
     'middleware' => 'jwt.verify'
 ], function ($router) {
-    $router->get('/question', [ChatbotController::class, 'getQuestion']);
-    $router->post('/answer', [ChatbotController::class, 'answerQuestion']);
+    // $router->get('/question', [ChatbotController::class, 'getQuestion']);
+    // $router->post('/answer', [ChatbotController::class, 'answerQuestion']);
     $router->post('/save', [ChatHistoryController::class, 'saveMessage']);
     $router->post('/reset-histories', [ChatHistoryController::class, 'resetHistories']);
+    $router->post('/regenerate', [ChatHistoryController::class, 'regenerateQuestions']);
     $router->get('/history/{topicGuid}/{userId}', [ChatHistoryController::class, 'getHistory']);
     $router->get('/status/{topicGuid}/{userId}', [ChatHistoryController::class, 'checkStatus']);
     $router->get('/languages/{topicGuid}', [ChatHistoryController::class, 'getAvailableLanguages']);
