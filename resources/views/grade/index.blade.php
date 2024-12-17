@@ -98,7 +98,7 @@
                     success: function(response) {
                         alert("Chat histories have been successfully reset!");
                         // Refresh data table atau halaman jika perlu
-                        $('#dataTable').DataTable().ajax.reload();
+                        window.location.reload()
                     },
                     error: function(xhr) {
                         alert("Failed to reset chat histories. Please try again.");

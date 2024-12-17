@@ -170,19 +170,19 @@
                             </div>
 
                             <!-- Kata Benda -->
-                            <div class="mb-3" id="nounInput">
+                            {{-- <div class="mb-3" id="nounInput">
                                 <label for="questionInput" class="form-label">Noun with ","</label>
                                 <input type="text" class="form-control" id="questionInput" name="questionInput">
-                            </div>
+                            </div> --}}
 
                             <!-- Skip Pages -->
-                            <div class="d-flex align-items-center" id="skipButton" style="display: none;">
+                            {{-- <div class="d-flex align-items-center" id="skipButton" style="display: none;">
                                 <div class="form-check" id="skipButton">
                                     <input type="checkbox" class="form-check-input" id="skipPagesCheckbox">
                                     <label class="mt-1 form-check-label" for="skipPagesCheckbox">Skip Unprocessable
                                         Pages</label>
                                 </div>
-                            </div>
+                            </div> --}}
 
                             <button type="submit" class="btn btn-primary">Submit</button>
                         </form>
@@ -634,19 +634,19 @@
             $('#questionInput').on('input', function() {
                 if ($(this).val() !== '') {
                     $('#pdfUpload').hide();
-                    $('#skipButton').hide();
+                    // $('#skipButton').hide();
                 } else {
                     $('#pdfUpload').show();
-                    $('#skipButton').show();
+                    // $('#skipButton').show();
                 }
             });
 
             $('#pdfInput').on('change', function() {
                 if ($(this).prop('files').length > 0) {
-                    $('#nounInput').hide();
-                    $('#skipButton').show();
+                    // $('#nounInput').hide();
+                    // $('#skipButton').show();
                 } else {
-                    $('#nounInput').show();
+                    // $('#nounInput').show();
                 }
             });
 
@@ -731,15 +731,15 @@
                                 $('#filePathDisplay').show();
                                 $('#deleteFilePath').show();
                                 $('#pdfUpload').hide();
-                                $('#nounInput').hide();
-                                $('#skipButton').show();
+                                // $('#nounInput').hide();
+                                // $('#skipButton').show();
                                 $('#fileLanguageContainer')
                                     .hide(); // Hide "File Language" if file exists
                             } else {
                                 $('#filePathDisplay').hide();
                                 $('#deleteFilePath').hide();
                                 $('#pdfUpload').show();
-                                $('#nounInput').show();
+                                // $('#nounInput').show();
                                 $('#fileLanguageContainer')
                                     .show(); // Show "File Language" if no file
                             }
@@ -753,7 +753,7 @@
                     $('#filePathDisplay').hide();
                     $('#deleteFilePath').hide();
                     $('#pdfUpload').hide();
-                    $('#nounInput').show();
+                    // $('#nounInput').show();
                     $('#fileLanguageContainer').show(); // Show "File Language" if no topic selected
                 }
             });
@@ -775,7 +775,7 @@
                         $('#filePathDisplay').hide();
                         $('#deleteFilePath').hide();
                         $('#pdfUpload').show();
-                        $('#nounInput').show();
+                        // $('#nounInput').show();
                         $('#fileLanguageContainer').show();
                         cachedFilePath = null;
                         alert('File berhasil dihapus');

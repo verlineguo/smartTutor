@@ -227,7 +227,7 @@
                     "type": "GET",
                     "beforeSend": function(request) {
                         request.setRequestHeader("Authorization", "Bearer {{ $token }}");
-                    },
+                    }
                 },
                 "columns": [{
                         data: null,

@@ -17,8 +17,8 @@
 @endsection
 @section('content')
     <main class="main-content position-relative max-height-vh-100 h-100 mt-1 border-radius-lg ">
-        <div class="col-md-3"><a class="btn btn-primary w-100" role="button" id="csv">Upload CSV<i class=""
-                    style="text-decoration: none; margin-left: 10px;"></i></a>
+        <div class="col-md-3"><a class="btn btn-primary w-100" role="button" id="csv">Upload CSV/Excel<i
+                    class="" style="text-decoration: none; margin-left: 10px;"></i></a>
         </div>
         <div class="container-xxl flex-grow-1 container-p-y" id="table-container">
             <!-- DataTable with Buttons -->
@@ -41,22 +41,30 @@
                 </div>
             </div>
         </div>
-        {{-- Modal Add Via CSV --}}
+        <!-- Modal Add Via CSV/Excel -->
         <div class="modal fade" id="csvModal" tabindex="-1" aria-labelledby="addViaCSVLabel" aria-hidden="true">
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title" id="addViaCSVLabel">Add Via CSV</h5>
+                        <h5 class="modal-title" id="addViaCSVLabel">Add Via CSV/Excel</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         <form id="addViaCSVForm">
                             <div class="mb-3" id="uploadCSV">
-                                <label for="csvInput" class="form-label">Upload CSV</label>
-                                <input type="file" class="form-control" id="csvInput" name="csvInput" accept=".csv">
-                                <button type="button" class="btn btn-danger mt-2" id="cancelCSV">Cancel</button>
+                                <label for="csvInput" class="form-label">Upload CSV/Excel</label>
+                                <input type="file" class="form-control" id="csvInput" name="csvInput"
+                                    accept=".csv, .xls, .xlsx">
                             </div>
-                            <button type="submit" class="btn btn-primary">Submit</button>
+                            <!-- Tautan untuk mengunduh file contoh -->
+                            <div class="mb-3">
+                                <a href="{{ asset('storage/example.xlsx') }}" class="btn btn-secondary" download>Download
+                                    Excel Format</a>
+                            </div>
+                            <div class="d-flex justify-content-end mt-3">
+                                <button type="button" class="btn btn-danger me-2" id="cancelCSV">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Submit</button>
+                            </div>
                         </form>
                     </div>
                 </div>
@@ -118,6 +126,7 @@
                     contentType: false,
                     processData: false,
                     success: function(response) {
+                        // console.log(response);
                         $('#table-data').DataTable({
                             "dom": "lrt",
                             "bFilter": false,

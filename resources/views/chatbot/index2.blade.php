@@ -9,6 +9,7 @@
 
 @section('add-css')
     <style>
+        /* Chatbot Container */
         .chatbot-container {
             border: 1px solid #ccc;
             border-radius: 10px;
@@ -21,129 +22,115 @@
             font-family: 'Arial', sans-serif;
             display: flex;
             flex-direction: column;
+            gap: 15px;
+            /* Jarak antar pesan */
             display: none;
         }
 
-        .bot-message,
-        .user-message {
-            margin-bottom: 15px;
-            max-width: 80%;
-            padding: 10px;
-            border-radius: 15px;
-            font-size: 14px;
-            line-height: 1.4;
-        }
-
+        /* Pesan Bot */
         .bot-message {
             background-color: #e0f7fa;
             color: #00796b;
             align-self: flex-start;
-            margin-right: auto;
+            padding: 12px 15px;
+            border-radius: 15px;
+            max-width: 75%;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 10px;
         }
 
+        /* Pesan User */
         .user-message {
             background-color: #fff3e0;
             color: #ff5722;
             align-self: flex-end;
-            margin-left: auto;
-        }
-
-        .input-group textarea {
-            resize: none;
-            /* Disable manual resizing */
-            overflow-y: auto;
-            /* Sembunyikan scrollbar vertikal */
-            max-height: 150px;
-            /* Batasi tinggi maksimum */
-            min-height: 50px;
-            /* Tetapkan tinggi minimum */
-            border: none;
-            /* border-radius: 20px; */
-            padding: 10px;
+            padding: 12px 15px;
+            border-radius: 15px;
+            max-width: 75%;
             font-size: 14px;
             line-height: 1.5;
+            margin-bottom: 10px;
         }
 
-        * {
-            box-sizing: border-box;
-            /* Pastikan padding dan border diperhitungkan */
-        }
-
+        /* Input Group (textarea dan tombol kirim) */
         .input-group {
             display: flex;
-            /* Gunakan flexbox */
+            flex-direction: column;
+            /* Kolom untuk textarea dan tombol */
             align-items: stretch;
-            /* Semua elemen akan memenuhi tinggi yang sama */
-            border: 1px solid #ddd;
-            border-radius: 20px;
-            overflow: hidden;
-            /* Hilangkan elemen yang keluar */
-            background-color: #fff;
+            /* Semua elemen memenuhi lebar */
+            gap: 10px;
+            width: 100%;
+            /* Lebar penuh */
         }
 
         .input-group textarea {
-            resize: none;
-            /* Nonaktifkan resize manual */
-            overflow-y: auto;
-            /* Aktifkan scrollbar vertikal jika diperlukan */
-            height: auto;
-            /* Sesuaikan tinggi berdasarkan konten */
+            width: 100%;
+            /* Lebar penuh */
             min-height: 50px;
-            /* Tetapkan tinggi minimum */
-            max-height: 150px;
-            /* Tetapkan tinggi maksimum */
-            border: none;
+            max-height: 120px;
+            resize: none;
+            border: 1px solid #ddd;
             padding: 10px;
             font-size: 14px;
             line-height: 1.5;
-            flex-grow: 1;
-            /* Biarkan textarea mengambil ruang yang tersedia */
+            outline: none;
+            overflow-y: auto;
+            font-family: 'Arial', sans-serif;
+            border-radius: 20px;
+            background-color: #f5f5f5;
         }
 
+        /* Tombol Kirim (Send) */
         .input-group button {
             background-color: #00796b;
-            /* Warna tombol */
             color: #fff;
             border: none;
             font-size: 14px;
             cursor: pointer;
-            display: flex;
-            align-items: center;
-            /* Pusatkan konten secara vertikal */
-            justify-content: center;
-            /* Pusatkan konten secara horizontal */
-            padding: 0 20px;
-            /* Tambahkan jarak horizontal */
-            height: auto;
-            /* Sesuaikan tinggi tombol dengan textarea */
-            min-height: 50px;
-            /* Tinggi minimum */
-            border-left: 1px solid #ddd;
-            /* Tambahkan pembatas di sebelah kiri */
+            padding: 8px 15px;
+            /* Padding lebih kecil untuk tombol */
+            border-radius: 20px 0 0 20px;
+            /* Round kiri tombol */
+            width: auto;
+            /* Tombol hanya sebesar kontennya */
+            max-width: 200px;
+            /* Batasi lebar maksimal tombol */
+            margin-left: auto;
+            /* Memindahkan tombol ke kanan */
             transition: background-color 0.3s ease;
-            /* Efek hover */
         }
 
         .input-group button:hover {
             background-color: #004d40;
-            /* Warna tombol saat di-hover */
         }
 
-        .input-group textarea,
-        .input-group button {
-            margin: 0;
-            /* Hapus margin tambahan */
-            outline: none;
-            /* Hapus outline bawaan */
-        }
+        /* Responsivitas: Agar chat container lebih responsif */
+        @media (max-width: 768px) {
+            .chatbot-container {
+                height: 350px;
+                padding: 15px;
+            }
 
+            .input-group textarea {
+                min-height: 50px;
+                max-height: 150px;
+                /* Tinggi maksimum textarea lebih besar pada mobile */
+            }
 
-
-        .language-selection {
-            margin-bottom: 20px;
+            .input-group button {
+                padding: 8px 15px;
+                /* Ukuran padding tombol lebih kecil */
+                max-width: 100px;
+                /* Lebar tombol dibatasi di perangkat kecil */
+            }
         }
     </style>
 @endsection
+
+
+
 
 @section('info-page')
     <ol class="breadcrumb bg-transparent mb-0 pb-0 pt-1 px-0 me-sm-6 me-5">
@@ -171,9 +158,15 @@
         <button id="send-button" class="btn">Send</button>
     </div>
 @endsection
-
+@section('vendor-javascript')
+    <script src="https://cdn.tiny.cloud/1/lvz6goxyxn405p74zr5vcn0xmwy7mmff6jf5wjqki5abvi3g/tinymce/7/tinymce.min.js"
+        referrerpolicy="origin"></script>
+@endsection
 @section('custom-javascript')
     <script type="text/javascript">
+        tinymce.init({
+            selector: '#user-input'
+        });
         $(document).ready(function() {
             const userId = "{{ $id }}";
             const topicGuid = "{{ $guid }}";
@@ -212,6 +205,8 @@
                     $("#start-quiz").prop("disabled", !selectedLanguage);
                 });
             });
+            $("#send-button").prop("disabled", true);
+            tinymce.get("user-input").mode.set("readonly");
             // Cek history saat halaman dimuat
             loadChatHistory();
 
@@ -219,7 +214,10 @@
             $("#start-quiz").on("click", function() {
                 $(".language-selection").hide();
                 $(".chatbot-container").show();
+                $("#send-button").prop("disabled", false);
+                tinymce.get("user-input").mode.set("design");
                 fetchQuestions().then(response => {
+                    console.log(response);
                     questionsGroupedByPage = response.data.reduce((acc, question) => {
                         const page = parseInt(question.page, 10) || 1;
                         if (!acc[page]) acc[page] = [];
@@ -243,10 +241,26 @@
                     },
                     success: function(response) {
                         if (response.data.length > 0) {
+                            selectedLanguage = response.language;
                             // Sembunyikan pilihan bahasa
                             $(".language-selection").hide();
                             $(".chatbot-container").show();
+                            $("#send-button").prop("disabled", true);
+                            fetchQuestions().then(response => {
+                                console.log(response);
+                                questionsGroupedByPage = response.data.reduce((acc,
+                                    question) => {
+                                    const page = parseInt(question.page, 10) || 1;
+                                    if (!acc[page]) acc[page] = [];
+                                    acc[page].push(question);
+                                    return acc;
+                                }, {});
 
+                                highestPage = Math.max(...Object.keys(questionsGroupedByPage)
+                                    .map(page =>
+                                        parseInt(page,
+                                            10)));
+                            });
                             response.data.forEach(message => {
                                 const messageClass = (message.sender === 'bot' || message
                                         .sender === 'cosine') ? 'bot-message' :
@@ -255,10 +269,9 @@
                                     `<div class="${messageClass}">${message.message}</div>`
                                 );
                                 if (message.sender === 'bot') {
-                                    const pageMatch = message.message.match(/Page (\d+):/);
-                                    if (pageMatch) {
-                                        currentPage = parseInt(pageMatch[1], 10);
-                                    }
+                                    currentPage = message.page
+                                    console.log(currentPage);
+
                                 }
                             });
 
@@ -267,11 +280,10 @@
                             // Cek kondisi akhir (cosine similarity di halaman terakhir)
                             const lastMessage = response.data[response.data.length - 1];
                             if (
-                                lastMessage.sender === 'cosine' &&
-                                // Pesan terakhir adalah cosine similarity
-                                currentPage === highestPage // Halaman saat ini adalah halaman terakhir
+                                response.regenerate ===
+                                'yes' // Halaman saat ini adalah halaman terakhir
                             ) {
-                                endChat(); // Langsung akhiri chat
+                                showRegenerateConfirmation();
                             } else {
                                 // Lanjutkan ke logika lainnya jika kondisi tidak terpenuhi
                                 const lastPage = currentPage; // Halaman terakhir dari history
@@ -284,10 +296,11 @@
                                 } else if (lastMessage.sender === 'bot' && (!lastMessage
                                         .cosine_similarity || lastMessage.cosine_similarity === null)) {
                                     currentQuestionGuid = lastMessage.question_guid || null;
-                                    $("#user-input").prop("disabled", false).focus();
+                                    $("#send-button").prop("disabled", false);
+                                    tinymce.get("user-input").mode.set("design");
                                 } else if (currentPage >= highestPage) {
                                     isReadOnly = true;
-                                    $("#user-input").prop("disabled", true);
+                                    // $("#user-input").prop("disabled", true);
                                 } else {
                                     if (!isReadOnly && !response.data.some(m => m.sender === 'user' && m
                                             .page === currentPage)) {
@@ -331,7 +344,11 @@
 
                 // Tambahkan threshold ke dalam formattedQuestion
                 const formattedQuestion =
-                    `Page ${currentPage}: ${question.question_fix} (Threshold: ${question.threshold})`;
+                    `<p class="question-text"><strong>Question:</strong> ${question.question_fix}</p>
+            <p class="question-meta">
+                <strong>Page:</strong> <span class="page-number">${currentPage}</span> | 
+                <strong>Threshold:</strong> <span class="threshold-value">${question.threshold || "N/A"}</span>
+            </p>`;
 
                 const lastBotMessage = $("#chatbot-container").find(".bot-message").last().text();
                 if (lastBotMessage === formattedQuestion) {
@@ -342,7 +359,9 @@
                 saveMessageToHistory(formattedQuestion, "bot", currentPage, currentQuestionGuid);
                 $("#chatbot-container").append(`<div class="bot-message">${formattedQuestion}</div>`);
                 scrollToBottom();
-                $("#user-input").prop("disabled", false).focus();
+                tinymce.get("user-input").getBody().setAttribute('contenteditable', true);
+                $("#send-button").prop("disabled", false);
+                tinymce.get("user-input").mode.set("design");
             }
 
 
@@ -361,6 +380,7 @@
                 );
                 scrollToBottom();
                 $("#user-input").prop("disabled", true);
+                tinymce.get("user-input").mode.set("readonly");
             }
 
             function saveMessageToHistory(message, sender, page, questionGuid) {
@@ -406,22 +426,24 @@
 
             // Fungsi untuk menangani klik tombol Send
             $("#send-button").on("click", function() {
-                const answer = $("#user-input").val().trim(); // Ambil nilai dari textarea
+                const answer = tinymce.get("user-input").getContent()
+                    .trim(); // Ambil konten HTML dari TinyMCE
                 if (answer) {
                     // Tampilkan jawaban pengguna di chatbox
                     $("#chatbot-container").append(`<div class="user-message">${answer}</div>`);
                     scrollToBottom(); // Gulir ke bawah chatbox
-                    $("#user-input").val(""); // Kosongkan textarea
-                    $("#user-input").css("height", "50px"); // Reset tinggi textarea
+                    tinymce.get("user-input").setContent("");
+                    tinymce.get("user-input").mode.set("readonly");
+                    $("#send-button").prop("disabled", true);
                     submitAnswer(answer); // Kirim jawaban ke server
                 }
             });
 
             // Sesuaikan tinggi textarea saat pengguna mengetik
-            $("#user-input").on("input", function() {
-                this.style.height = "auto"; // Reset tinggi agar bisa dihitung ulang
-                this.style.height = `${this.scrollHeight}px`; // Atur tinggi sesuai konten
-            });
+            // $("#user-input").on("input", function() {
+            //     this.style.height = "auto"; // Reset tinggi agar bisa dihitung ulang
+            //     this.style.height = `${this.scrollHeight}px`; // Atur tinggi sesuai konten
+            // });
 
 
 
@@ -429,7 +451,7 @@
                 if (isSubmitting) return;
                 isSubmitting = true;
 
-                $("#user-input").prop("disabled", true);
+                // $("#user-input").prop("disabled", true);
 
                 $.ajax({
                     type: "POST",
@@ -461,17 +483,10 @@
                                 currentQuestionGuid);
                             askQuestion(questionsGroupedByPage);
                         } else if (response.status === 'retry') {
-                            const retryMessage = `
-        <div class="bot-message">
-            Retry required! <br>
-            <strong>Page:</strong> ${currentPage} <br>
-            <strong>Threshold:</strong> ${response.threshold || "N/A"} <br>
-            <strong>Message:</strong> ${response.nextQuestion}
-        </div>`;
-
-                            $("#chatbot-container").append(retryMessage);
+                            $("#chatbot-container").append(response.nextQuestion);
                             scrollToBottom();
-                            $("#user-input").prop("disabled", false).focus();
+                            $("#send-button").prop("disabled", false);
+                            tinymce.get("user-input").mode.set("design");
                             currentQuestionGuid = response.nextQuestionGuid;
                         } else if (response.status === 'no_questions_left') {
                             // Jika tidak ada pertanyaan tersisa, tampilkan konfirmasi untuk regenerasi
@@ -488,11 +503,11 @@
             function showRegenerateConfirmation() {
                 // Tampilkan pesan konfirmasi kepada pengguna
                 const confirmationMessage = `
-        <div class="bot-message">
+        <div class="bot-message" id="confirmation-message">
             All questions for page ${currentPage} have been asked, and you have not yet reached the threshold. Would you like to regenerate with GPT?
             <br><br>
-            <button id="regenerate-yes" class="btn btn-success">Ya</button>
-            <button id="regenerate-no" class="btn btn-danger">Tidak</button>
+            <button id="regenerate-yes" class="btn btn-success">Yes</button>
+            <button id="regenerate-no" class="btn btn-danger">No</button>
         </div>
     `;
                 $("#chatbot-container").append(confirmationMessage);
@@ -501,14 +516,17 @@
                 // Tangani pilihan pengguna
                 $("#regenerate-yes").on("click", function() {
                     handleRegenerateResponse(true);
+                    $("#confirmation-message").remove();
                 });
 
                 $("#regenerate-no").on("click", function() {
-                    askQuestion(questionsGroupedByPage);
+                    moveToNextPage();
+                    $("#confirmation-message").remove();
                 });
             }
 
             function handleRegenerateResponse(isRegenerate) {
+                console.log(currentPage);
                 $.ajax({
                     type: "POST",
                     url: "{{ env('URL_API') }}/api/v1/chatbot/regenerate", // API endpoint untuk handle regenerasi
@@ -533,6 +551,8 @@
 
                         $("#chatbot-container").append(retryMessage);
                         scrollToBottom();
+                        $("#send-button").prop("disabled", false);
+                        tinymce.get("user-input").mode.set("design");
                     },
                     error: function(xhr) {
                         console.error(`Error sending regenerate response: ${xhr.statusText}`);
