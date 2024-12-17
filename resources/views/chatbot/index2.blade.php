@@ -206,7 +206,7 @@
                 });
             });
             $("#send-button").prop("disabled", true);
-            tinymce.get("user-input").mode.set("readonly");
+            // tinymce.get("user-input").mode.set("readonly");
             // Cek history saat halaman dimuat
             loadChatHistory();
 
@@ -540,19 +540,16 @@
                         request.setRequestHeader("Authorization", `Bearer ${token}`);
                     },
                     success: function(response) {
-                        console.log(response);
-                        const retryMessage = `
-        <div class="bot-message">
-            Retry required! <br>
-            <strong>Page:</strong> ${currentPage} <br>
-            <strong>Threshold:</strong> ${response.newQuestion.threshold || "N/A"} <br>
-            <strong>Message:</strong> ${response.newQuestion.question_fix}
-        </div>`;
+                        if (response.status != "no_attempts_left") {
+                            console.log(response);
+                            $("#chatbot-container").append(response.newQuestion.message);
+                            scrollToBottom();
+                            $("#send-button").prop("disabled", false);
+                            tinymce.get("user-input").mode.set("design");
+                        } else {
+                            moveToNextPage();
+                        }
 
-                        $("#chatbot-container").append(retryMessage);
-                        scrollToBottom();
-                        $("#send-button").prop("disabled", false);
-                        tinymce.get("user-input").mode.set("design");
                     },
                     error: function(xhr) {
                         console.error(`Error sending regenerate response: ${xhr.statusText}`);
