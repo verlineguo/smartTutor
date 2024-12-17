@@ -678,6 +678,9 @@
 
             $('#courseInput').on('change', function() {
                 const course = $('#courseInput').val();
+                $('#pdfUpload').hide();
+                $('#filePathDisplay').hide();
+                $('#fileLanguageContainer').hide();
                 if (course) {
                     $('#topic').show();
 
