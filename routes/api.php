@@ -85,7 +85,7 @@ Route::group([
     $router->put('/', [UserController::class, 'updateData']);
     $router->delete('/{id}', [UserController::class, 'deleteData']);
     $router->post('/', [UserController::class, 'insertData']);
-    $router->post('/upload-file', [UserController::class, 'uploadCSV']);
+    $router->post('/upload-file', [UserController::class, 'uploadFile']);
     $router->post('/user-course', [UserController::class, 'filterUserCourse']);
     $router->post('/assistant', [UserController::class, 'filterAssistant']);
     $router->post('/google', [UserController::class, 'google']);

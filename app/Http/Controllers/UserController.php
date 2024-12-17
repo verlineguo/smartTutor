@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Validator;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Hash;
 use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
 
 class UserController extends Controller
 {
@@ -51,9 +53,11 @@ class UserController extends Controller
         }
 
         $userIds = UserCourse::where('course_code', '=', $request['code'])->pluck('user_id');
-
+        $assistantIds = Assistant::where('course_code', '=', $request['code'])->pluck('user_id');
         $user = User::whereNotIn('id', $userIds)
+            ->whereNotIn('id', $assistantIds)
             ->where('role_guid', '<>', '120014de-1d48-4947-b801-afe701bb19b8')
+            ->where('role_guid', '<>', 'c6a51300-8153-4f31-933c-dc7cd0fb7d6f')
             ->get();
 
         return ResponseController::getResponse($user, 200, 'Get User Success');
@@ -153,21 +157,67 @@ class UserController extends Controller
         ], 200, 'Success');
     }
 
-    public function uploadCSV(Request $request)
+
+    public function uploadFile(Request $request)
     {
         if ($request->hasFile('csv')) {
             $file = $request->file('csv');
+            $extension = $file->getClientOriginalExtension();
 
-            $data = array_map(function ($row) {
-                return str_getcsv($row);
-            }, file($file));
+            $data = [];
 
-            $header = array_shift($data);
+            if ($extension == 'csv') {
+                // Jika file CSV
+                $fileContent = file_get_contents($file);
 
-            $data = array_map(function ($row) use ($header) {
-                return array_combine($header, $row);
-            }, $data);
+                // Hapus BOM (Byte Order Mark) jika ada
+                if (substr($fileContent, 0, 3) == "\xef\xbb\xbf") {
+                    $fileContent = substr($fileContent, 3);
+                }
 
+                // Tentukan delimiter yang digunakan
+                $delimiter = ';'; // Gunakan titik koma sebagai delimiter
+
+                // Baca data CSV menggunakan delimiter titik koma
+                $data = array_map(function ($row) use ($delimiter) {
+                    return str_getcsv($row, $delimiter); // Gunakan delimiter titik koma
+                }, explode("\n", $fileContent));
+
+                // Ambil header CSV dan gabungkan dengan data
+                $header = array_shift($data);
+
+                // Pastikan jumlah header dan data baris cocok
+                $data = array_filter($data, function ($row) use ($header) {
+                    return count($row) === count($header);
+                });
+
+                // Gabungkan header dengan baris data yang valid
+                $data = array_map(function ($row) use ($header) {
+                    return array_combine($header, $row);
+                }, $data);
+            } elseif (in_array($extension, ['xls', 'xlsx'])) {
+                // Jika file Excel (.xls, .xlsx)
+                $spreadsheet = IOFactory::load($file);
+                $sheet = $spreadsheet->getActiveSheet();
+                $rows = $sheet->toArray();
+
+                // Ambil header dari baris pertama
+                $header = array_shift($rows);
+
+                // Pastikan jumlah header dan data baris cocok
+                $rows = array_filter($rows, function ($row) use ($header) {
+                    return count($row) === count($header);
+                });
+
+                // Gabungkan header dengan baris data yang valid
+                $data = array_map(function ($row) use ($header) {
+                    return array_combine($header, $row);
+                }, $rows);
+            } else {
+                return response()->json(['message' => 'File tidak valid. Harap unggah file CSV atau Excel.'], 400);
+            }
+
+            // Proses data dan tampilkan menggunakan DataTables
             $dataTable = DataTables::of($data)
                 ->addIndexColumn()
                 ->make(true);
@@ -175,8 +225,9 @@ class UserController extends Controller
             return $dataTable;
         }
 
-        return response()->json(['message' => 'Tidak ada file CSV yang diunggah.'], 400);
+        return response()->json(['message' => 'Tidak ada file yang diunggah.'], 400);
     }
+
 
     public function showData()
     {

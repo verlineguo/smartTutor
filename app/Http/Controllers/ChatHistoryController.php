@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ChatHistory;
+use App\Models\PageNoun;
 use App\Models\Question;
 use App\Models\Topic;
 use Illuminate\Http\Request;
@@ -16,7 +17,7 @@ class ChatHistoryController extends Controller
 {
     public function saveMessage(Request $request)
     {
-        // Validate the request
+        // Validasi request
         $validated = $request->validate([
             'user_id' => 'required|string',
             'topic_guid' => 'required|string',
@@ -26,73 +27,115 @@ class ChatHistoryController extends Controller
             'question_guid' => 'required|string',
         ]);
 
-        usleep(1000000); // Delay for 1 second
+        usleep(1000000); // Delay 1 detik
 
+        // Jika yang mengirim adalah bot atau cosine, simpan ke chat history
         if (in_array($validated['sender'], ['bot', 'cosine'])) {
-            // Save bot's or cosine's message to chat history
             ChatHistory::create($validated);
             return response()->json(['status' => 'question_saved']);
         }
 
-
-        // For user sender, proceed with saving the user's response
+        // Untuk pengirim user, simpan respons pengguna
         $chatHistory = ChatHistory::create(array_merge($validated, ['cosine_similarity' => null]));
 
-        // Fetch the corresponding question
+        // Ambil pertanyaan yang sesuai
         $question = Question::where('guid', $validated['question_guid'])->first();
         if (!$question) {
             return response()->json(['error' => 'Question not found'], 404);
         }
 
-        // Calculate cosine similarity
-        $similarity_score = $this->calculateCosineSimilarity($validated['message'], $question->answer_fix);
+        // Hitung cosine similarity antara jawaban pengguna dan jawaban yang benar
+        $similarityResult = $this->calculateCosineSimilarity($validated['message'], $question->answer_fix, $validated['page'], $validated['topic_guid'], $question->language);
+        // Simpan nilai cosine similarity ke chat history
+        $similarity_score = $similarityResult['similarity_score'];
 
-        // Update chat history with the calculated cosine similarity score
+        // Ambil data cosine per noun
+        $noun_cosine_data = $similarityResult['noun_cosine_data'];
+
+        // Simpan nilai cosine similarity ke chat history
         $chatHistory->update(['cosine_similarity' => $similarity_score]);
 
-        // Prepare similarity message for response
-        $similarityMessage = "Cosine Similarity Score: {$similarity_score}%";
+        // Persiapkan pesan untuk ditampilkan
+        $similarityMessage = "<p><strong>Cosine Similarity Score:</strong> {$similarity_score}%</p>";
 
-        // Determine if similarity score meets or exceeds threshold
-        if ($similarity_score >= $question->threshold) {
-            return $this->responseForSuccess($validated['page'], $similarityMessage, $similarity_score, $question->threshold);
+        // Menambahkan data cosine similarity per noun
+        if (!empty($noun_cosine_data)) {
+            $similarityMessage .= "<ul>";
+            foreach ($noun_cosine_data as $nounData) {
+                $similarityMessage .= "<li><strong>Noun:</strong> {$nounData['noun']['noun']} - <strong>Similarity Page:</strong> {$nounData['noun']['cosine_similarity']}% - <strong>Similarity Answer:</strong> {$nounData['cosine_answer']}%</li>";
+            }
+            $similarityMessage .= "</ul>";
         }
 
-        // Otherwise, check for remaining questions on the current page
-        return $this->responseForRetry($validated, $similarityMessage, $similarity_score, $question->threshold, $question->language);
+        // Tentukan apakah nilai similarity mencapai threshold
+        if ($similarity_score >= $question->threshold) {
+            return $this->responseForSuccess($validated, $validated['page'], $similarityMessage, $similarity_score, $question->threshold, $noun_cosine_data);
+        }
+
+        // Jika tidak, periksa pertanyaan yang tersisa pada halaman ini
+        return $this->responseForRetry($validated, $similarityMessage, $similarity_score, $question->threshold, $question->language, $noun_cosine_data);
     }
+
+
 
     /**
      * Calculate cosine similarity by calling the Flask API.
      */
-    protected function calculateCosineSimilarity($user_answer, $actual_answer)
+    protected function calculateCosineSimilarity($user_answer, $actual_answer, $page, $topic_guid, $language)
     {
+        // Ambil semua nouns dan nilai cosine untuk halaman yang relevan
+        $pageNouns = PageNoun::where('topic_guid', $topic_guid)
+            ->where('language', $language)
+            ->where('page', $page)
+            ->get();
+
+        // Format data untuk dikirim ke Flask
+        $nounsData = $pageNouns->map(function ($item) {
+            return [
+                'noun' => $item->noun,
+                'cosine_similarity' => $item->cosine, // Cosine yang sudah ada di database
+            ];
+        })->toArray();
+
+        $nounsDataJson = json_encode($nounsData);
+
+        // Kirimkan data ke API Flask
         $flask_url = env('FLASK_API_URL') . '/cosine_similarity';
         $response = Http::post($flask_url, [
             'user_answer' => $user_answer,
-            'actual_answer' => $actual_answer
+            'actual_answer' => $actual_answer,
+            'nouns' => $nounsDataJson, // Mengirimkan data nouns dan cosine
         ]);
 
         if ($response->failed()) {
             throw new \Exception('Failed to calculate cosine similarity');
         }
 
-        return $response->json()['similarity_score'] * 100;
+        $responseData = $response->json();
+
+        // Mengembalikan skor similarity dan data cosine per noun
+        return [
+            'similarity_score' => $responseData['actual_similarity_score'] * 100, // Skor similarity secara keseluruhan
+            'noun_cosine_data' => $responseData['noun_similarities'] // Data cosine per noun
+        ];
     }
+
 
     /**
      * Prepare success response for when the similarity score meets the threshold.
      */
-    protected function responseForSuccess($currentPage, $similarityMessage, $similarity_score, $threshold)
+    protected function responseForSuccess($validated, $currentPage, $similarityMessage, $similarity_score, $threshold, $noun_cosine_data)
     {
         return response()->json([
             'status' => 'success',
             'nextPage' => $currentPage + 1,
             'similarityMessage' => $similarityMessage,
             'similarity_score' => $similarity_score,
-            'threshold' => $threshold
+            'threshold' => $threshold,
+            'noun_cosine_data' => $noun_cosine_data, // Menambahkan data cosine per noun
         ]);
     }
+
 
     /**
      * Prepare retry response for when the similarity score is below the threshold.
@@ -110,55 +153,78 @@ class ChatHistoryController extends Controller
         $remainingQuestions = Question::where('topic_guid', $validated['topic_guid'])
             ->where('page', $validated['page'])
             ->where('language', $language)
+            ->where('user_id', null)
             ->whereNotIn('guid', $askedQuestions)
             ->get();
 
+        // Simpan message similarity ke history dengan HTML
         ChatHistory::create([
             'user_id' => $validated['user_id'],
             'topic_guid' => $validated['topic_guid'],
-            'message' => $similarityMessage,
+            'message' => $similarityMessage,  // HTML disimpan di sini
             'sender' => 'cosine',
             'page' => $validated['page'],
             'question_guid' => $validated['question_guid'],
             'cosine_similarity' => null,
         ]);
-        // If no remaining questions, ask if the user wants to generate new questions
+
+        // Jika tidak ada pertanyaan yang tersisa, beri tahu untuk regenerasi
         if ($remainingQuestions->isEmpty()) {
-            // Respond with a message to the frontend asking if the user wants to regenerate questions
             return response()->json([
                 'status' => 'no_questions_left',
                 'message' => 'No remaining questions. Would you like to regenerate questions?',
-                'similarityMessage' => $similarityMessage,
+                'similarityMessage' => $similarityMessage,  // HTML disertakan dalam response
                 'similarity_score' => $similarity_score,
             ]);
         }
 
-        // If there are remaining questions, select the next question and continue
+        // Jika masih ada pertanyaan tersisa, ambil pertanyaan berikutnya
         $nextQuestion = $remainingQuestions->random();
 
+        usleep(1000000); // Delay untuk simulasi
 
-        usleep(1000000);
+        // Simpan pertanyaan retry ke dalam chat history dengan HTML
+        $retryMessage = '<div class="bot-message">' .
+            'Retry required! <br>' .
+            '<strong>Page:</strong> ' . $validated['page'] . ' <br>' .
+            '<strong>Threshold:</strong> ' . ($threshold ?? "N/A") . ' <br>' .
+            '<strong>Message:</strong> ' . $nextQuestion->question_fix .
+            '</div>';
 
-        // Save the retry question to ChatHistory
         ChatHistory::create([
             'user_id' => $validated['user_id'],
             'topic_guid' => $validated['topic_guid'],
-            'message' => $nextQuestion->question_fix,
+            'message' => $retryMessage,  // HTML retry message disimpan di sini
             'sender' => 'bot',
             'page' => $validated['page'],
             'question_guid' => $nextQuestion->guid,
-            'cosine_similarity' => null, // Retry questions do not have cosine similarity
+            'cosine_similarity' => null,
         ]);
+
+        // Ambil data nouns dan cosine untuk halaman ini
+        $nounsData = PageNoun::where('page', $validated['page'])
+            ->where('topic_guid', $validated['topic_guid'])
+            ->where('language', $language)
+            ->get();
+
+        $nounsCosineData = $nounsData->map(function ($item) {
+            return [
+                'noun' => $item->noun,
+                'cosine_similarity' => $item->cosine,  // Nilai cosine dari database
+            ];
+        });
 
         return response()->json([
             'status' => 'retry',
-            'nextQuestion' => $nextQuestion->question_fix,
+            'nextQuestion' => $retryMessage,
             'nextQuestionGuid' => $nextQuestion->guid,
-            'similarityMessage' => $similarityMessage,
+            'similarityMessage' => $similarityMessage,  // HTML disertakan
             'similarity_score' => $similarity_score,
             'threshold' => $threshold,
+            'nouns_cosine_data' => $nounsCosineData,  // Data noun cosine
         ]);
     }
+
 
 
     public function regenerateQuestions(Request $request)
@@ -282,10 +348,21 @@ class ChatHistoryController extends Controller
                 'topic_guid' => $validated['topic_guid'],
                 'category' => $newQuestion['category'],
                 'user_id' => $validated['user_id'],
+                'page' => $validated['page'],
                 'attempt' => $currentAttempt, // Increment attempt untuk setiap user
                 'language' => $language,
                 'weight' => 0,
                 'threshold' => $threshold, // Menggunakan threshold dari pertanyaan terakhir
+            ]);
+
+            ChatHistory::create([
+                'user_id' => $validated['user_id'],
+                'topic_guid' => $validated['topic_guid'],
+                'message' => $newQuestion['question'],
+                'sender' => 'bot',
+                'page' => $validated['page'],
+                'question_guid' => $question->guid,
+                'cosine_similarity' => null,
             ]);
 
 
@@ -309,8 +386,70 @@ class ChatHistoryController extends Controller
             ->orderBy('created_at')
             ->get();
 
-        return response()->json(['data' => $history]);
+        // Pastikan ada data history
+        if ($history->isEmpty()) {
+            $language = null;
+        } else {
+            // Ambil question_guid dari record pertama (atau bisa diubah sesuai kebutuhan)
+            $questionGuid = $history->first()->question_guid;
+
+            // Query ke tabel Question berdasarkan question_guid untuk mengambil bahasa
+            $question = Question::where('guid', $questionGuid)->first();
+
+            // Cek apakah data question ditemukan
+            if (!$question) {
+                return response()->json(['message' => 'Question not found'], 404);
+            }
+
+            // Ambil bahasa dari question (asumsi field 'language' ada pada tabel Question)
+            $language = $question->language;
+        }
+
+        // Cek apakah pesan terakhir dari sender 'cosine'
+        $lastMessage = $history->last();
+        $regenerate = 'no';  // Default regenerate
+
+        if ($lastMessage && $lastMessage->sender === 'cosine') {
+            // Ambil cosine similarity dari pesan terakhir
+            $cosineSimilarity = $lastMessage->cosine_similarity;
+
+            // Ambil threshold dari pertanyaan terkait
+            $threshold = $question->threshold;
+
+            // Cek apakah cosine similarity lebih besar atau sama dengan threshold
+            if ($cosineSimilarity >= $threshold) {
+                $regenerate = 'no';
+            } else {
+                // Jika cosine similarity kurang dari threshold, cek apakah ada pertanyaan yang tersisa
+                $askedQuestions = ChatHistory::where('user_id', $userId)
+                    ->where('topic_guid', $topicGuid)
+                    ->where('page', $history->last()->page)
+                    ->pluck('question_guid')
+                    ->toArray();
+
+                // Cari pertanyaan yang belum diajukan
+                $remainingQuestions = Question::where('topic_guid', $topicGuid)
+                    ->where('page', $history->last()->page)
+                    ->where('language', $language)
+                    ->whereNull('user_id')  // Pertanyaan yang belum diajukan
+                    ->whereNotIn('guid', $askedQuestions)
+                    ->get();
+
+                // Jika tidak ada pertanyaan yang tersisa
+                if ($remainingQuestions->isEmpty()) {
+                    $regenerate = 'yes';
+                }
+            }
+        }
+
+        // Mengembalikan data history, language dan regenerate
+        return response()->json([
+            'data' => $history,
+            'language' => $language,
+            'regenerate' => $regenerate  // Mengembalikan key regenerate
+        ]);
     }
+
 
     public function checkStatus($topicGuid, $userId)
     {
@@ -355,6 +494,10 @@ class ChatHistoryController extends Controller
 
         // Hapus semua chat histories berdasarkan user_id dan topic_guid
         $deleted = ChatHistory::where('user_id', $validated['user_id'])
+            ->where('topic_guid', $validated['topic_guid'])
+            ->delete();
+
+        Question::where('user_id', $validated['user_id'])
             ->where('topic_guid', $validated['topic_guid'])
             ->delete();
 

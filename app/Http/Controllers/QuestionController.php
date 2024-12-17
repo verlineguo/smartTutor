@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Gram;
+use App\Models\PageNoun;
 use App\Models\Question;
 use App\Models\Topic;
 use Illuminate\Http\Request;
@@ -253,7 +254,7 @@ class QuestionController extends Controller
                     });
                 })->toArray();
 
-            return ResponseController::getResponse(['tfidf_data' => $tfidfData], 200, 'TF-IDF sudah dihitung sebelumnya.');
+            return $this->calculateTfidfPage($request);
         }
 
         // Proses TF-IDF menggunakan file terjemahan yang ditemukan
@@ -286,8 +287,94 @@ class QuestionController extends Controller
             }
         }
 
+        // Setelah selesai menghitung TF-IDF, lanjutkan untuk menghitung TF-IDF per halaman
+        return $this->calculateTfidfPage($request);
+    }
+
+    public function calculateTfidfPage(Request $request)
+    {
+        set_time_limit(900);
+
+        $validator = Validator::make($request->all(), [
+            'topic_guid' => 'required|string',
+            'language' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return ResponseController::getResponse(null, 422, $validator->errors()->first());
+        }
+
+        $topic = Topic::where('guid', $request->get('topic_guid'))->first();
+        if (!$topic) {
+            return ResponseController::getResponse(null, 404, "Topik tidak ditemukan.");
+        }
+
+        // Parsing translation_metadata untuk mencari file berdasarkan bahasa
+        $translationMetadata = json_decode($topic->translation_metadata, true);
+        $translatedFile = collect($translationMetadata)->firstWhere('language', $request->get('language'));
+
+        if (!$translatedFile || !Storage::disk('public')->exists($translatedFile['path'])) {
+            return ResponseController::getResponse(null, 404, "File terjemahan untuk bahasa yang diminta tidak ditemukan.");
+        }
+
+        // Cek apakah data PageNoun sudah ada untuk topic_guid dan language
+        $existingPageNouns = PageNoun::where('topic_guid', $topic->guid)
+            ->where('language', $request->get('language'))
+            ->exists();
+
+        if ($existingPageNouns) {
+            // Jika data sudah ada, kembalikan response tanpa perlu melakukan request ke Flask
+            $pageNounData = PageNoun::where('topic_guid', $topic->guid)
+                ->where('language', $request->get('language'))
+                ->get(['page', 'noun', 'cosine'])
+                ->groupBy('page')
+                ->map(function ($group) {
+                    return $group->map(function ($item) {
+                        return [
+                            'Noun' => $item->noun,
+                            'Cosine Similarity' => $item->cosine,
+                        ];
+                    });
+                })->toArray();
+
+            return ResponseController::getResponse(['page_noun_data' => $pageNounData], 200, 'Data PageNoun sudah ada.');
+        }
+
+        // Proses TF-IDF menggunakan file terjemahan yang ditemukan
+        $response = Http::attach(
+            'pdf',
+            Storage::disk('public')->get($translatedFile['path']),
+            'translated_file.pdf'
+        )->timeout(900)
+            ->post(env('FLASK_API_URL') . '/tfidf-page', [
+                'language' => $request->get('language'),
+            ]);
+
+        if ($response->failed()) {
+            return ResponseController::getResponse(null, 500, "Kesalahan saat menghitung TF-IDF.");
+        }
+
+        $data = $response->json();
+
+        // Penyimpanan data TF-IDF dan Cosine Similarity ke dalam database untuk setiap halam
+
+        foreach ($data as $page => $cosineData) {
+            foreach ($cosineData['cosine_similarity'] as $noun => $cosine) {
+                // Simpan data ke dalam tabel 'page_noun' untuk setiap halaman
+                PageNoun::create([
+                    'topic_guid' => $topic->guid,
+                    'language' =>  $request->get('language'),
+                    'page' => (int) $page,  // Menyimpan nomor halaman
+                    'noun' => $noun,  // Menyimpan kata kunci
+                    'cosine' => (float) $cosine,  // Menyimpan nilai cosine similarity
+                ]);
+            }
+        }
+
         return ResponseController::getResponse(['tfidf_data' => $data], 200, 'TF-IDF berhasil dihitung.');
     }
+
+
 
     public function saveQuestions(Request $request)
     {
@@ -448,6 +535,7 @@ class QuestionController extends Controller
         } else {
             $data = Question::where('topic_guid', '=', $guid)
                 ->where('language', '=', $language) // Filter berdasarkan bahasa
+                ->where('user_id', '=', null)
                 ->orderByRaw('cast(page as unsigned) asc')
                 ->get();
         }
@@ -479,9 +567,9 @@ class QuestionController extends Controller
                 ->get();
         }
 
-        if (!isset($data) || $data->isEmpty()) {
-            return ResponseController::getResponse(null, 400, "Data not found");
-        }
+        // if (!isset($data) || $data->isEmpty()) {
+        //     return ResponseController::getResponse(null, 400, "Data not found");
+        // }
 
         $dataTable = DataTables::of($data)
             ->addIndexColumn()
