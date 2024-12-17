@@ -355,10 +355,15 @@ class ChatHistoryController extends Controller
                 'threshold' => $threshold, // Menggunakan threshold dari pertanyaan terakhir
             ]);
 
-            ChatHistory::create([
+            $chat = ChatHistory::create([
                 'user_id' => $validated['user_id'],
                 'topic_guid' => $validated['topic_guid'],
-                'message' => $newQuestion['question'],
+                'message' => '<div class="bot-message">
+                                Retry required! <br>
+                                <strong>Page:</strong> ' . $validated['page'] . ' <br>
+                                <strong>Threshold:</strong> ' . ($response['newQuestion']['threshold'] ?? "N/A") . ' <br>
+                                <strong>Message:</strong> ' . $response['newQuestion']['question_fix'] . '
+                              </div>',
                 'sender' => 'bot',
                 'page' => $validated['page'],
                 'question_guid' => $question->guid,
@@ -366,11 +371,12 @@ class ChatHistoryController extends Controller
             ]);
 
 
+
             // Kirim respons sukses dengan pertanyaan baru
             return response()->json([
                 'status' => 'success',
                 'message' => 'Questions have been regenerated successfully.',
-                'newQuestion' => $question,  // Pertanyaan baru dari Flask
+                'newQuestion' => $chat,  // Pertanyaan baru dari Flask
             ]);
         }
     }
