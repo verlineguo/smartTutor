@@ -69,11 +69,10 @@ class GradeController extends Controller
 
             // Cari page terakhir berdasarkan topic_guid dan language
             $highestPage = null;
-            if ($language) {
-                $highestPage = Question::where('topic_guid', $guid)
-                    ->where('language', $language)
-                    ->max('page');
-            }
+
+            $highestPage = Question::where('topic_guid', $guid)
+                ->max('page');
+
 
             // Hitung jumlah halaman yang telah selesai (sender 'cosine')
             $completedPages = $user->chathistories
