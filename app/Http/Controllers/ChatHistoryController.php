@@ -22,7 +22,7 @@ class ChatHistoryController extends Controller
             'user_id' => 'required|string',
             'topic_guid' => 'required|string',
             'message' => 'required|string',
-            'sender' => 'required|in:user,bot,cosine',
+            'sender' => 'required|in:user,bot,cosine,openai',
             'page' => 'required|integer',
             'question_guid' => 'required|string',
         ]);
@@ -30,7 +30,7 @@ class ChatHistoryController extends Controller
         usleep(1000000); // Delay 1 detik
 
         // Jika yang mengirim adalah bot atau cosine, simpan ke chat history
-        if (in_array($validated['sender'], ['bot', 'cosine'])) {
+        if (in_array($validated['sender'], ['bot', 'cosine', 'openai'])) {
             ChatHistory::create($validated);
             return response()->json(['status' => 'question_saved']);
         }
@@ -45,7 +45,7 @@ class ChatHistoryController extends Controller
         }
 
         // Hitung cosine similarity antara jawaban pengguna dan jawaban yang benar
-        $similarityResult = $this->calculateCosineSimilarity($validated['message'], $question->answer_fix, $validated['page'], $validated['topic_guid'], $question->language);
+        $similarityResult = $this->calculateCosineSimilarity($validated['message'], $question->answer_fix, $validated['page'], $validated['topic_guid'], $question->language, $question->question_fix);
         // Simpan nilai cosine similarity ke chat history
         $similarity_score = $similarityResult['similarity_score'];
 
@@ -56,24 +56,34 @@ class ChatHistoryController extends Controller
         $chatHistory->update(['cosine_similarity' => $similarity_score]);
 
         // Persiapkan pesan untuk ditampilkan
-        $similarityMessage = "<p><strong>Cosine Similarity Score:</strong> {$similarity_score}%</p>";
+        $similarityMessage = "<p><strong>Cosine Similarity Score:</strong> " . number_format($similarity_score, 2) . "%</p>";
 
         // Menambahkan data cosine similarity per noun
         if (!empty($noun_cosine_data)) {
+            // Sorting noun_cosine_data berdasarkan cosine_answer
+            usort($noun_cosine_data, function ($a, $b) {
+                return $b['cosine_answer'] <=> $a['cosine_answer']; // Mengurutkan descending berdasarkan cosine_answer
+            });
+
             $similarityMessage .= "<ul>";
             foreach ($noun_cosine_data as $nounData) {
-                $similarityMessage .= "<li><strong>Noun:</strong> {$nounData['noun']['noun']} - <strong>Similarity Page:</strong> {$nounData['noun']['cosine_similarity']}% - <strong>Similarity Answer:</strong> {$nounData['cosine_answer']}%</li>";
+                $similarityMessage .= "<li><strong>Noun:</strong> " .
+                    htmlspecialchars($nounData['noun']['noun']) . " - <strong>Similarity Page:</strong> " .
+                    number_format($nounData['noun']['cosine_similarity'] * 100, 2) . "% - " .
+                    "<strong>Similarity Answer:</strong> " .
+                    number_format($nounData['cosine_answer'] * 100, 2) . "%</li>";
             }
             $similarityMessage .= "</ul>";
         }
 
+
         // Tentukan apakah nilai similarity mencapai threshold
         if ($similarity_score >= $question->threshold) {
-            return $this->responseForSuccess($validated, $validated['page'], $similarityMessage, $similarity_score, $question->threshold, $noun_cosine_data);
+            return $this->responseForSuccess($validated, $validated['page'], $similarityMessage, $similarity_score, $question->threshold, $noun_cosine_data, $similarityResult['answer_ai']);
         }
 
         // Jika tidak, periksa pertanyaan yang tersisa pada halaman ini
-        return $this->responseForRetry($validated, $similarityMessage, $similarity_score, $question->threshold, $question->language, $noun_cosine_data);
+        return $this->responseForRetry($validated, $similarityMessage, $similarity_score, $question->threshold, $question->language, $similarityResult['answer_ai']);
     }
 
 
@@ -81,7 +91,7 @@ class ChatHistoryController extends Controller
     /**
      * Calculate cosine similarity by calling the Flask API.
      */
-    protected function calculateCosineSimilarity($user_answer, $actual_answer, $page, $topic_guid, $language)
+    protected function calculateCosineSimilarity($user_answer, $actual_answer, $page, $topic_guid, $language, $question)
     {
         // Ambil semua nouns dan nilai cosine untuk halaman yang relevan
         $pageNouns = PageNoun::where('topic_guid', $topic_guid)
@@ -113,10 +123,15 @@ class ChatHistoryController extends Controller
 
         $responseData = $response->json();
 
+        $answerAI = Http::post(env('FLASK_API_URL') . '/answer_ai', [
+            'question' => $question
+        ]);
+
         // Mengembalikan skor similarity dan data cosine per noun
         return [
             'similarity_score' => $responseData['actual_similarity_score'] * 100, // Skor similarity secara keseluruhan
-            'noun_cosine_data' => $responseData['noun_similarities'] // Data cosine per noun
+            'noun_cosine_data' => $responseData['noun_similarities'], // Data cosine per noun
+            'answer_ai' => strval($answerAI)
         ];
     }
 
@@ -124,7 +139,7 @@ class ChatHistoryController extends Controller
     /**
      * Prepare success response for when the similarity score meets the threshold.
      */
-    protected function responseForSuccess($validated, $currentPage, $similarityMessage, $similarity_score, $threshold, $noun_cosine_data)
+    protected function responseForSuccess($validated, $currentPage, $similarityMessage, $similarity_score, $threshold, $noun_cosine_data, $answer_ai)
     {
         return response()->json([
             'status' => 'success',
@@ -133,6 +148,7 @@ class ChatHistoryController extends Controller
             'similarity_score' => $similarity_score,
             'threshold' => $threshold,
             'noun_cosine_data' => $noun_cosine_data, // Menambahkan data cosine per noun
+            'answer_ai' => $answer_ai
         ]);
     }
 
@@ -140,7 +156,7 @@ class ChatHistoryController extends Controller
     /**
      * Prepare retry response for when the similarity score is below the threshold.
      */
-    protected function responseForRetry($validated, $similarityMessage, $similarity_score, $threshold, $language)
+    protected function responseForRetry($validated, $similarityMessage, $similarity_score, $threshold, $language, $answer_ai)
     {
         // Get already asked questions for this topic and page
         $askedQuestions = ChatHistory::where('user_id', $validated['user_id'])
@@ -168,6 +184,16 @@ class ChatHistoryController extends Controller
             'cosine_similarity' => null,
         ]);
 
+        usleep(1000000);
+        ChatHistory::create([
+            'user_id' => $validated['user_id'],
+            'topic_guid' => $validated['topic_guid'],
+            'message' => strval($answer_ai),  // HTML disimpan di sini
+            'sender' => 'openai',
+            'page' => $validated['page'],
+            'question_guid' => $validated['question_guid'],
+            'cosine_similarity' => null
+        ]);
         // Jika tidak ada pertanyaan yang tersisa, beri tahu untuk regenerasi
         if ($remainingQuestions->isEmpty()) {
             return response()->json([
@@ -222,6 +248,7 @@ class ChatHistoryController extends Controller
             'similarity_score' => $similarity_score,
             'threshold' => $threshold,
             'nouns_cosine_data' => $nounsCosineData,  // Data noun cosine
+            'answer_ai' => $answer_ai
         ]);
     }
 
@@ -361,8 +388,8 @@ class ChatHistoryController extends Controller
                 'message' => '<div class="bot-message">
                                 Retry required! <br>
                                 <strong>Page:</strong> ' . $validated['page'] . ' <br>
-                                <strong>Threshold:</strong> ' . ($response['newQuestion']['threshold'] ?? "N/A") . ' <br>
-                                <strong>Message:</strong> ' . $response['newQuestion']['question_fix'] . '
+                                <strong>Threshold:</strong> ' . ($question['threshold'] ?? "N/A") . ' <br>
+                                <strong>Message:</strong> ' . $question['question_fix'] . '
                               </div>',
                 'sender' => 'bot',
                 'page' => $validated['page'],

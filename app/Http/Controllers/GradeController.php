@@ -64,7 +64,7 @@ class GradeController extends Controller
             $user = $item->user;
 
             // Ambil record terakhir dari chathistories
-            $lastChatHistory = $user->chathistories()->latest('created_at')->first();
+            $lastChatHistory = $user->chathistories()->where('topic_guid', $guid)->latest('created_at')->first();
             $language = $lastChatHistory && $lastChatHistory->question ? $lastChatHistory->question->language : null;
 
             // Cari page terakhir berdasarkan topic_guid dan language
@@ -76,6 +76,7 @@ class GradeController extends Controller
 
             // Hitung jumlah halaman yang telah selesai (sender 'cosine')
             $completedPages = $user->chathistories
+                ->where('topic_guid', $guid)
                 ->groupBy('page') // Grupkan berdasarkan page
                 ->filter(function ($chats, $page) {
                     // Ambil chat terakhir berdasarkan created_at

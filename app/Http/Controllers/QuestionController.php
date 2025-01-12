@@ -130,6 +130,7 @@ class QuestionController extends Controller
             'question_fix' => $request['question_fix'],
             'answer_fix' => $request['answer_fix'],
             'category' => $request['category'],
+            'weight' => 1.0,
             'threshold' => $request['threshold'],
             'topic_guid' => $request['topic_guid'],
             'language' => $request['language'],

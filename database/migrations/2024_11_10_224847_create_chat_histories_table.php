@@ -18,7 +18,7 @@ return new class extends Migration
             $table->longText('message');
             $table->integer('page');
             $table->float('cosine_similarity')->nullable();
-            $table->enum('sender', ['user', 'bot', 'cosine']);
+            $table->enum('sender', ['user', 'bot', 'cosine', 'openai']);
             $table->char('question_guid', 50);
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
             $table->foreign('topic_guid')->references('guid')->on('topics')->onDelete('cascade');
