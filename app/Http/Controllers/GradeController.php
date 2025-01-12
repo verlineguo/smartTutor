@@ -81,7 +81,7 @@ class GradeController extends Controller
                 ->filter(function ($chats, $page) {
                     // Ambil chat terakhir berdasarkan created_at
                     $lastChat = $chats->sortByDesc('created_at')->first();
-                    return $lastChat && $lastChat->sender === 'cosine'; // Periksa jika sender adalah 'cosine'
+                    return $lastChat && $lastChat->sender === 'openai'; // Periksa jika sender adalah 'cosine'
                 })
                 ->count(); // Hitung jumlah halaman selesai
 
