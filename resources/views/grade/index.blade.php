@@ -6,6 +6,7 @@
     <link rel="stylesheet" href="{{ asset('./assets/dashboard/datatables-buttons-bs5/buttons.bootstrap5.css') }}">
     <!-- Row Group CSS -->
     <link rel="stylesheet" href="{{ asset('./assets/dashboard/datatables-rowgroup-bs5/rowgroup.bootstrap5.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/css/toastr.min.css">
 @endsection
 @section('info-page')
     <ol class="breadcrumb bg-transparent mb-0 pb-0 pt-1 px-0 me-sm-6 me-5">
@@ -79,34 +80,50 @@
     <!-- Row Group JS -->
     <script src="{{ asset('./assets/dashboard/datatables-rowgroup/datatables.rowgroup.js') }}"></script>
     <script src="{{ asset('./assets/dashboard/datatables-rowgroup-bs5/rowgroup.bootstrap5.js') }}"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/js/toastr.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 @endsection
 @section('custom-javascript')
     <script type="text/javascript">
         function resetHistories(userId, topicGuid) {
-            if (confirm("Are you sure you want to reset this user's chat histories for this topic?")) {
-                $.ajax({
-                    url: "{{ env('URL_API') }}/api/v1/chatbot/reset-histories", // Endpoint backend untuk reset histories
-                    type: "POST",
-                    data: {
-                        user_id: userId,
-                        topic_guid: topicGuid,
-                    },
-                    beforeSend: function(request) {
-                        request.setRequestHeader("Authorization",
-                            "Bearer {{ $token }}");
-                    },
-                    success: function(response) {
-                        alert("Chat histories have been successfully reset!");
-                        // Refresh data table atau halaman jika perlu
-                        window.location.reload()
-                    },
-                    error: function(xhr) {
-                        alert("Failed to reset chat histories. Please try again.");
-                        console.error(xhr.responseText);
-                    }
-                });
-            }
+            // Use SweetAlert2 for a more customizable confirmation dialog
+            Swal.fire({
+                title: 'Are you sure?',
+                text: "This will reset the user's chat histories for this topic!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, reset it!',
+                cancelButtonText: 'No, cancel!',
+                reverseButtons: true
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.ajax({
+                        url: "{{ env('URL_API') }}/api/v1/chatbot/reset-histories", // Backend endpoint for resetting histories
+                        type: "POST",
+                        data: {
+                            user_id: userId,
+                            topic_guid: topicGuid,
+                        },
+                        beforeSend: function(request) {
+                            request.setRequestHeader("Authorization", "Bearer {{ $token }}");
+                        },
+                        success: function(response) {
+                            toastr.options.closeButton = true;
+                            toastr.options.timeOut = 3000;
+                            toastr.success('Chat histories have been successfully reset!');
+                            window.location.reload(); // Optionally reload the page after success
+                        },
+                        error: function(xhr) {
+                            toastr.options.closeButton = true;
+                            toastr.options.timeOut = 3000;
+                            toastr.error('Failed to reset chat histories. Please try again.');
+                            console.error(xhr.responseText);
+                        }
+                    });
+                }
+            });
         }
+
         $(document).ready(function() {
 
             $('#table-data').DataTable({
