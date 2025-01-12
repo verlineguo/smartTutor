@@ -18,7 +18,7 @@ class GuestMiddleware
     public function handle(Request $request, Closure $next)
     {
         $session = new Session();
-        $token = $session->get('access_token');
+        $token = session('access_token');
 
         if (!isset($token)) {
             return $next($request);

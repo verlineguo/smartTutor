@@ -6,6 +6,7 @@
     <link rel="stylesheet" href="{{ asset('./assets/dashboard/datatables-buttons-bs5/buttons.bootstrap5.css') }}">
     <!-- Row Group CSS -->
     <link rel="stylesheet" href="{{ asset('./assets/dashboard/datatables-rowgroup-bs5/rowgroup.bootstrap5.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/css/toastr.min.css">
 @endsection
 
 @section('info-page')
@@ -60,6 +61,14 @@
                                         <div class="mb-3">
                                             <label for="add-answer" class="form-label">Answer</label>
                                             <textarea class="form-control" id="add-answer" name="add-answer" rows="3" required></textarea>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="add-category" class="form-label">Category</label>
+                                            <select class="form-select" id="add-category" name="add-category" required>
+                                                <option value="">Select Category</option>
+                                                <option value="remembering">Remembering</option>
+                                                <option value="understanding">Understanding</option>
+                                            </select>
                                         </div>
                                         <div class="mb-3">
                                             <label for="add-threshold" class="form-label">Threshold</label>
@@ -215,7 +224,9 @@
     <script src="{{ asset('./assets/dashboard/datatables-buttons/buttons.print.js') }}"></script>
     <!-- Row Group JS -->
     <script src="{{ asset('./assets/dashboard/datatables-rowgroup/datatables.rowgroup.js') }}"></script>
-    <script src="{{ asset('./assets/dashboard/datatables-rowgroup-bs5/rowgroup.bootstrap5.js') }}"></script>
+    <script src="{{ asset('./assets/dashboard/datatables-rowgroup-bs5/rowgroup.bootstrap5.js') }}"></script>\
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.blockUI/2.70/jquery.blockUI.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/js/toastr.min.js"></script>
 @endsection
 @section('custom-javascript')
     <script type="text/javascript">
@@ -346,14 +357,20 @@
                                             "Bearer {{ $token }}");
                                     },
                                     success: function(response) {
-                                        alert(response.message ||
-                                            'Rows deleted successfully.');
-                                        table.ajax.reload();
+                                        toastr.options.closeButton = true;
+                                        toastr.options.timeOut = 1000;
+                                        toastr.options.onHidden = function() {
+                                            table.ajax.reload();
+                                        };
+                                        toastr.success("Success delete data",
+                                            "Success");
                                     },
                                     error: function(xhr) {
-                                        alert('Error deleting rows: ' + xhr
-                                            .responseText);
-                                    },
+                                        $.unblockUI();
+                                        var jsonResponse = JSON.parse(xhr.responseText);
+                                        toastr.options.closeButton = true;
+                                        toastr.error(jsonResponse['message'], "Error");
+                                    }
                                 });
                             }
                         },
@@ -447,13 +464,37 @@
                             "Bearer {{ $token }}");
                     },
                     success: function(response) {
-                        alert(response.message || 'Threshold updated successfully.');
+                        // Unblock the UI if it's blocked
+                        $.unblockUI();
+
+                        // Configure toastr options
+                        toastr.options.closeButton = true;
+                        toastr.options.timeOut = 1000; // Set timeout for toast message
+
+                        // Show success message
+                        toastr.success(response.message || 'Threshold updated successfully.',
+                            "Success");
+
+                        // Hide the modal
                         $('#modalBulkUpdate').modal('hide');
+
+                        // Reload the table to reflect changes
                         table.ajax.reload();
                     },
+
                     error: function(xhr) {
-                        alert('Error updating threshold: ' + xhr.responseText);
-                    },
+                        $.unblockUI();
+
+                        // Get error message from response or fallback to default
+                        var errorMessage = xhr.status + ': ' + xhr.statusText;
+                        var jsonResponse = JSON.parse(xhr.responseText);
+
+                        // Configure toastr options for error
+                        toastr.options.closeButton = true;
+
+                        // Show error message
+                        toastr.error(jsonResponse['message'] || errorMessage, "Error");
+                    }
                 });
             });
 
@@ -480,12 +521,16 @@
                             "Bearer {{ $token }}");
                     },
                     success: function(response) {
-                        alert(response.message || 'Rows deleted successfully.');
+                        toastr.options.closeButton = true;
+                        toastr.options.timeOut = 1000;
+                        toastr.success("Success delete data", "Success");
                         table.ajax.reload();
                     },
                     error: function(xhr) {
-                        alert('Error deleting rows: ' + xhr.responseText);
-                    },
+                        var jsonResponse = JSON.parse(xhr.responseText);
+                        toastr.options.closeButton = true;
+                        toastr.error(jsonResponse['message'], "Error");
+                    }
                 });
             });
 
@@ -511,12 +556,32 @@
 
                     },
                     success: function(result) {
+                        // Unblock the UI if it's blocked
+                        $.unblockUI();
+
+                        // Configure toastr options
+                        toastr.options.closeButton = true;
+                        toastr.options.timeOut = 1000; // Set timeout for the toast message
+
+                        // Show success message
+                        toastr.success("Data has been updated successfully.", "Success");
+
+                        // Redirect to the 'question' route
                         window.location.href =
                             "{{ route('question', ['guid' => $guid, 'code' => $code]) }}";
                     },
+
                     error: function(xhr, status, error) {
+                        $.unblockUI();
+
+                        // Get error message from response or fallback to status and statusText
                         var errorMessage = xhr.status + ': ' + xhr.statusText;
-                        alert('Terjadi kesalahan: ' + errorMessage);
+
+                        // Configure toastr options for error
+                        toastr.options.closeButton = true;
+
+                        // Show error message
+                        toastr.error(errorMessage, "Error");
                     }
                 });
             });
@@ -548,8 +613,17 @@
                         $('#modalEdit').modal('show');
                     },
                     error: function(xhr, status, error) {
+                        // Unblock the UI if it's blocked
+                        $.unblockUI();
+
+                        // Get error message from response or fallback to status and statusText
                         var errorMessage = xhr.status + ': ' + xhr.statusText;
-                        alert('Terjadi kesalahan: ' + errorMessage);
+
+                        // Configure toastr options for error
+                        toastr.options.closeButton = true;
+
+                        // Show error message
+                        toastr.error(errorMessage, "Error");
                     }
                 });
 
@@ -580,13 +654,17 @@
                             "Bearer {{ $token }}");
                     },
                     success: function(result) {
+                        toastr.options.closeButton = true;
+                        toastr.options.timeOut = 1000;
+                        toastr.success("Question updated successfully", "Success");
                         $('#modalEdit').modal('hide');
                         window.location.href =
                             "{{ route('question', ['guid' => $guid, 'code' => $code]) }}";
                     },
                     error: function(xhr, status, error) {
                         var errorMessage = xhr.status + ': ' + xhr.statusText;
-                        alert('Terjadi kesalahan: ' + errorMessage);
+                        toastr.options.closeButton = true;
+                        toastr.error('Terjadi kesalahan: ' + errorMessage, "Error");
                     }
                 });
             });
@@ -621,13 +699,35 @@
                     },
                     success: function(result) {
                         $('#modalAdd').modal('hide');
-                        window.location.href =
-                            "{{ route('question', ['guid' => $guid, 'code' => $code]) }}";
+
+                        // Block the UI before performing redirection
+                        $.unblockUI();
+
+                        // Configure toastr options
+                        toastr.options.closeButton = true;
+                        toastr.options.timeOut = 1000; // Set timeout for toast message
+                        toastr.options.onHidden = function() {
+                            window.location.href =
+                                "{{ route('question', ['guid' => $guid, 'code' => $code]) }}";
+                        };
+
+                        // Display success message
+                        toastr.success("Data added successfully!", "Success");
                     },
                     error: function(xhr, status, error) {
+                        $.unblockUI();
+
+                        // Parse the error message
                         var errorMessage = xhr.status + ': ' + xhr.statusText;
-                        alert('Terjadi kesalahan: ' + errorMessage);
+                        var jsonResponse = JSON.parse(xhr.responseText);
+
+                        // Configure toastr options for error
+                        toastr.options.closeButton = true;
+
+                        // Display error message
+                        toastr.error(jsonResponse['message'] || errorMessage, "Error");
                     }
+
                 });
             });
         });

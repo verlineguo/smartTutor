@@ -6,6 +6,7 @@
     <link rel="stylesheet" href="{{ asset('./assets/dashboard/datatables-buttons-bs5/buttons.bootstrap5.css') }}">
     <!-- Row Group CSS -->
     <link rel="stylesheet" href="{{ asset('./assets/dashboard/datatables-rowgroup-bs5/rowgroup.bootstrap5.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/css/toastr.min.css">
 @endsection
 @section('info-page')
     <ol class="breadcrumb bg-transparent mb-0 pb-0 pt-1 px-0 me-sm-6 me-5">
@@ -208,6 +209,8 @@
     <!-- Row Group JS -->
     <script src="{{ asset('./assets/dashboard/datatables-rowgroup/datatables.rowgroup.js') }}"></script>
     <script src="{{ asset('./assets/dashboard/datatables-rowgroup-bs5/rowgroup.bootstrap5.js') }}"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.blockUI/2.70/jquery.blockUI.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/js/toastr.min.js"></script>
 @endsection
 @section('custom-javascript')
     <script type="text/javascript">
@@ -421,11 +424,16 @@
 
                     },
                     success: function(result) {
+                        toastr.options.closeButton = true;
+                        toastr.options.timeOut = 3000;
+                        toastr.success('Topic deleted successfully.');
                         window.location.href = "{{ route('topic', ['code' => $code]) }}";
                     },
                     error: function(xhr, status, error) {
                         var errorMessage = xhr.status + ': ' + xhr.statusText;
-                        alert('Terjadi kesalahan: ' + errorMessage);
+                        toastr.options.closeButton = true;
+                        toastr.options.timeOut = 3000;
+                        toastr.error('An error occurred: ' + errorMessage);
                     }
                 });
             });
@@ -453,7 +461,9 @@
                     },
                     error: function(xhr, status, error) {
                         var errorMessage = xhr.status + ': ' + xhr.statusText;
-                        alert('Terjadi kesalahan: ' + errorMessage);
+                        toastr.options.closeButton = true;
+                        toastr.options.timeOut = 3000;
+                        toastr.error('An error occurred: ' + errorMessage);
                     }
                 });
 
@@ -488,11 +498,16 @@
                     },
                     success: function(result) {
                         $('#modalEdit').modal('hide');
+                        toastr.options.closeButton = true;
+                        toastr.options.timeOut = 3000;
+                        toastr.success('Topic updated successfully!');
                         window.location.href = "{{ route('topic', ['code' => $code]) }}";
                     },
                     error: function(xhr, status, error) {
                         var errorMessage = xhr.status + ': ' + xhr.statusText;
-                        alert('Terjadi kesalahan: ' + errorMessage);
+                        toastr.options.closeButton = true;
+                        toastr.options.timeOut = 3000;
+                        toastr.error('An error occurred: ' + errorMessage);
                     }
                 });
             });
@@ -528,10 +543,15 @@
                     success: function(result) {
                         $('#modalAdd').modal('hide');
                         window.location.href = "{{ route('topic', ['code' => $code]) }}";
+                        toastr.options.closeButton = true;
+                        toastr.options.timeOut = 3000;
+                        toastr.success('Topic add successfully.');
                     },
                     error: function(xhr, status, error) {
                         var errorMessage = xhr.status + ': ' + xhr.statusText;
-                        alert('Terjadi kesalahan: ' + errorMessage);
+                        toastr.options.closeButton = true;
+                        toastr.options.timeOut = 3000;
+                        toastr.error('An error occurred: ' + errorMessage);
                     }
                 });
             });
@@ -571,10 +591,14 @@
                         $('#modalUploadFile').modal('hide'); // Hide modal on success
                         $('#table-data').DataTable().ajax
                             .reload(); // Refresh table to show updated file
-                        alert('File uploaded successfully.');
+                        toastr.options.closeButton = true;
+                        toastr.options.timeOut = 3000;
+                        toastr.success('File uploaded successfully.');
                     },
                     error: function(xhr) {
-                        alert('File upload failed: ' + xhr.statusText);
+                        toastr.options.closeButton = true;
+                        toastr.options.timeOut = 3000;
+                        toastr.error('File upload failed: ' + xhr.statusText);
                     }
                 });
             });
@@ -600,11 +624,15 @@
                     },
                     success: function() {
                         $('#table-data').DataTable().ajax
-                            .reload(); // Refresh tabel setelah file dihapus
-                        alert('File berhasil dihapus');
+                            .reload(); // Refresh the table after the file is deleted
+                        toastr.options.closeButton = true;
+                        toastr.options.timeOut = 3000;
+                        toastr.success('File successfully deleted');
                     },
                     error: function(xhr) {
-                        alert('Gagal menghapus file: ' + xhr.statusText);
+                        toastr.options.closeButton = true;
+                        toastr.options.timeOut = 3000;
+                        toastr.error('Failed to delete file: ' + xhr.statusText);
                     }
                 });
             });

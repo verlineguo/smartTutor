@@ -5,6 +5,7 @@
     <link rel="stylesheet" href="{{ asset('./assets/dashboard/datatables-checkboxes-jquery/datatables.checkboxes.css') }}">
     <link rel="stylesheet" href="{{ asset('./assets/dashboard/datatables-buttons-bs5/buttons.bootstrap5.css') }}">
     <link rel="stylesheet" href="{{ asset('./assets/dashboard/datatables-rowgroup-bs5/rowgroup.bootstrap5.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/css/toastr.min.css">
 @endsection
 
 @section('add-css')
@@ -161,6 +162,7 @@
 @section('vendor-javascript')
     <script src="https://cdn.tiny.cloud/1/lvz6goxyxn405p74zr5vcn0xmwy7mmff6jf5wjqki5abvi3g/tinymce/7/tinymce.min.js"
         referrerpolicy="origin"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/js/toastr.min.js"></script>
 @endsection
 @section('custom-javascript')
     <script type="text/javascript">
@@ -263,7 +265,8 @@
                             });
                             response.data.forEach(message => {
                                 const messageClass = (message.sender === 'bot' || message
-                                        .sender === 'cosine') ? 'bot-message' :
+                                        .sender === 'cosine' || message
+                                        .sender === 'openai') ? 'bot-message' :
                                     'user-message';
                                 $("#chatbot-container").append(
                                     `<div class="${messageClass}">${message.message}</div>`
@@ -313,8 +316,10 @@
                             $(".language-selection").show();
                         }
                     },
-                    error: function(xhr) {
-                        console.error(`Error loading chat history: ${xhr.statusText}`);
+                    error: function(xhr, status, error) {
+                        var errorMessage = xhr.status + ': ' + xhr.statusText;
+                        toastr.options.closeButton = true;
+                        toastr.error("Error load chat history: " + errorMessage, "Error");
                     }
                 });
             }
@@ -401,8 +406,10 @@
                     success: function(response) {
                         console.log(response);
                     },
-                    error: function(xhr) {
-                        console.error(`Error saving message: ${xhr.statusText}`);
+                    error: function(xhr, status, error) {
+                        var errorMessage = xhr.status + ': ' + xhr.statusText;
+                        toastr.options.closeButton = true;
+                        toastr.error("Error saving message: " + errorMessage, "Error");
                     }
                 });
             }
@@ -471,15 +478,16 @@
                         isSubmitting = false;
 
                         const similarityMessage = response.similarityMessage;
-
                         $("#chatbot-container").append(
-                            `<div class="bot-message">${similarityMessage}</div>`
+                            `<div class="bot-message">${similarityMessage}</div>`,
+                            `<div class="bot-message">${response.answer_ai}</div>`
                         );
                         scrollToBottom();
-
                         if (response.status === 'success') {
                             currentPage = response.nextPage;
                             saveMessageToHistory(similarityMessage, "cosine", currentPage,
+                                currentQuestionGuid);
+                            saveMessageToHistory(response.answer_ai, "openai", currentPage,
                                 currentQuestionGuid);
                             askQuestion(questionsGroupedByPage);
                         } else if (response.status === 'retry') {
@@ -493,9 +501,10 @@
                             showRegenerateConfirmation();
                         }
                     },
-                    error: function(xhr) {
-                        isSubmitting = false;
-                        console.error(`Error saving message: ${xhr.statusText}`);
+                    error: function(xhr, status, error) {
+                        var errorMessage = xhr.status + ': ' + xhr.statusText;
+                        toastr.options.closeButton = true;
+                        toastr.error("Error saving message: " + errorMessage, "Error");
                     }
                 });
             }
@@ -551,8 +560,10 @@
                         }
 
                     },
-                    error: function(xhr) {
-                        console.error(`Error sending regenerate response: ${xhr.statusText}`);
+                    error: function(xhr, status, error) {
+                        var errorMessage = xhr.status + ': ' + xhr.statusText;
+                        toastr.options.closeButton = true;
+                        toastr.error("Error sending regenerate response: " + errorMessage, "Error");
                     }
                 });
             }

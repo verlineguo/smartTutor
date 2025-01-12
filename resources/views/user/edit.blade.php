@@ -6,6 +6,7 @@
     <link rel="stylesheet" href="{{ asset('./assets/dashboard/datatables-buttons-bs5/buttons.bootstrap5.css') }}">
     <!-- Row Group CSS -->
     <link rel="stylesheet" href="{{ asset('./assets/dashboard/datatables-rowgroup-bs5/rowgroup.bootstrap5.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/css/toastr.min.css">
 @endsection
 @section('info-page')
     <ol class="breadcrumb bg-transparent mb-0 pb-0 pt-1 px-0 me-sm-6 me-5">
@@ -79,6 +80,7 @@
     <!-- Row Group JS -->
     <script src="{{ asset('./assets/dashboard/datatables-rowgroup/datatables.rowgroup.js') }}"></script>
     <script src="{{ asset('./assets/dashboard/datatables-rowgroup-bs5/rowgroup.bootstrap5.js') }}"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/js/toastr.min.js"></script>
 @endsection
 @section('custom-javascript')
     <script type="text/javascript">
@@ -107,11 +109,17 @@
                             "Bearer {{ $token }}");
                     },
                     success: function(result) {
-                        window.location.href = "{{ route('index-user') }}";
+                        toastr.options.closeButton = true;
+                        toastr.options.timeOut = 1000;
+                        toastr.options.onHidden = function() {
+                            window.location.href = "{{ route('index-user') }}";
+                        };
+                        toastr.success("User data successfully updated", "Success");
                     },
                     error: function(xhr, status, error) {
-                        var errorMessage = xhr.status + ': ' + xhr.statusText;
-                        alert('Terjadi kesalahan: ' + errorMessage);
+                        toastr.options.closeButton = true;
+                        toastr.error("Failed to update user: " + xhr.status + " - " + xhr
+                            .statusText, "Error");
                     }
                 });
             });

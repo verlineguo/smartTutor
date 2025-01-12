@@ -7,6 +7,7 @@
     <!-- Row Group CSS -->
     <link rel="stylesheet" href="{{ asset('./assets/dashboard/datatables-rowgroup-bs5/rowgroup.bootstrap5.css') }}">
     <link rel="stylesheet" href="{{ asset('./assets/css/generate.css') }}" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/css/toastr.min.css">
 @endsection
 @section('add-css')
     <style>
@@ -229,6 +230,7 @@
     <script src="{{ asset('./assets/dashboard/datatables-buttons/buttons.html5.js') }}"></script>
     <script src="{{ asset('./assets/dashboard/datatables-buttons/buttons.print.js') }}"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.blockUI/2.70/jquery.blockUI.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/js/toastr.min.js"></script>
 @endsection
 
 @section('custom-javascript')
@@ -262,7 +264,9 @@
                 });
 
                 if (selectedLanguages.length === 0) {
-                    alert('Please select at least one language for translation.');
+                    toastr.options.closeButton = true;
+                    toastr.options.timeOut = 3000;
+                    toastr.error('Please select at least one language for translation.');
                     return;
                 }
 
@@ -278,7 +282,9 @@
                     // Jika ada file PDF yang diupload
                     uploadFile(pdfFile, $('#fileLanguage').val(), topic, selectedLanguages);
                 } else {
-                    alert('Please upload a PDF file or select a topic with an existing file.');
+                    toastr.options.closeButton = true;
+                    toastr.options.timeOut = 3000;
+                    toastr.error('Please upload a PDF file or select a topic with an existing file.');
                 }
             });
 
@@ -300,13 +306,18 @@
                             "Bearer {{ $token }}");
                     },
                     success: function(response) {
-                        alert("Questions saved successfully.");
+                        toastr.options.closeButton = true;
+                        toastr.options.timeOut = 3000;
+                        toastr.success("Questions saved successfully.");
+
                         // Redirect ke route question setelah sukses
                         window.location.href = "{{ url('/question') }}/" + code + "/" +
                             topicGuid;
                     },
                     error: function(xhr) {
-                        alert("Failed to save questions: " + xhr.responseText);
+                        toastr.options.closeButton = true;
+                        toastr.options.timeOut = 3000;
+                        toastr.error("Failed to save questions: " + xhr.responseText);
                     }
                 });
             });
@@ -341,8 +352,11 @@
                     },
                     error: function() {
                         $.unblockUI();
-                        alert('Failed to upload file.');
+                        toastr.options.closeButton = true;
+                        toastr.options.timeOut = 3000;
+                        toastr.error('Failed to upload file.');
                     }
+
                 });
             }
 
@@ -564,7 +578,9 @@
                 const bulkThreshold = $('#bulkThreshold').val();
 
                 if (bulkThreshold === '') {
-                    alert('Please enter a value for threshold.');
+                    toastr.options.closeButton = true;
+                    toastr.options.timeOut = 3000;
+                    toastr.error('Please enter a value for threshold.');
                     return;
                 }
 
@@ -584,7 +600,9 @@
                 table.draw(false);
 
                 $('#updateBulkModal').modal('hide');
-                alert('Selected rows updated successfully.');
+                toastr.options.closeButton = true;
+                toastr.options.timeOut = 3000;
+                toastr.success('Selected rows updated successfully.');
             });
 
 
@@ -595,7 +613,9 @@
                 const selectedRows = $('.row-checkbox:checked');
 
                 if (selectedRows.length === 0) {
-                    alert('No rows selected.');
+                    toastr.options.closeButton = true;
+                    toastr.options.timeOut = 3000;
+                    toastr.error('No rows selected.');
                     return;
                 }
 
@@ -613,7 +633,9 @@
                 // Update nomor urut setelah penghapusan
                 updateRowNumbers(table);
 
-                alert('Selected rows deleted successfully.');
+                toastr.options.closeButton = true;
+                toastr.options.timeOut = 3000;
+                toastr.success('Selected rows deleted successfully.');
             });
 
             // Fungsi untuk memperbarui nomor urut setelah penghapusan
@@ -671,8 +693,9 @@
                     }
                 },
                 error: function(xhr) {
-                    console.error("Error loading courses:", xhr.responseText);
-                    alert("Failed to load courses.");
+                    // Display error message using toastr
+                    toastr.options.closeButton = true;
+                    toastr.error("Error loading courses: " + xhr.responseText, "Error");
                 }
             });
 
@@ -703,6 +726,11 @@
                             });
                         },
                         error: function(xhr) {
+                            // Display error message using toastr
+                            toastr.options.closeButton = true;
+                            toastr.error("Error loading topics: " + xhr.responseText, "Error");
+
+                            // Log error to console for debugging purposes
                             console.error("Error loading topics:", xhr.responseText);
                         }
                     });
@@ -748,6 +776,12 @@
                             }
                         },
                         error: function(xhr) {
+                            // Display error message using toastr
+                            toastr.options.closeButton = true;
+                            toastr.error("Error checking topic file path: " + xhr.responseText,
+                                "Error");
+
+                            // Log error to console for debugging purposes
                             console.error("Error checking topic file path:", xhr.responseText);
                         }
                     });
@@ -778,14 +812,20 @@
                         $('#filePathDisplay').hide();
                         $('#deleteFilePath').hide();
                         $('#pdfUpload').show();
-                        // $('#nounInput').show();
                         $('#fileLanguageContainer').show();
                         cachedFilePath = null;
-                        alert('File berhasil dihapus');
+
+                        // Display success message using toastr
+                        toastr.options.closeButton = true;
+                        toastr.success("File has been successfully deleted", "Success");
                     },
+
                     error: function(xhr) {
-                        alert('Gagal menghapus file: ' + xhr.statusText);
+                        // Display error message using toastr
+                        toastr.options.closeButton = true;
+                        toastr.error("Failed to delete file: " + xhr.statusText, "Error");
                     }
+
                 });
             });
         });

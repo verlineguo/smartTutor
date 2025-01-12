@@ -6,6 +6,7 @@
     <link rel="stylesheet" href="{{ asset('./assets/dashboard/datatables-buttons-bs5/buttons.bootstrap5.css') }}">
     <!-- Row Group CSS -->
     <link rel="stylesheet" href="{{ asset('./assets/dashboard/datatables-rowgroup-bs5/rowgroup.bootstrap5.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/css/toastr.min.css">
 @endsection
 @section('info-page')
     <ol class="breadcrumb bg-transparent mb-0 pb-0 pt-1 px-0 me-sm-6 me-5">
@@ -85,6 +86,7 @@
     <!-- Row Group JS -->
     <script src="{{ asset('./assets/dashboard/datatables-rowgroup/datatables.rowgroup.js') }}"></script>
     <script src="{{ asset('./assets/dashboard/datatables-rowgroup-bs5/rowgroup.bootstrap5.js') }}"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/js/toastr.min.js"></script>
 @endsection
 @section('custom-javascript')
     <script type="text/javascript">
@@ -264,7 +266,9 @@
             var row = $(this).closest('tr');
             table.row(row).remove().draw();
             updateRowIndex();
-        };
+            toastr.options.closeButton = true;
+            toastr.success('Row deleted successfully!', 'Success');
+        }
 
         function updateRowIndex() {
             var table = $('#table-data').DataTable();
@@ -311,24 +315,22 @@
                                         "Bearer {{ $token }}");
                                 },
                                 success: function(response) {
-                                    console.log(response);
-                                    var course = $('#courseInput').val();
                                     successCount++;
                                     if (successCount + errorCount === numRows) {
-                                        alert("Success to save data!");
+                                        toastr.options.closeButton = true;
+                                        toastr.success('Data saved successfully!',
+                                            'Success');
                                         window.location = "/user";
                                     }
                                 },
-                                error: function(xhr, status, error) {
-                                    console.error(xhr.responseText);
+                                error: function(xhr) {
                                     errorCount++;
                                     if (successCount + errorCount === numRows) {
-                                        alert(
-                                            "Terjadi kesalahan saat menyimpan data."
-                                        );
+                                        toastr.options.closeButton = true;
+                                        toastr.error('Error occurred while saving data.',
+                                            'Error');
                                     }
                                 }
-
                             });
                         },
                         error: function(xhr, status, error) {

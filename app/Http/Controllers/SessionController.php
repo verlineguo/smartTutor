@@ -14,6 +14,7 @@ class SessionController extends Controller
         $session->set('name', $request->name);
         $session->set('id', $request->id);
         $session->set('role_name', $request->role_name);
+        session(['access_token' => $request->access_token]);
 
         return $request->name;
     }
@@ -22,6 +23,7 @@ class SessionController extends Controller
     {
         $session = new Session();
         $session->clear();
+        session()->forget('access_token');
 
         return true;
     }
