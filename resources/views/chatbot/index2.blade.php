@@ -487,6 +487,9 @@
                             currentPage = response.nextPage;
                             saveMessageToHistory(similarityMessage, "cosine", currentPage,
                                 currentQuestionGuid);
+                            setTimeout(function() {
+                                //your code to be executed after 1 second
+                            }, 1000);
                             saveMessageToHistory(response.answer_ai, "openai", currentPage,
                                 currentQuestionGuid);
                             askQuestion(questionsGroupedByPage);
