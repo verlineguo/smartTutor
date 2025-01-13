@@ -27,7 +27,7 @@ class ChatHistoryController extends Controller
             'question_guid' => 'required|string',
         ]);
 
-        usleep(1000000); // Delay 1 detik
+        sleep(1); // Delay 1 detik
 
         // Jika yang mengirim adalah bot atau cosine, simpan ke chat history
         if (in_array($validated['sender'], ['bot', 'cosine', 'openai'])) {
