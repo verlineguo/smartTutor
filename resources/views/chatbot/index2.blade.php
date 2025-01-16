@@ -489,9 +489,9 @@
                             setTimeout(function() {
                                 saveMessageToHistory(response.answer_ai, "openai", currentPage,
                                     currentQuestionGuid);
+                                currentPage = response.nextPage;
+                                askQuestion(questionsGroupedByPage);
                             }, 1000);
-                            currentPage = response.nextPage;
-                            askQuestion(questionsGroupedByPage);
                         } else if (response.status === 'retry') {
                             $("#chatbot-container").append(response.nextQuestion);
                             scrollToBottom();
