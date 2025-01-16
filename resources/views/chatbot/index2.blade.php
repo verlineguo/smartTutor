@@ -484,14 +484,13 @@
                         );
                         scrollToBottom();
                         if (response.status === 'success') {
-                            currentPage = response.nextPage;
                             saveMessageToHistory(similarityMessage, "cosine", currentPage,
                                 currentQuestionGuid);
                             setTimeout(function() {
-                                //your code to be executed after 1 second
+                                saveMessageToHistory(response.answer_ai, "openai", currentPage,
+                                    currentQuestionGuid);
                             }, 1000);
-                            saveMessageToHistory(response.answer_ai, "openai", currentPage,
-                                currentQuestionGuid);
+                            currentPage = response.nextPage;
                             askQuestion(questionsGroupedByPage);
                         } else if (response.status === 'retry') {
                             $("#chatbot-container").append(response.nextQuestion);
