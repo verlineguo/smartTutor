@@ -1,6 +1,8 @@
 hidden.txt
+hidden2.txt
 flask_app/
 /.ssh
 *.pyc
 myenv/
 __pycache__/
+nama/

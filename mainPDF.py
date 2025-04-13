@@ -1,7 +1,7 @@
 # !pip install openai
 # !pip install pdfplumber
 # !pip install sklearn
-
+import google.generativeai as genai
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
@@ -12,9 +12,18 @@ from sklearn.metrics.pairwise import cosine_similarity
 with open('hidden.txt') as file:
     openai.api_key = file.read()
 
+
+with open('hidden2.txt') as file:
+    genai_api_key = file.read()
+
+
+# Setup API Client
+# genai.configure(api_key=GENAI_API_KEY)
+# deepseek_client = openai.OpenAI(api_key=DEEPSEEK_API_KEY)
+genai.configure(api_key=genai_api_key)
+
+
 # Fungsi untuk ekstraksi teks per halaman dari PDF
-
-
 def extract_text(file):
     with pdfplumber.open(file) as pdf:
         return [page.extract_text() for page in pdf.pages]
@@ -65,11 +74,11 @@ def generate_questions(prompt, page_text, temp=0.7, top_p=0.7, freq_penalty=0.5,
 
     return text
 
-# Validasi struktur JSON yang dihasilkan
+# # Validasi struktur JSON yang dihasilkan
 
 
 def validate_json(data):
-    required_keys = {"question", "answer", "category", "question_nouns"}
+    required_keys = {"question", "category", "question_nouns"}
     valid_categories = {"remembering", "understanding"}
 
     if "questions" not in data or not isinstance(data["questions"], list):
@@ -132,27 +141,18 @@ def generate_prompt(content, noun_list=None):
          "questions":[
                       {
                       "question": "What is supervised learning method?",
-                      "answer": "Supervised learning method is an approach in machine learning where the model learns from labeled data, which means the model learns by mapping input to desired output.",
                       "category": "remembering",
                       "question_nouns": ["learning method", "approach", "machine learning", "model", "data", "input", "output"]
                       },
                       {
                       "question": "How do you choose an appropriate model in machine learning?",
-                      "answer": "Choosing a model in machine learning involves understanding the characteristics of the data, prediction objectives, and model performance. This includes considering model complexity, generalization, and adaptation to the data type.",
                       "category": "remembering",
                       "question_nouns": ["model", "machine learning", "data", "objectives", "performance", "complexity", "generalization", "adaptation"]
                       },
                       {
                       "question": "Why is cross-validation important in machine learning?",
-                      "answer": "Cross-validation is used to evaluate the performance of a model by dividing the data into training and testing subsets. It helps measure how well the model can generalize to unseen data.",
                       "category": "understanding",
                       "question_nouns": ["cross-validation", "model", "performance", "data", "subsets"]
-                      },
-                      {
-                      "question": "How can we evaluate the performance of a model in machine learning?",
-                      "answer": "The performance evaluation of a model in machine learning can be done using metrics such as accuracy, precision, recall, F1-score, and ROC-AUC curve. This helps to understand how well the model predicts unseen data.",
-                      "category": "understanding",
-                      "question_nouns": ["performance", "model", "machine learning", "metrics", "accuracy", "precision", "recall", "F1-score", "ROC-AUC curve", "data"]
                       }
                   ]
 
@@ -161,27 +161,18 @@ def generate_prompt(content, noun_list=None):
         "questions": [
                         {
                             "question": "教師あり学習手法とは何ですか？",
-                            "answer": "教師あり学習手法は、モデルがラベル付きデータから学習する機械学習のアプローチであり、モデルが入力を期待する出力にマッピングすることを意味します。",
                             "category": "remembering",
                             "question_nouns": ["学習手法", "アプローチ", "機械学習", "モデル", "データ", "入力", "出力"]
                         },
                         {
                             "question": "機械学習において適切なモデルをどのように選択しますか？",
-                            "answer": "機械学習におけるモデルの選択は、データの特性、予測目標、モデルの性能を理解することに関わります。これには、モデルの複雑さ、一般化、データ型への適応を考慮することが含まれます。",
                             "category": "remembering",
                             "question_nouns": ["モデル", "機械学習", "データ", "目標", "性能", "複雑さ", "一般化", "適応"]
                         },
                         {
                             "question": "機械学習において交差検証が重要なのはなぜですか？",
-                            "answer": "交差検証は、データをトレーニングとテストのサブセットに分割することでモデルの性能を評価するために使用されます。これにより、モデルが未知のデータにどの程度一般化できるかを測定できます。",
                             "category": "understanding",
                             "question_nouns": ["交差検証", "モデル", "性能", "データ", "サブセット"]
-                        },
-                        {
-                            "question": "機械学習においてモデルの性能をどのように評価できますか？",
-                            "answer": "機械学習のモデル性能の評価は、精度、適合率、再現率、F1スコア、ROC-AUCカーブなどの指標を使用して行うことができます。これにより、モデルが未知のデータをどの程度予測できるかを理解することができます。",
-                            "category": "understanding",
-                            "question_nouns": ["性能", "モデル", "機械学習", "指標", "精度", "適合率", "再現率", "F1スコア", "ROC-AUCカーブ", "データ"]
                         }
                     ]
 
@@ -226,13 +217,10 @@ def process_page(page_num, text, content, nouns, tfidf_terms, tfidf_embeddings, 
                     question_noun_embeddings[noun] = get_embedding(noun)
 
         # Proses setiap pertanyaan
-        for question in data['questions']:
+        for question in data['questions'][:2]:
             question_text = question['question']
-            answer_text = question['answer']
             question_embedding = get_embedding(question_text)
-            answer_embedding = get_embedding(answer_text)
-            question['cosine_q&a'] = cosine_sim(
-                question_embedding, answer_embedding)
+
 
             # Hitung avg_similarity menggunakan embedding yang sudah dihitung
             avg_similarity = sum(
@@ -244,6 +232,8 @@ def process_page(page_num, text, content, nouns, tfidf_terms, tfidf_embeddings, 
             question['page_number'] = page_num + 1
 
             questions_data.append(question)
+            
+            
 
         data['questions'] = questions_data
         return data
