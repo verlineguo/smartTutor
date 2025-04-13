@@ -14,7 +14,9 @@ return new class extends Migration
         Schema::create('questions', function (Blueprint $table) {
             $table->uuid('guid')->primary();
             $table->string('question_ai');
-            $table->text('answer_ai');
+            $table->text('answer_openai');
+            $table->text('answer_gemini')->nullable();
+            $table->text('answer_deepseek')->nullable();
             $table->string('question_fix');
             $table->text('answer_fix');
             $table->float('weight');

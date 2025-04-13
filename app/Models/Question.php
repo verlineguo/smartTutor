@@ -30,8 +30,8 @@ class Question extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'question_ai',
-        'answer_ai',
+        'question',
+        'answer_pdf_guid',
         'question_fix',
         'answer_fix',
         'weight',
@@ -43,7 +43,11 @@ class Question extends Model
         'attempt',
         'page',
         'cossine_similarity',
+        // 'openai_cosine',
+        // 'gemini_cosine',
+        // 'deepseek_cosine',
         'language'
+        
     ];
 
     /**
@@ -79,5 +83,19 @@ class Question extends Model
     public function user_answer()
     {
         return $this->hasMany(Answer::class);
+    }
+    /**
+     * ANSWER PDF OBJECT
+     */
+    public function answer_pdf()
+    {
+        return $this->hasMany(AnswerPDF::class, 'question_guid', 'guid');
+    }
+    /**
+     * ANSWER LLM OBJECT
+     */
+    public function answer_llm()
+    {
+        return $this->hasMany(AnswerLLM::class, 'question_guid', 'guid');
     }
 }

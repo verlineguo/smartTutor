@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AnswerUser;
 use App\Models\ChatHistory;
 use App\Models\Course;
 use App\Models\Grade;
@@ -47,6 +48,7 @@ class TopicController extends Controller
 
     public function showData()
     {
+        
         $data = Topic::all();
         if (!isset($data)) {
             return ResponseController::getResponse(null, 400, "Data not found");
@@ -101,17 +103,19 @@ class TopicController extends Controller
      */
     private function calculateGradeByTopic($userId, $topicGuid)
     {
+        $questionGuids = Question::where('topic_guid', $topicGuid)->pluck('guid');
+
         // Ambil chat history untuk user dan topic tertentu
-        $chatHistories = ChatHistory::where('topic_guid', $topicGuid)
-            ->where('user_id', $userId)
-            ->orderBy('page', 'asc') // Urutkan berdasarkan halaman
-            ->get();
+        $answerUsers = AnswerUser::whereIn('question_guid', $questionGuids)
+        ->where('user_id', $userId)
+        ->orderBy('page', 'asc') // Urutkan berdasarkan halaman
+        ->get();
 
         // Ambil jumlah halaman dari tabel questions
         $totalPages = Question::where('topic_guid', $topicGuid)->max('page');
 
         // Hitung cosine tertinggi per halaman
-        $cosinePerPage = $chatHistories->groupBy('page')->map(function ($chats) {
+        $cosinePerPage = $answerUsers->groupBy('page')->map(function ($chats) {
             return $chats->max('cosine_similarity'); // Nilai cosine tertinggi di setiap halaman
         });
 

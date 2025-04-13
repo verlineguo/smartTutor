@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\AnswerController;
+use App\Http\Controllers\AnswerLLMController;
+use App\Http\Controllers\AnswerPDFController;
+use App\Http\Controllers\AssignmentController;
 use App\Http\Controllers\AssistantController;
 use App\Http\Controllers\OtpController;
 use App\Http\Controllers\PasswordController;
@@ -8,10 +11,12 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\ChatHistoryController;
 use App\Http\Controllers\CourseController;
+use App\Http\Controllers\EvaluationController;
 use App\Http\Controllers\GradeController;
 use App\Http\Controllers\JawabanController;
 use App\Http\Controllers\MataKuliahController;
 use App\Http\Controllers\MateriController;
+use App\Http\Controllers\PlagiarismController;
 use App\Http\Controllers\QuestionController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SoalController;
@@ -19,6 +24,7 @@ use App\Http\Controllers\TopicController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserCourseController;
 use App\Http\Controllers\UserMataKuliahController;
+use App\Http\Controllers\SimilarityController;
 use App\Models\ChatHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -72,6 +78,8 @@ Route::group([
 /**
  * PROFILE
  */
+
+
 Route::group([
     'prefix' => $url . 'user',
     'middleware' => 'jwt.verify'
@@ -114,27 +122,14 @@ Route::group([
     $router->put('/', [QuestionController::class, 'updateData']);
     $router->get('/{guid}', [QuestionController::class, 'getData']);
     $router->delete('/{guid}', [QuestionController::class, 'deleteData']);
-
     $router->post('/', [QuestionController::class, 'insertData']);
+    $router->get('llm-answers/{topicGuid}', [QuestionController::class, 'getLlmAnswers']);
+    $router->get('llm-answers-by-question/{questionGuid}', [QuestionController::class, 'getLlmAnswersByQuestion']);
+    $router->get('pdf-answers/{topicGuid}', [QuestionController::class, 'getPdfAnswers']);
+    $router->get('pdf-answers-by-question/{questionGuid}', [QuestionController::class, 'getPdfAnswersByQuestion']);
 });
 
 
-/**
- * CHATBOT
- */
-Route::group([
-    'prefix' => $url . 'chatbot',
-    'middleware' => 'jwt.verify'
-], function ($router) {
-    // $router->get('/question', [ChatbotController::class, 'getQuestion']);
-    // $router->post('/answer', [ChatbotController::class, 'answerQuestion']);
-    $router->post('/save', [ChatHistoryController::class, 'saveMessage']);
-    $router->post('/reset-histories', [ChatHistoryController::class, 'resetHistories']);
-    $router->post('/regenerate', [ChatHistoryController::class, 'regenerateQuestions']);
-    $router->get('/history/{topicGuid}/{userId}', [ChatHistoryController::class, 'getHistory']);
-    $router->get('/status/{topicGuid}/{userId}', [ChatHistoryController::class, 'checkStatus']);
-    $router->get('/languages/{topicGuid}', [ChatHistoryController::class, 'getAvailableLanguages']);
-});
 
 /**
  * ROLE
@@ -240,4 +235,73 @@ Route::group([
     $router->get('/', [GradeController::class, 'getData']);
     $router->post('/', [GradeController::class, 'insertData']);
     $router->put('/', [GradeController::class, 'updateData']);
+});
+
+/**
+ * ASSIGNMENT
+ */
+
+ Route::group([
+    'prefix' => $url . 'assignment',
+    'middleware' => 'jwt.verify'
+], function ($router) {
+    
+    $router->get('/languages/{topicGuid}', [AssignmentController::class, 'getAvailableLanguages']);
+    $router->post('/submit', [AssignmentController::class, 'submitAnswer']);
+    $router->post('/plagiarism/check', [AssignmentController::class, 'checkPlagiarism']);
+    $router->get('/answers/alternatives/{questionGuid}', [AssignmentController::class, 'getAlternativeAnswers']);
+    $router->get('/history/{userId}/{topicGuid}/{questionGuid}', [AssignmentController::class, 'getAnswerHistory']);
+});
+
+
+
+Route::group([
+    'prefix' => $url . 'answerpdf',
+    'middleware' => 'jwt.verify'
+], function ($router) {
+ 
+    $router->post('/bert-qa', [AnswerPDFController::class, 'getBertAnswer']);
+
+});
+
+
+Route::group([
+    'prefix' => $url . 'llm-answer',
+    'middleware' => 'jwt.verify'
+], function ($router) {
+  
+    $router->post('/', [AnswerLLMController::class, 'getLLMAnswer']);
+
+});
+
+Route::group([
+    'prefix' => $url . 'answerUser',
+    'middleware' => 'jwt.verify'
+], function ($router) {
+  
+    $router->post('/save', [AnswerLLMController::class, 'submit']);
+
+
+});
+
+Route::group([
+    'prefix' => $url . 'plagiarism',
+    'middleware' => 'jwt.verify'
+], function ($router) {
+   
+    $router->post('/check', [PlagiarismController::class, 'checkPlagiarism']);
+
+
+});
+
+Route::group([
+    'prefix' => $url . 'evaluation',
+    'middleware' => 'jwt.verify'
+], function ($router) {
+
+    $router->get('/{questionGuid}/{answerGuid}', [EvaluationController::class, 'show']);
+    $router->get('/plagiarism/{questionGuid}/{answerGuid}', [EvaluationController::class, 'getAllPlagiarismData']);
+    $router->get('/history/{userId?}', [EvaluationController::class, 'getSubmissionHistory']);
+    $router->get('/download-report/{questionGuid}/{answerGuid}', [EvaluationController::class, 'downloadReport']);
+
 });

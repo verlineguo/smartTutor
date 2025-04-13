@@ -2,15 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AnswerLLM;
+use App\Models\AnswerPDF;
 use App\Models\Gram;
 use App\Models\PageNoun;
 use App\Models\Question;
 use App\Models\Topic;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Session\Session;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Storage;
@@ -27,7 +31,7 @@ class QuestionController extends Controller
         $file = $request->file('pdf');
         $name = $file->hashName();
         $file->storeAs($path, $name);
-        $page = Http::attach('pdf', file_get_contents('/home/u486571172/domains/smart-tutor-fit.com/smart-tutor-backend/storage/app/public/file/' . $name), 'file.pdf', ['Content-Type' => 'pdf'])
+        $page = Http::attach('pdf', file_get_contents('/home/u486571172/domains/smart-tutor-fit.com/storage/app/public/file/' . $name), 'file.pdf', ['Content-Type' => 'pdf'])
             ->post(
                 'http://91.108.110.58/count-page'
             );
@@ -53,50 +57,7 @@ class QuestionController extends Controller
             return false;
         }
     }
-    // public function generateData(Request $request)
-    // {
-
-    //     if ($request->get('path') != "") {
-
-    //         $Rawdata = Http::timeout(300)
-    //             ->attach('pdf', file_get_contents('/home/u486571172/domains/smart-tutor-fit.com/smart-tutor-backend/storage/app/public/file/' . $request->get('name')), 'file.pdf', ['Content-Type' => 'pdf'])
-    //             ->post(
-    //                 'http://91.108.110.58/generate',
-    //                 [
-    //                     'language' => $request->get('language'),
-    //                     'page' => $request->get('page')
-    //                 ]
-    //             );
-    //         if (!isset($Rawdata[0])) {
-    //             return 0;
-    //         }
-    //         $data = json_decode($Rawdata, true);
-    //         if (isset($data['pertanyaan'])) {
-    //             return $data['pertanyaan'];
-    //         } else {
-    //             return false;
-    //         }
-    //         // Storage::delete($request->get('path') . $request->get('name'));
-    //     } else if ($request->get('noun') != "") {
-
-    //         $data = Http::withHeaders([
-    //             'Content-Type' => "application/json"
-    //         ])->post(
-    //             "http://91.108.110.58/generate",
-    //             [
-    //                 'topic' => $request->get('noun'),
-    //                 'language' => $request->get('language'),
-    //             ]
-    //         );
-    //     }
-
-    //     $data = json_decode($data, true);
-    //     $dataTable = DataTables::of($data['pertanyaan'])
-    //         ->addIndexColumn()
-    //         ->make(true);
-
-    //     return $dataTable;
-    // }
+    
     public function convertDatatable(Request $request)
     {
         $dataTable = DataTables::of($request->get('data'))
@@ -104,39 +65,6 @@ class QuestionController extends Controller
             ->make(true);
         Storage::delete($request['path'] . $request['name']);
         return $dataTable;
-    }
-
-
-    public function insertData(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'question_ai' => 'required|string',
-            'answer_ai' => 'required|string',
-            'question_fix' => 'required|string',
-            'answer_fix' => 'required|string',
-            'threshold' => 'required|numeric',
-            'category' => 'required|string|max:40',
-            'language' => 'required|string|max:40',
-            'topic_guid' => 'required|string|max:40',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['error' => $validator->errors()->first()], 422);
-        }
-
-        $data = Question::create([
-            'question_ai' => $request['question_ai'],
-            'answer_ai' => $request['answer_ai'],
-            'question_fix' => $request['question_fix'],
-            'answer_fix' => $request['answer_fix'],
-            'category' => $request['category'],
-            'weight' => 1.0,
-            'threshold' => $request['threshold'],
-            'topic_guid' => $request['topic_guid'],
-            'language' => $request['language'],
-        ]);
-
-        return response()->json(['data' => $data, 'message' => 'Success'], 200);
     }
 
     public function translateDocument(Request $request)
@@ -375,6 +303,137 @@ class QuestionController extends Controller
         return ResponseController::getResponse(['tfidf_data' => $data], 200, 'TF-IDF berhasil dihitung.');
     }
 
+    public function getLlmAnswers($topicGuid)
+    {
+        try {
+            $questions = Question::where('topic_guid', $topicGuid)
+                ->orderByRaw('cast(page as unsigned) asc')
+                ->get();
+
+            $result = [];
+            foreach ($questions as $question) {
+                $llmAnswers = AnswerLLM::where('question_guid', $question->guid)->get();
+                
+                $item = [
+                    'guid' => $question->guid,
+                    'question' => $question->question,
+                    'openai_answer' => null,
+                    'gemini_answer' => null,
+                    'deepseek_answer' => null
+                ];
+
+                foreach ($llmAnswers as $answer) {
+                    if ($answer->source === 'openai') {
+                        $item['openai_answer'] = $answer->answer;
+                    } elseif ($answer->source === 'gemini') {
+                        $item['gemini_answer'] = $answer->answer;
+                    } elseif ($answer->source === 'deepseek') {
+                        $item['deepseek_answer'] = $answer->answer;
+                    }
+                }
+
+                $result[] = $item;
+            }
+
+            return DataTables::of($result)
+                ->addIndexColumn()
+                ->make(true);
+        } catch (\Exception $e) {
+            return ResponseController::getResponse(null, 500, $e->getMessage());
+        }
+    }
+
+
+
+    public function getLlmAnswersByQuestion($questionGuid)
+    {
+        try {
+            $answers = AnswerLLM::where('question_guid', $questionGuid)->get();
+            
+            return response()->json([
+                'status' => 'success',
+                'message' => 'LLM answers retrieved successfully',
+                'data' => $answers
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getPdfAnswers($topicGuid)
+    {
+        try {
+            $questions = Question::where('topic_guid', $topicGuid)
+                ->orderByRaw('cast(page as unsigned) asc')
+                ->get();
+
+            $result = [];
+            foreach ($questions as $question) {
+                $pdfAnswer = AnswerPdf::where('question_guid', $question->guid)->first();
+                
+                $item = [
+                    'guid' => $question->guid,
+                    'question' => $question->question,
+                    'pdf_answer' => $pdfAnswer ? $pdfAnswer->answer : null,
+                    'combined_score' => $pdfAnswer ? $pdfAnswer->combined_score : null,
+                    'qa_score' => $pdfAnswer ? $pdfAnswer->qa_score : null,
+                    'retrieval_score' => $pdfAnswer ? $pdfAnswer->retrieval_score : null
+                ];
+
+                $result[] = $item;
+            }
+
+            return DataTables::of($result)
+                ->addIndexColumn()
+                ->make(true);
+        } catch (\Exception $e) {
+            return ResponseController::getResponse(null, 500, $e->getMessage());
+        }
+    }
+
+    public function getPdfAnswersByQuestion($questionGuid)
+    {
+        try {
+            $question = Question::where('guid', $questionGuid)->first();
+                
+            if (!$question) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Question not found'
+                ], 404);
+            }
+            
+            $pdfAnswers = AnswerPDF::where('question_guid', $questionGuid)
+                ->orderBy('combined_score', 'desc')
+                ->get();
+            
+            // Mark the currently selected answer if it exists
+            foreach ($pdfAnswers as $key => $answer) {
+                $pdfAnswers[$key]->is_selected = ($answer->guid === $question->answer_pdf_guid);
+                
+                // Add the page from the question if it exists
+                if ($question->page) {
+                    $pdfAnswers[$key]->page = $question->page;
+                }
+            }
+                
+            return response()->json([
+                'status' => true,
+                'message' => 'PDF answers loaded successfully',
+                'data' => $pdfAnswers
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed to load PDF answers: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+
 
 
     public function saveQuestions(Request $request)
@@ -382,35 +441,74 @@ class QuestionController extends Controller
         $validator = Validator::make($request->all(), [
             'topic_guid' => 'required|string',
             'questions' => 'required|array',
-            'questions.*.question' => 'required|string',
-            'questions.*.answer' => 'required|string',
-            'questions.*.category' => 'required|string',
-            'questions.*.language' => 'required|string',
         ]);
-
+    
         if ($validator->fails()) {
             return ResponseController::getResponse(null, 422, $validator->errors()->first());
         }
-
-        foreach ($request->questions as $questionData) {
-            Question::create([
-                'question_ai' => $questionData['question'],
-                'answer_ai' => $questionData['answer'],
-                'question_fix' => $questionData['question'],
-                'answer_fix' => $questionData['answer'],
-                'threshold' => $questionData['threshold'], // Default value
-                'weight' => 1.0, // Default value
-                'category' => $questionData['category'],
-                'topic_guid' => $request->topic_guid,
-                'language' => $questionData['language'],
-                'question_nouns' => json_encode($questionData['question_nouns'] ?? []),
-                'page' => $questionData['page_number'] ?? null,
-                'cossine_similarity' => $questionData['cosine_q&d'] ?? 0.0,
-            ]);
+    
+        try {
+            $questions = $request->get('questions');
+    
+            foreach ($questions as $questionData) {
+   
+                $question = Question::create([
+                    'topic_guid' => $request->topic_guid,
+                    'question' => $questionData['question'],
+                    'question_fix' => $questionData['question'],
+                    'language' => $questionData['language'],
+                    'threshold' => $questionData['threshold'] ?? 0,
+                    'weight' => 1.0,
+                    'category' => $questionData['category'] ?? null,
+                    'question_nouns' => json_encode($questionData['question_nouns'] ?? []),
+                    'page' => $questionData['page_number'] ?? null,
+                    'cossine_similarity' => $questionData['cosine_q&d'] ?? 0,
+                ]);
+    
+                if (isset($questionData['all_pdf_answers']) && is_array($questionData['all_pdf_answers'])) {
+                    foreach ($questionData['all_pdf_answers'] as $pdfAnswer) {
+                        $answerPdf = AnswerPDF::create([
+                            'question_guid' => $question->guid,
+                            'answer' => $pdfAnswer['answer'],
+                            'combined_score' => $pdfAnswer['combined_score'] ?? 0,
+                            'qa_score' => $pdfAnswer['qa_score'] ?? 0,
+                            'retrieval_score' => $pdfAnswer['retrieval_score'] ?? 0,
+                        ]);
+                        
+                        // If this is the best answer, update the question with the reference
+                        if (isset($questionData['pdf_answer']) && $questionData['pdf_answer'] == $pdfAnswer['answer']) {
+                            $question->answer_pdf_guid = $answerPdf->guid;
+                            $question->answer_fix = $answerPdf->answer;
+                            $question->save();
+                        }
+                    }
+                }
+               
+    
+                // Simpan jawaban LLM ke tabel `answer_llm`
+                if (isset($questionData['answer_openai'])) {
+                    AnswerLLM::create([
+                        'question_guid' => $question->guid,
+                        'answer' => $questionData['answer_openai'],
+                        'source' => 'openai',
+                    ]);
+                }
+    
+                if (isset($questionData['answer_gemini'])) {
+                    AnswerLLM::create([
+                        'question_guid' => $question->guid,
+                        'answer' => $questionData['answer_gemini'],
+                        'source' => 'gemini',
+                    ]);
+                }
+            }
+    
+            return ResponseController::getResponse(null, 200, 'Questions and answers saved successfully.');
+        } catch (\Exception $e) {
+            return ResponseController::getResponse(null, 500, "Error: " . $e->getMessage());
         }
-
-        return ResponseController::getResponse(null, 200, 'Questions saved successfully.');
     }
+
 
 
     public function generateData(Request $request)
@@ -459,27 +557,22 @@ class QuestionController extends Controller
                 'tfidf_data' => $tfidfDataJson,
             ]);
 
-        if ($generateResponse->failed()) {
-            return ResponseController::getResponse(null, 500, "Kesalahan saat menghasilkan pertanyaan.");
-        }
+            if ($generateResponse->failed()) {
+                Log::error('Flask API Error', [
+                    'status' => $generateResponse->status(),
+                    'response' => $generateResponse->body(),
+                    'request' => $request->all()
+                ]);
+                
+                return ResponseController::getResponse(null, 500, "Flask API Error: " . $generateResponse->body());
+            }
 
         $questionsData = $generateResponse->json();
-        // foreach ($questionsData as $questionData) {
-        //     Question::create([
-        //         'question_ai' => (string) ($questionData['question'] ?? ''), // Cast to string
-        //         'answer_ai' => (string) ($questionData['answer'] ?? ''), // Cast to string
-        //         'question_fix' => (string) ($questionData['question'] ?? ''), // Cast to string
-        //         'answer_fix' => (string) ($questionData['answer'] ?? ''), // Cast to string
-        //         'threshold' => (float) 70.0, // Cast to float
-        //         'weight' => (float) 1.0, // Cast to float
-        //         'category' => (string) ($questionData['category'] ?? 'general'), // Cast to string
-        //         'topic_guid' => (string) $request->get('topic_guid'), // Cast to string
-        //         'language' => (string) $request->get('language'), // Cast to string
-        //         'question_nouns' => json_encode($questionData['question_nouns'] ?? []),
-        //         'page' => isset($questionData['page_number']) ? (int) $questionData['page_number'] : null, // Cast to integer
-        //         'cossine_similarity' => (float) ($questionData['cosine_q&d'] ?? 0.0), // Cast to float
-        //     ]);
-        // }
+        $questionsData = array_map(function ($question) {
+            $question['guid'] = (string) Str::uuid(); // Tambahkan GUID unik
+            return $question;
+        }, $questionsData);
+
 
         return ResponseController::getResponse($questionsData, 200, 'Pertanyaan berhasil dihasilkan.');
         // return ResponseController::getResponse(null, 200, 'Pertanyaan berhasil dihasilkan.');
@@ -541,6 +634,8 @@ class QuestionController extends Controller
                 ->get();
         }
 
+        
+
         if (!isset($data) || $data->isEmpty()) {
             return ResponseController::getResponse(null, 400, "Data not found");
         }
@@ -568,10 +663,6 @@ class QuestionController extends Controller
                 ->get();
         }
 
-        // if (!isset($data) || $data->isEmpty()) {
-        //     return ResponseController::getResponse(null, 400, "Data not found");
-        // }
-
         $dataTable = DataTables::of($data)
             ->addIndexColumn()
             ->make(true);
@@ -594,6 +685,9 @@ class QuestionController extends Controller
             'threshold' => 'required|numeric',
             'category' => 'required|string|max:40',
             'language' => 'required|string|max:40',
+            'page' => 'nullable|numeric|min:0',
+            'weight' => 'nullable|numeric|min:0|max:100',
+            'answer_pdf_guid' => 'nullable|string|exists:answer_pdf,guid',
         ]);
 
         if ($validator->fails()) {
@@ -611,19 +705,74 @@ class QuestionController extends Controller
         $data->threshold = $request['threshold'];
         $data->category = $request['category'];
         $data->language = $request['language'];
+        $data->weight = $request['weight'] ?? 1.0;
         $data->save();
+        if ($request->has('answer_pdf_guid') && $request->answer_pdf_guid) {
+            $updateData['answer_pdf_guid'] = $request->answer_pdf_guid;
+        }
 
         return response()->json(['data' => $data, 'message' => 'Success'], 200);
     }
+
+    public function setSelectedPdfAnswer(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'question_guid' => 'required|string|exists:question,guid',
+                'answer_pdf_guid' => 'required|string|exists:answer_pdf,guid',
+            ]);
+            
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+            
+            // Verify the answer belongs to the question
+            $answerExists = AnswerPDF::where('guid', $request->answer_pdf_guid)
+                ->where('question_guid', $request->question_guid)
+                ->exists();
+                
+            if (!$answerExists) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'The selected answer does not belong to this question'
+                ], 400);
+            }
+            
+            Question::where('guid', $request->question_guid)
+                ->update([
+                    'answer_pdf_guid' => $request->answer_pdf_guid,
+                    'updated_at' => Carbon::now()
+                ]);
+            
+            return response()->json([
+                'status' => true,
+                'message' => 'Selected PDF answer updated successfully'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed to update selected PDF answer: ' . $e->getMessage()
+            ], 500);
+        }
+    }
     public function deleteData($guid)
     {
+        
+
         $data = Question::where('guid', '=', $guid)->first();
 
         if (!isset($data)) {
             return ResponseController::getResponse(null, 400, "Data not found");
         }
 
+
         $data->delete();
+        AnswerLLM::where('question_guid', $guid)->delete();
+        AnswerPDF::where('question_guid', $guid)->delete();
 
         return ResponseController::getResponse(null, 200, 'Success');
     }

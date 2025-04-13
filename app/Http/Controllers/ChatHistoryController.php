@@ -2,7 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\ChatHistory;
+use App\Models\AnswerPDF;
+use App\Models\AnswerUser;
 use App\Models\PageNoun;
 use App\Models\Question;
 use App\Models\Topic;
@@ -21,22 +22,24 @@ class ChatHistoryController extends Controller
         $validated = $request->validate([
             'user_id' => 'required|string',
             'topic_guid' => 'required|string',
-            'message' => 'required|string',
-            'sender' => 'required|in:user,bot,cosine,openai',
+            'answer' => 'required|string',
             'page' => 'required|integer',
             'question_guid' => 'required|string',
         ]);
 
         sleep(1); // Delay 1 detik
 
-        // Jika yang mengirim adalah bot atau cosine, simpan ke chat history
-        if (in_array($validated['sender'], ['bot', 'cosine', 'openai'])) {
-            ChatHistory::create($validated);
-            return response()->json(['status' => 'question_saved']);
-        }
+        
 
         // Untuk pengirim user, simpan respons pengguna
-        $chatHistory = ChatHistory::create(array_merge($validated, ['cosine_similarity' => null]));
+        $answerUser = AnswerUser::create([
+            'user_id' => $validated['user_id'],
+            'topic_guid' => $validated['topic_guid'],
+            'answer' => $validated['answer'],
+            'page' => $validated['page'],
+            'question_guid' => $validated['question_guid'],
+            'cosine_similarity' => null
+        ]);
 
         // Ambil pertanyaan yang sesuai
         $question = Question::where('guid', $validated['question_guid'])->first();
@@ -45,15 +48,22 @@ class ChatHistoryController extends Controller
         }
 
         // Hitung cosine similarity antara jawaban pengguna dan jawaban yang benar
-        $similarityResult = $this->calculateCosineSimilarity($validated['message'], $question->answer_fix, $validated['page'], $validated['topic_guid'], $question->language, $question->question_fix);
+        $similarityResult = $this->calculateCosineSimilarity(
+            $validated['answer'], 
+            $question->answer_fix, 
+            $validated['page'], 
+            $validated['topic_guid'], 
+            $question->language, 
+            $question->question_fix
+        );
         // Simpan nilai cosine similarity ke chat history
         $similarity_score = $similarityResult['similarity_score'];
-
+        
         // Ambil data cosine per noun
         $noun_cosine_data = $similarityResult['noun_cosine_data'];
 
         // Simpan nilai cosine similarity ke chat history
-        $chatHistory->update(['cosine_similarity' => $similarity_score]);
+        $answerUser->update(['cosine_similarity' => $similarity_score]);
 
         // Persiapkan pesan untuk ditampilkan
         $similarityMessage = "<p><strong>Cosine Similarity Score:</strong> " . number_format($similarity_score, 2) . "%</p>";
@@ -79,67 +89,178 @@ class ChatHistoryController extends Controller
 
         // Tentukan apakah nilai similarity mencapai threshold
         if ($similarity_score >= $question->threshold) {
-            return $this->responseForSuccess($validated, $validated['page'], $similarityMessage, $similarity_score, $question->threshold, $noun_cosine_data, $similarityResult['answer_ai']);
+            return $this->responseForSuccess($validated, $validated['page'], $similarityMessage, $similarity_score, $question->threshold, $noun_cosine_data, $similarityResult['answer_openai']);
+            
         }
 
         // Jika tidak, periksa pertanyaan yang tersisa pada halaman ini
-        return $this->responseForRetry($validated, $similarityMessage, $similarity_score, $question->threshold, $question->language, $similarityResult['answer_ai']);
+        return $this->responseForRetry($validated, $similarityMessage, $similarity_score, $question->threshold, $question->language, $similarityResult['answer_openai']);
     }
 
 
 
     /**
      * Calculate cosine similarity by calling the Flask API.
-     */
+      */
+    // protected function calculateCosineSimilarity($user_answer, $actual_answer, $page, $topic_guid, $language, $question)
+    // {
+    //     // Ambil semua nouns dan nilai cosine untuk halaman yang relevan
+    //     $pageNouns = PageNoun::where('topic_guid', $topic_guid)
+    //         ->where('language', $language)
+    //         ->where('page', $page)
+    //         ->get();
+
+    //     // Format data untuk dikirim ke Flask
+    //     $nounsData = $pageNouns->map(function ($item) {
+    //         return [
+    //             'noun' => $item->noun,
+    //             'cosine_similarity' => $item->cosine, // Cosine yang sudah ada di database
+    //         ];
+    //     })->toArray();
+
+    //     $nounsDataJson = json_encode($nounsData);
+
+        // Kirimkan data ke API Flask
+        // $flask_url = env('FLASK_API_URL') . '/cosine_similarity';
+        // $response = Http::post($flask_url, [
+        //     'user_answer' => $user_answer,
+        //     'actual_answer' => $actual_answer,
+        //     'nouns' => $nounsDataJson, // Mengirimkan data nouns dan cosine
+        // ]);
+
+    //     if ($response->failed()) {
+    //         throw new \Exception('Failed to calculate cosine similarity');
+    //     }
+
+
+    //     $responseData = $response->json();
+        
+    //     $answerOpenAI = Http::post(env('FLASK_API_URL') . '/answer_openai', [
+    //         'question' => $question
+    //     ]);
+
+        
+    //     $similarity_score = $responseData['actual_similarity_score'] 
+    //         ?? $responseData['similarity_score'] 
+    //         ?? 0;
+
+    //     // Default noun similarities jika tidak ada
+    //     $noun_similarities = $responseData['noun_similarities'] 
+    //         ?? $responseData['noun_cosine_data'] 
+    //         ?? [];
+        
+    //     try {
+    //         $answerOpenAI = Http::timeout(10)->post(
+    //             env('FLASK_API_URL', 'http://localhost:5000') . '/answer_openai', 
+    //             ['question' => $question]
+    //         );
+    //     } catch (\Exception $e) {
+    //         Log::error('OpenAI API call failed', [
+    //             'message' => $e->getMessage()
+    //         ]);
+    //         $answerOpenAI = null;
+    //     }
+        
+        
+    //     // $answerGemini = Http::post(env('FLASK_API_URL') . '/answer_gemini', [
+    //     //     'question' => $question
+    //     // ]);
+    //     // Mengembalikan skor similarity dan data cosine per noun
+    //     return [
+    //         'similarity_score' => $similarity_score * 100,
+    //         'noun_cosine_data' => $noun_similarities,
+    //         'answer_openai' => $answerOpenAI ? $answerOpenAI->body() : '',
+    //         'answer_gemini' => ''
+    //     ];
+        
+        
+    // }
+
     protected function calculateCosineSimilarity($user_answer, $actual_answer, $page, $topic_guid, $language, $question)
-    {
+{
+    try {
         // Ambil semua nouns dan nilai cosine untuk halaman yang relevan
         $pageNouns = PageNoun::where('topic_guid', $topic_guid)
             ->where('language', $language)
             ->where('page', $page)
             ->get();
 
-        // Format data untuk dikirim ke Flask
+        
+
         $nounsData = $pageNouns->map(function ($item) {
             return [
                 'noun' => $item->noun,
-                'cosine_similarity' => $item->cosine, // Cosine yang sudah ada di database
+                'cosine_similarity' => $item->cosine,
             ];
         })->toArray();
 
+
+
         $nounsDataJson = json_encode($nounsData);
 
-        // Kirimkan data ke API Flask
-        $flask_url = env('FLASK_API_URL') . '/cosine_similarity';
+        // Gunakan URL lengkap dengan protokol
+        $flask_url = env('FLASK_API_URL', 'http://localhost:5000') . '/cosine_similarity';
+          
+        
         $response = Http::post($flask_url, [
             'user_answer' => $user_answer,
             'actual_answer' => $actual_answer,
             'nouns' => $nounsDataJson, // Mengirimkan data nouns dan cosine
         ]);
 
+
         if ($response->failed()) {
             throw new \Exception('Failed to calculate cosine similarity');
         }
 
+
         $responseData = $response->json();
 
-        $answerAI = Http::post(env('FLASK_API_URL') . '/answer_ai', [
-            'question' => $question
-        ]);
+      
+        // Validasi struktur response
+        // Gunakan similarity_score jika actual_similarity_score tidak ada
+        $similarity_score = $responseData['similarity_score'];
 
-        // Mengembalikan skor similarity dan data cosine per noun
+        // Default noun similarities jika tidak ada
+        $noun_similarities = $responseData['noun_similarities'] 
+            ?? $responseData['noun_cosine_data'] 
+            ?? [];
+
+            try {
+                $answerOpenAI = Http::timeout(10)->post(
+                    env('FLASK_API_URL', 'http://localhost:5000') . '/answer_openai', 
+                    ['question' => $question]
+                );
+                    } catch (\Exception $e) {
+                        Log::error('OpenAI API call failed', [
+                            'message' => $e->getMessage()
+                        ]);
+                        $answerOpenAI = null;
+                    }
+    
+
+
         return [
-            'similarity_score' => $responseData['actual_similarity_score'] * 100, // Skor similarity secara keseluruhan
-            'noun_cosine_data' => $responseData['noun_similarities'], // Data cosine per noun
-            'answer_ai' => strval($answerAI)
+            'similarity_score' => $similarity_score * 100,
+            'noun_cosine_data' => $noun_similarities,
+            'answer_openai' => strval($answerOpenAI),
+        ];
+
+    } catch (\Exception $e) {
+        Log::error('Error in Flask API call', [
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+        return [
+            'similarity_score' => 0,
+            'noun_cosine_data' => [],
         ];
     }
+}
 
+// Helper method untuk result default
 
-    /**
-     * Prepare success response for when the similarity score meets the threshold.
-     */
-    protected function responseForSuccess($validated, $currentPage, $similarityMessage, $similarity_score, $threshold, $noun_cosine_data, $answer_ai)
+    protected function responseForSuccess($validated, $currentPage, $similarityMessage, $similarity_score, $threshold, $noun_cosine_data, $answer_openai)
     {
         return response()->json([
             'status' => 'success',
@@ -148,18 +269,19 @@ class ChatHistoryController extends Controller
             'similarity_score' => $similarity_score,
             'threshold' => $threshold,
             'noun_cosine_data' => $noun_cosine_data, // Menambahkan data cosine per noun
-            'answer_ai' => $answer_ai
+            'answer_openai' => $answer_openai
         ]);
+        
     }
 
 
     /**
      * Prepare retry response for when the similarity score is below the threshold.
      */
-    protected function responseForRetry($validated, $similarityMessage, $similarity_score, $threshold, $language, $answer_ai)
+    protected function responseForRetry($validated, $similarityMessage, $similarity_score, $threshold, $language, $answer_openai)
     {
         // Get already asked questions for this topic and page
-        $askedQuestions = ChatHistory::where('user_id', $validated['user_id'])
+        $askedQuestions = AnswerUser::where('user_id', $validated['user_id'])
             ->where('topic_guid', $validated['topic_guid'])
             ->where('page', $validated['page'])
             ->pluck('question_guid')
@@ -174,7 +296,7 @@ class ChatHistoryController extends Controller
             ->get();
 
         // Simpan message similarity ke history dengan HTML
-        ChatHistory::create([
+        AnswerUser::create([
             'user_id' => $validated['user_id'],
             'topic_guid' => $validated['topic_guid'],
             'message' => $similarityMessage,  // HTML disimpan di sini
@@ -185,14 +307,14 @@ class ChatHistoryController extends Controller
         ]);
 
         usleep(1000000);
-        ChatHistory::create([
-            'user_id' => $validated['user_id'],
-            'topic_guid' => $validated['topic_guid'],
-            'message' => strval($answer_ai),  // HTML disimpan di sini
-            'sender' => 'openai',
-            'page' => $validated['page'],
+        AnswerPDF::create([
             'question_guid' => $validated['question_guid'],
-            'cosine_similarity' => null
+            'topic_guid' => $validated['topic_guid'],
+            'answer' => $answer_openai,
+            'page' => $validated['page'],
+            'combined_score' => $similarity_score,
+            'qa_score' => $similarity_score,
+            'retrieval_score' => 0 // Set a default or calculate as needed
         ]);
         // Jika tidak ada pertanyaan yang tersisa, beri tahu untuk regenerasi
         if ($remainingQuestions->isEmpty()) {
@@ -217,16 +339,6 @@ class ChatHistoryController extends Controller
             '<strong>Message:</strong> ' . $nextQuestion->question_fix .
             '</div>';
 
-        ChatHistory::create([
-            'user_id' => $validated['user_id'],
-            'topic_guid' => $validated['topic_guid'],
-            'message' => $retryMessage,  // HTML retry message disimpan di sini
-            'sender' => 'bot',
-            'page' => $validated['page'],
-            'question_guid' => $nextQuestion->guid,
-            'cosine_similarity' => null,
-        ]);
-
         // Ambil data nouns dan cosine untuk halaman ini
         $nounsData = PageNoun::where('page', $validated['page'])
             ->where('topic_guid', $validated['topic_guid'])
@@ -248,7 +360,9 @@ class ChatHistoryController extends Controller
             'similarity_score' => $similarity_score,
             'threshold' => $threshold,
             'nouns_cosine_data' => $nounsCosineData,  // Data noun cosine
-            'answer_ai' => $answer_ai
+            'answer_openai' => $answer_openai,
+            // 'answer_gemini' => $answer_gemini
+
         ]);
     }
 
@@ -294,7 +408,7 @@ class ChatHistoryController extends Controller
         // Jika regenerasi diinginkan dan masih ada sisa attempt
         if ($isRegenerate) {
             // Proses regenerasi pertanyaan
-            $askedQuestions = ChatHistory::where('user_id', $validated['user_id'])
+            $askedQuestions = AnswerUser::where('user_id', $validated['user_id'])
                 ->where('topic_guid', $validated['topic_guid'])
                 ->where('page', $validated['page'])
                 ->pluck('question_guid')
@@ -320,14 +434,14 @@ class ChatHistoryController extends Controller
             // Mengambil konten file PDF
 
             // Ambil data terakhir dari tabel chathistory untuk user_id dan topic_guid yang sesuai
-            $lastChatHistory = ChatHistory::where('user_id', $validated['user_id'])
+            $lastAnswer = AnswerUser::where('user_id', $validated['user_id'])
                 ->where('topic_guid', $validated['topic_guid'])
                 ->orderBy('created_at', 'desc')
                 ->first();
 
             // Jika ada record chathistory terakhir, ambil question_guid-nya
-            if ($lastChatHistory) {
-                $questionGuidFromHistory = $lastChatHistory->question_guid;
+            if ($lastAnswer) {
+                $questionGuidFromHistory = $lastAnswer->question_guid;
 
                 // Cari threshold berdasarkan question_guid dari tabel question
                 $lastQuestion = Question::where('guid', $questionGuidFromHistory)->first();
@@ -368,9 +482,9 @@ class ChatHistoryController extends Controller
             // Simpan pertanyaan baru ke database dengan increment attempt
 
             $question = Question::create([
-                'question_ai' => $newQuestion['question'],
+                'question' => $newQuestion['question'],
                 'question_fix' => $newQuestion['question'],
-                'answer_ai' => $newQuestion['answer'],
+                'answer_openai' => $newQuestion['answer_openai'],
                 'answer_fix' => $newQuestion['answer'],
                 'topic_guid' => $validated['topic_guid'],
                 'category' => $newQuestion['category'],
@@ -381,29 +495,21 @@ class ChatHistoryController extends Controller
                 'weight' => 0,
                 'threshold' => $threshold, // Menggunakan threshold dari pertanyaan terakhir
             ]);
+            $nextQuestionMessage = '<div class="bot-message">
+                Retry required! <br>
+                <strong>Page:</strong> ' . $validated['page'] . ' <br>
+                <strong>Threshold:</strong> ' . ($question->threshold ?? "N/A") . ' <br>
+                <strong>Message:</strong> ' . $question->question_fix . '
+            </div>';
 
-            $chat = ChatHistory::create([
-                'user_id' => $validated['user_id'],
-                'topic_guid' => $validated['topic_guid'],
-                'message' => '<div class="bot-message">
-                                Retry required! <br>
-                                <strong>Page:</strong> ' . $validated['page'] . ' <br>
-                                <strong>Threshold:</strong> ' . ($question['threshold'] ?? "N/A") . ' <br>
-                                <strong>Message:</strong> ' . $question['question_fix'] . '
-                              </div>',
-                'sender' => 'bot',
-                'page' => $validated['page'],
-                'question_guid' => $question->guid,
-                'cosine_similarity' => null,
-            ]);
-
-
-
-            // Kirim respons sukses dengan pertanyaan baru
-            return response()->json([
+                // Kirim respons sukses dengan pertanyaan baru
+                return response()->json([
                 'status' => 'success',
                 'message' => 'Questions have been regenerated successfully.',
-                'newQuestion' => $chat,  // Pertanyaan baru dari Flask
+                'newQuestion' => [
+                    'message' => $nextQuestionMessage,
+                    'question_guid' => $question->guid,
+                ],
             ]);
         }
     }
@@ -414,10 +520,15 @@ class ChatHistoryController extends Controller
     public function getHistory($topicGuid, $userId)
     {
         // Mendapatkan history berdasarkan user_id dan topic_guid
-        $history = ChatHistory::where('user_id', $userId)
+        $userAnswers = AnswerUser::where('user_id', $userId)
             ->where('topic_guid', $topicGuid)
             ->orderBy('created_at')
             ->get();
+
+        $pdfAnswers = AnswerPDF::where('topic_guid', $topicGuid)
+            ->orderBy('created_at')
+            ->get();
+        $history = $userAnswers->concat($pdfAnswers)->sortBy('created_at');
 
         // Pastikan ada data history
         if ($history->isEmpty()) {
@@ -441,33 +552,25 @@ class ChatHistoryController extends Controller
         // Cek apakah pesan terakhir dari sender 'cosine'
         $lastMessage = $history->last();
         $regenerate = 'no';  // Default regenerate
-
-        if ($lastMessage && $lastMessage->sender === 'cosine') {
-            // Ambil cosine similarity dari pesan terakhir
-            $cosineSimilarity = $lastMessage->cosine_similarity;
-
+        
+        if ($userAnswers->isNotEmpty()) {
+            $lastAnswer = $userAnswers->last();
+            
             // Ambil threshold dari pertanyaan terkait
-            $threshold = $question->threshold;
-
-            // Cek apakah cosine similarity lebih besar atau sama dengan threshold
-            if ($cosineSimilarity >= $threshold) {
-                $regenerate = 'no';
-            } else {
-                // Jika cosine similarity kurang dari threshold, cek apakah ada pertanyaan yang tersisa
-                $askedQuestions = ChatHistory::where('user_id', $userId)
-                    ->where('topic_guid', $topicGuid)
-                    ->where('page', $history->last()->page)
-                    ->pluck('question_guid')
-                    ->toArray();
-
+            $lastQuestion = Question::where('guid', $lastAnswer->question_guid)->first();
+            
+            if ($lastQuestion && $lastAnswer->cosine_similarity < $lastQuestion->threshold) {
+                // Cek apakah ada pertanyaan yang tersisa
+                $askedQuestions = $userAnswers->pluck('question_guid')->toArray();
+                
                 // Cari pertanyaan yang belum diajukan
                 $remainingQuestions = Question::where('topic_guid', $topicGuid)
-                    ->where('page', $history->last()->page)
+                    ->where('page', $lastAnswer->page)
                     ->where('language', $language)
-                    ->whereNull('user_id')  // Pertanyaan yang belum diajukan
+                    ->whereNull('user_id')
                     ->whereNotIn('guid', $askedQuestions)
                     ->get();
-
+                    
                 // Jika tidak ada pertanyaan yang tersisa
                 if ($remainingQuestions->isEmpty()) {
                     $regenerate = 'yes';
@@ -526,7 +629,7 @@ class ChatHistoryController extends Controller
         ]);
 
         // Hapus semua chat histories berdasarkan user_id dan topic_guid
-        $deleted = ChatHistory::where('user_id', $validated['user_id'])
+        $deleted = AnswerUser::where('user_id', $validated['user_id'])
             ->where('topic_guid', $validated['topic_guid'])
             ->delete();
 
