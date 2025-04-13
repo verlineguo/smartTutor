@@ -173,7 +173,7 @@
                         enabled: false
                     }
                 ],
-            }), $("div.head-label").html('<h5 class="card-title mb-0">Active Quiz</h5>');
+            }), $("div.head-label").html('<h5 class="card-title mb-0">Active Assignment</h5>');
         });
     </script>
 @endsection

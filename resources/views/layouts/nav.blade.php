@@ -50,7 +50,7 @@
                                 xmlns:xlink="http://www.w3.org/1999/xlink">
                             <title>shop </title>
                         </div>
-                        <p class="m-1 ">User Profile</p>
+                        <p class="m-1 ">Users Profile</p>
                     </a>
                 </li>
                 @isRole(['admin', 'lecturer'])

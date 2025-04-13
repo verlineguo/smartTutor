@@ -569,6 +569,8 @@
             $('#upload-file-form').on('submit', function(e) {
                 e.preventDefault();
 
+                
+    
                 var guid = $('#upload-guid').val();
                 var fileData = $('#file-input')[0].files[0];
                 var fileLanguage = $('#file-language').val(); // Get selected language
@@ -577,6 +579,9 @@
                 formData.append('topic_guid', guid);
                 formData.append('language', fileLanguage); // Add language to FormData
 
+                console.log('file', fileData);
+                console.log('topic_guid', guid);
+                console.log('language', fileLanguage);
                 $.ajax({
                     url: "{{ env('URL_API') }}/api/v1/topic/upload-file",
                     type: "POST",

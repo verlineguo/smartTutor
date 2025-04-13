@@ -21,7 +21,7 @@
                                 xmlns:xlink="http://www.w3.org/1999/xlink">
                             <title>shop</title>
                         </div>
-                        <p class="m-1 textSidebar">Quiz</p>
+                        <p class="m-1 textSidebar">Assignment</p>
                     </a>
                 </li>
                 <li class="TextSidebar mt-2">

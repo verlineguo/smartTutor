@@ -1,17 +1,21 @@
 <?php
 
 use App\Http\Controllers\AnswerController;
+use App\Http\Controllers\AssignmentController;
 use App\Http\Controllers\AssistantController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ChatbotController;
+use App\Http\Controllers\ComparisonController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EvaluationController;
 use App\Http\Controllers\GradeController;
 use App\Http\Controllers\PasswordController;
 use App\Http\Controllers\QuestionController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\TopicController;
+// use App\Http\Controllers\AssignmentController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -69,4 +73,5 @@ Route::group([
     Route::get('/user/answer/result/{guid}', [AnswerController::class, 'answerResult'])->name('user-answer-result')->middleware('role:student');
     Route::get('/user/profile', [UserController::class, 'profile'])->name('user-profile');
     Route::get('/password/change', [PasswordController::class, 'changePassword'])->name('change-password');
+    Route::get('/evaluation/{questionGuid}/{userAnswerGuid}', [EvaluationController::class, 'index'])->name('user-evaluation')->middleware('role:student');
 });

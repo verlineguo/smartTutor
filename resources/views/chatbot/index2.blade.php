@@ -10,51 +10,48 @@
 
 @section('add-css')
     <style>
-        /* Chatbot Container */
-        .chatbot-container {
+        .evaluation-container {
             border: 1px solid #ccc;
-            border-radius: 10px;
-            padding: 20px;
-            height: 400px;
-            max-height: 500px;
-            overflow-y: auto;
-            background-color: #f9f9f9;
-            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
-            font-family: 'Arial', sans-serif;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            /* Jarak antar pesan */
+            border-radius: 8px;
             display: none;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
         }
 
-        /* Pesan Bot */
-        .bot-message {
-            background-color: #e0f7fa;
-            color: #00796b;
-            align-self: flex-start;
-            padding: 12px 15px;
-            border-radius: 15px;
-            max-width: 75%;
-            font-size: 14px;
-            line-height: 1.5;
-            margin-bottom: 10px;
+        
+        .question-box {
+            margin-bottom: 20px;
         }
-
-        /* Pesan User */
-        .user-message {
-            background-color: #fff3e0;
-            color: #ff5722;
-            align-self: flex-end;
-            padding: 12px 15px;
-            border-radius: 15px;
-            max-width: 75%;
-            font-size: 14px;
-            line-height: 1.5;
-            margin-bottom: 10px;
+        .btn-group {
+            display: flex;
+            justify-content: center;
+            margin-top: 10px;
+            gap: 20px;
         }
+        .btn-group .btn {
+            width: auto; /* Mengubah lebar tombol */
+            border-radius: 5px; /* Mengatur sudut tombol */
+            padding: 5px 15px; /* Mengatur padding */
+            font-size: 16px; /* Mengubah ukuran font */
+            background: none; /* Warna latar belakang tombol */
+            border: 1px solid #00000025; /* Warna border tombol */
+            color: #000000be; /* Warna teks tombol */
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        
 
-        /* Input Group (textarea dan tombol kirim) */
+        .btn-group .btn:hover, .btn-group .btn.active {
+            background: #f0eeee; /* Warna latar belakang saat hover atau aktif */
+        }
+        .content-section {
+            display: none;
+            margin-top: 15px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #f9f9f9;
+        }
         .input-group {
             display: flex;
             flex-direction: column;
@@ -83,6 +80,39 @@
             background-color: #f5f5f5;
         }
 
+        .chatbot-container {
+            margin: 20px auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            height: 500px;
+            max-height: 700px;
+            overflow-y: auto;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+
+        .bot-message, .user-message {
+            padding: 10px 15px;
+            border-radius: 15px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+
+        .bot-message {
+            background-color: #f1f1f1;
+            align-self: flex-start;
+        }
+
+        .user-message {
+            background-color: #00796b;
+            color: white;
+            align-self: flex-end;
+        }
+
+
         /* Tombol Kirim (Send) */
         .input-group button {
             background-color: #00796b;
@@ -107,7 +137,6 @@
             background-color: #004d40;
         }
 
-        /* Responsivitas: Agar chat container lebih responsif */
         @media (max-width: 768px) {
             .chatbot-container {
                 height: 350px;
@@ -142,22 +171,28 @@
 @endsection
 
 @section('content')
+   
     <div class="language-selection">
         <label for="language">Pilih Bahasa:</label>
         <select id="language" class="form-control">
             <option value="">Select Language</option>
         </select>
-        <button id="start-quiz" class="btn btn-primary mt-2" disabled>Start Quiz</button>
+        <button id="start-test" class="btn btn-primary mt-2" disabled>Start Test</button>
     </div>
 
-    <div class="chatbot-container" id="chatbot-container">
-        <!-- Chatbot history will load here -->
-    </div>
-
-    <div class="input-group">
-        <textarea id="user-input" class="form-control" rows="1" placeholder="Type your answer here..." disabled></textarea>
+    <div class="evaluation-container" id="evaluation-container"> 
+        <div class="question-box"> 
+            <h6>Pertanyaan:</h6> 
+            <p id="question-text"></p> 
+        </div>
+        <div class="mb-3 input-group">
+            <label for="user-input" class="form-label"><h6>Jawaban Anda:</h6></label>
+            <textarea id="user-input" class="form-control" rows="1" placeholder="Type your answer here..." disabled></textarea>
+        </div>
         <button id="send-button" class="btn">Send</button>
+
     </div>
+
 @endsection
 @section('vendor-javascript')
     <script src="https://cdn.tiny.cloud/1/lvz6goxyxn405p74zr5vcn0xmwy7mmff6jf5wjqki5abvi3g/tinymce/7/tinymce.min.js"
@@ -204,7 +239,7 @@
                 $("#language").on("change", function() {
                     selectedLanguage = $(this).val();
                     console.log(selectedLanguage);
-                    $("#start-quiz").prop("disabled", !selectedLanguage);
+                    $("#start-test").prop("disabled", !selectedLanguage);
                 });
             });
             $("#send-button").prop("disabled", true);
@@ -213,9 +248,9 @@
             loadChatHistory();
 
             // Start quiz when the button is clicked
-            $("#start-quiz").on("click", function() {
+            $("#start-test").on("click", function() {
                 $(".language-selection").hide();
-                $(".chatbot-container").show();
+                $(".evaluation-container").show();
                 $("#send-button").prop("disabled", false);
                 tinymce.get("user-input").mode.set("design");
                 fetchQuestions().then(response => {
@@ -247,6 +282,7 @@
                             // Sembunyikan pilihan bahasa
                             $(".language-selection").hide();
                             $(".chatbot-container").show();
+                            $(".evaluation-container").show();
                             $("#send-button").prop("disabled", true);
                             fetchQuestions().then(response => {
                                 console.log(response);
@@ -388,6 +424,7 @@
                 tinymce.get("user-input").mode.set("readonly");
             }
 
+
             function saveMessageToHistory(message, sender, page, questionGuid) {
                 $.ajax({
                     type: "POST",
@@ -405,6 +442,11 @@
                     },
                     success: function(response) {
                         console.log(response);
+
+                        // if (sender === "user") {
+                        //     saveSimilarityResults(response.results, response.guid);
+                        // }
+
                     },
                     error: function(xhr, status, error) {
                         var errorMessage = xhr.status + ': ' + xhr.statusText;
@@ -452,7 +494,40 @@
             //     this.style.height = `${this.scrollHeight}px`; // Atur tinggi sesuai konten
             // });
 
+            // function saveSimilarityResults(results, userAnswerGuid) {
+            //     const llmTypes = ['openai', 'gemini', 'deepseek'];
+            //     const algorithms = ['cosine', 'jaccard', 'bert'];
 
+            //     llmTypes.forEach(llmType => {
+            //         algorithms.forEach(algorithm => {
+            //             const similarityScore = results[`${llmType}_${algorithm}_similarity`];
+
+            //             if (similarityScore !== null) {
+            //                 $.ajax({
+            //                     type: "POST",
+            //                     url: "{{ env('URL_API') }}/api/v1/similarity/save",
+            //                     data: {
+            //                         user_answer_guid: userAnswerGuid,
+            //                         llm_type: llmType,
+            //                         algorithm: algorithm,
+            //                         similarity_score: similarityScore
+            //                     },
+            //                     beforeSend: function(request) {
+            //                         request.setRequestHeader("Authorization", `Bearer ${token}`);
+            //                     },
+            //                     success: function(response) {
+            //                         console.log("Saved to similarity table:", response);
+            //                     },
+            //                     error: function(xhr, status, error) {
+            //                         var errorMessage = xhr.status + ': ' + xhr.statusText;
+            //                         toastr.options.closeButton = true;
+            //                         toastr.error("Error saving to similarity: " + errorMessage, "Error");
+            //                     }
+            //                 });
+            //             }
+            //         });
+            //     });
+            // }
 
             function submitAnswer(answer) {
                 if (isSubmitting) return;
@@ -477,17 +552,33 @@
                     success: function(response) {
                         isSubmitting = false;
 
+                        // const results = response.results; 
+                        // const userAnswerGuid = response.guid;
+                        // $("#chatbot-container").append(
+                        //     `<div class="bot-message">${response.answer_openai}</div>`
+                        //     `<div class="bot-message">${similarityMessage}</div>`,
+                        //     `<div class="bot-message">Similarity Score: ${similarityScore}%</div>`,
+                        //     `<div class="bot-message"><a href="${detailsLink}" target="_blank">See Details</a></div>`,  
+                        // );
+                        // Simpan hasil ke tabel similarity
+                        // saveSimilarityResults(results, userAnswerGuid);
+
+                        // // Tampilkan jawaban dari LLM
+                        // displayLLMResults(results);
                         const similarityMessage = response.similarityMessage;
+                        console.log(similarityMessage);
                         $("#chatbot-container").append(
                             `<div class="bot-message">${similarityMessage}</div>`,
                             `<div class="bot-message">${response.answer_ai}</div>`
                         );
+
                         scrollToBottom();
                         if (response.status === 'success') {
-                            saveMessageToHistory(similarityMessage, "cosine", currentPage,
+                            saveMessageToHistory(response.similarityMessage, "cosine", currentPage,
                                 currentQuestionGuid);
+
                             setTimeout(function() {
-                                saveMessageToHistory(response.answer_ai, "openai", currentPage,
+                                saveMessageToHistory(response.answer_openai, "openai", currentPage,
                                     currentQuestionGuid);
                                 currentPage = response.nextPage;
                                 askQuestion(questionsGroupedByPage);
@@ -504,22 +595,42 @@
                         }
                     },
                     error: function(xhr, status, error) {
+                        console.error("XHR Response:", xhr.responseText);
                         var errorMessage = xhr.status + ': ' + xhr.statusText;
                         toastr.options.closeButton = true;
                         toastr.error("Error saving message: " + errorMessage, "Error");
+
+                        // Additional Debugging:
+                        console.error("Status:", status);
+                        console.error("Error:", error);
                     }
+
                 });
             }
+
+            // function displayLLMResults(results) {
+            //     const llmTypes = ['openai', 'gemini', 'deepseek'];
+            //     llmTypes.forEach(llmType => {
+            //         const answer = results[`${llmType}_answer`]; // Ambil jawaban dari LLM
+            //         const similarityScore = results[`${llmType}_similarity`]; // Ambil skor kesamaan
+
+            //         $("#chatbot-container").append(
+            //             `<div class="bot-message">${answer}</div>
+            //             <div class="bot-message">Similarity Score: ${similarityScore}%</div>
+            //             <div class="bot-message"><a href="/comparison/${currentQuestionGuid}/${llmType}" class="see-details">See Details</a></div>`
+            //         );
+            //     });
+            // }
 
             function showRegenerateConfirmation() {
                 // Tampilkan pesan konfirmasi kepada pengguna
                 const confirmationMessage = `
-        <div class="bot-message" id="confirmation-message">
-            All questions for page ${currentPage} have been asked, and you have not yet reached the threshold. Would you like to regenerate with GPT?
-            <br><br>
-            <button id="regenerate-yes" class="btn btn-success">Yes</button>
-            <button id="regenerate-no" class="btn btn-danger">No</button>
-        </div>
+                    <div class="bot-message" id="confirmation-message">
+                        All questions for page ${currentPage} have been asked, and you have not yet reached the threshold. Would you like to regenerate with GPT?
+                        <br><br>
+                        <button id="regenerate-yes" class="btn btn-success">Yes</button>
+                        <button id="regenerate-no" class="btn btn-danger">No</button>
+                    </div>
     `;
                 $("#chatbot-container").append(confirmationMessage);
                 scrollToBottom();
