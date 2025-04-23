@@ -463,7 +463,7 @@
                                     </div>
                                 </div>
 
-                                
+
                             </div>
                             <div class="card">
                                 <div class="card-header">
@@ -491,13 +491,13 @@
                                         <div class="tab-pane fade" id="deepseek-llm">
                                             <!-- Deepseek content -->
                                         </div>
-    
+
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        
+
                     </div>
 
                     <!-- History Tab -->
@@ -551,13 +551,13 @@
 
                     <!-- Action buttons -->
                     <div class="action-buttons">
-                    
-                            <button id="download-report" class="btn btn-outline-primary me-2">
-                                <i class="fas fa-download me-2"></i>Download Report
-                            </button>
-                            <button id="next-question" class="btn btn-primary me-4">
-                                Next Question<i class="fas fa-arrow-right ms-2"></i>
-                            </button>
+
+                        <button id="download-report" class="btn btn-outline-primary me-2">
+                            <i class="fas fa-download me-2"></i>Download Report
+                        </button>
+                        <button id="next-question" class="btn btn-primary me-4">
+                            Next Question<i class="fas fa-arrow-right ms-2"></i>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -655,7 +655,7 @@
                 downloadReport(questionGuid, answerGuid);
             });
 
-       
+
             $("#next-question").on("click", function() {
                 window.location.href = `/user/answer/${evaluationData.question.topic_guid}`;
             });
@@ -670,7 +670,7 @@
                         request.setRequestHeader("Authorization", `Bearer ${token}`);
                     },
                     success: function(response) {
-                        console.log(response); 
+                        console.log(response);
                         if (response.success) {
                             evaluationData = response.data;
                             updateUI(response.data);
@@ -692,7 +692,8 @@
             function loadPlagiarismData(questionGuid, answerGuid) {
                 $.ajax({
                     type: "GET",
-                    url: "{{ env('URL_API') }}/api/v1/evaluation/plagiarism/" + questionGuid + "/" + answerGuid,
+                    url: "{{ env('URL_API') }}/api/v1/evaluation/plagiarism/" + questionGuid + "/" +
+                        answerGuid,
 
                     beforeSend: function(request) {
                         showLoading();
@@ -715,38 +716,6 @@
                     }
                 });
             }
-
-            // Function to load submission history
-            function loadHistoryData() {
-                $.ajax({
-                    type: "GET",
-                    url: "{{ env('URL_API') }}/api/v1/evaluation/history/" + userId,
-
-                    beforeSend: function(request) {
-                        showLoading();
-                        request.setRequestHeader("Authorization", `Bearer ${token}`);
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            updateHistoryUI(response.data);
-                        } else {
-                            toastr.error("Failed to load history: " + response.message);
-                        }
-                    },
-                    error: function(xhr) {
-                        toastr.error("Gagal mendapatkan data evaluasi. Silakan coba lagi.");
-                        console.error("Error fetch:", xhr);
-                    },
-                    complete: function() {
-                        hideLoading();
-                    }
-                });
-            }
-
-            // // Download report
-            // function downloadReport(questionGuid, answerGuid) {
-            //     window.location.href = `${API_BASE_URL}/api/v1/evaluation/download-report/${questionGuid}/${answerGuid}?token=${getAuthToken()}`;
-            // }
 
             // Find next question
             function findNextQuestion(currentQuestionGuid) {
@@ -820,21 +789,21 @@
             }
 
             $("#llm-tabs .nav-link").on("click", function(e) {
-    const targetId = $(this).attr("href"); // e.g., "#openai-llm"
-    const llmSource = targetId.replace("-llm", "").replace("#", ""); // e.g., "openai"
-    
-    // Find the data for this LLM source
-    const plagiarismData = window.plagiarismData || []; // Store data globally
-    const selectedData = plagiarismData.find(item => item.source === llmSource);
-    
-    if (selectedData) {
-        // Update detection methods section with this LLM's data
-        updateDetectionMethods(selectedData);
-    }
-});
-           
-function updateDetectionMethods(data) {
-    const methodsHtml = `
+                const targetId = $(this).attr("href"); // e.g., "#openai-llm"
+                const llmSource = targetId.replace("-llm", "").replace("#", ""); // e.g., "openai"
+
+                // Find the data for this LLM source
+                const plagiarismData = window.plagiarismData || []; // Store data globally
+                const selectedData = plagiarismData.find(item => item.source === llmSource);
+
+                if (selectedData) {
+                    // Update detection methods section with this LLM's data
+                    updateDetectionMethods(selectedData);
+                }
+            });
+
+            function updateDetectionMethods(data) {
+                const methodsHtml = `
         <div class="col-md-3 detection-method">
             <div class="detection-method-value">${(data.cosine_similarity || 0).toFixed(1)}%</div>
             <div class="detection-method-name">Cosine Similarity</div>
@@ -848,8 +817,8 @@ function updateDetectionMethods(data) {
             <div class="detection-method-name">BERT Embedding</div>
         </div>
     `;
-    $("#detection-methods").html(methodsHtml);
-}
+                $("#detection-methods").html(methodsHtml);
+            }
 
             // Update plagiarism UI
             function updatePlagiarismUI(data) {

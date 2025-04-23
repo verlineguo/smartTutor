@@ -87,6 +87,7 @@
                 transform: translateY(0);
             }
         }
+
         .history-section {
             border: 1px solid #dee2e6;
             border-radius: 8px;
@@ -184,6 +185,89 @@
                 gap: 10px;
             }
         }
+
+        .bloom-level-indicator {
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            display: inline-block;
+        }
+
+        .remembering {
+            background-color: #e3f2fd;
+            color: #0d47a1;
+        }
+
+        .understanding {
+            background-color: #e8f5e9;
+            color: #1b5e20;
+        }
+
+        .applying {
+            background-color: #fff3e0;
+            color: #e65100;
+        }
+
+        .analyzing {
+            background-color: #fce4ec;
+            color: #880e4f;
+        }
+
+        .progress-container {
+            margin: 15px 0;
+        }
+
+        .streak-counter {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+@endsection
+
+@section('add-css')
+    <style>
+        /* Keep existing styles and add new ones for Bloom's taxonomy */
+        .bloom-level-indicator {
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            display: inline-block;
+        }
+
+        .remembering {
+            background-color: #e3f2fd;
+            color: #0d47a1;
+        }
+
+        .understanding {
+            background-color: #e8f5e9;
+            color: #1b5e20;
+        }
+
+        .applying {
+            background-color: #fff3e0;
+            color: #e65100;
+        }
+
+        .analyzing {
+            background-color: #fce4ec;
+            color: #880e4f;
+        }
+
+        .progress-container {
+            margin: 15px 0;
+        }
+
+        .streak-counter {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        /* Rest of your existing styles... */
     </style>
 @endsection
 
@@ -192,53 +276,85 @@
         <li class="breadcrumb-item text-sm"><a class="opacity-5 text-dark" href="javascript:;">Pages</a></li>
         <li class="breadcrumb-item text-sm text-dark active text-capitalize" aria-current="page">Assignment</li>
     </ol>
-    <h5 class="font-weight-bolder mb-0 text-capitalize">Assignment</h5>
+    <h5 class="font-weight-bolder mb-0 text-capitalize">Assignment: {{ $name }}</h5>
 @endsection
 
 @section('content')
-    <!-- Language Selection -->
-    <div class="language-selection">
-        <label for="language">Pilih Bahasa:</label>
-        <select id="language" class="form-control">
-            <option value="">Select Language</option>
-        </select>
-        <button id="start-test" class="btn btn-primary mt-2" disabled>Start Test</button>
-    </div>
     <div class="container mt-4">
+        <!-- Bloom's Taxonomy Level Indicator -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div id="bloom-level-display" class="bloom-level-indicator remembering">
+                    Level: Remembering
+                </div>
+                <div class="progress-container">
+                    <div class="progress">
+                        <div id="bloom-progress" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <div id="streak-counter" class="streak-counter">Correct streak: 0/4</div>
+                </div>
+            </div>
+        </div>
+
         <div class="row">
             <div class="col-lg-8 d-flex flex-column">
+                <!-- Question Box -->
                 <div class="question-box" id="question-box">
-                    <h6 class="mb-3">Pertanyaan:</h6>
+                    <h6 class="mb-3">Question:</h6>
                     <div id="question-text"></div>
-                    <div class="question-meta" id="question-meta"></div>
+                    <div class="question-meta mt-2">
+                        <span id="question-category" class="badge bg-secondary"></span>
+                        <span id="question-page" class="badge bg-info ms-2"></span>
+                    </div>
                 </div>
 
-                <!-- Assignment Container -->
+                <!-- Answer Container -->
                 <div class="assignment-container" id="assignment-container">
-                    <h6 class="mb-3">Jawaban Anda:</h6>
-                    <div class="mb-3">
-                        <textarea id="user-input" class="form-control" rows="6" placeholder="Ketik jawaban Anda di sini..." disabled></textarea>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <button class="btn btn-primary" id="send-button" disabled>
-                            <i class="fas fa-paper-plane me-2"></i>Kirim Jawaban
+                    <h6 class="mb-3">Your Answer:</h6>
+                    <textarea id="user-input" class="form-control" rows="6" placeholder="Type your answer here..."></textarea>
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <button id="submit-answer" class="btn btn-primary">
+                            <i class="fas fa-paper-plane me-2"></i>Submit Answer
                         </button>
                     </div>
                 </div>
             </div>
+
             <div class="col-lg-4">
-                <div class="history-section" id="history-section">
-                    <div class="card">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0">Riwayat Jawaban</h6>
-                        </div>
-                        <div class="card-body">
-                            <div id="history-list" class="history-list">
-                                <div class="text-center py-4 text-muted" id="no-history-message">
-                                    <i class="fas fa-history fa-2x mb-2"></i>
-                                    <p>Belum ada riwayat jawaban untuk topik ini.</p>
+                <!-- Evaluation Results -->
+                <div class="card mb-4" id="evaluation-results" style="display:none;">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0">Evaluation Results</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <strong>Similarity Score:</strong>
+                            <div class="progress mt-2">
+                                <div id="similarity-score-bar" class="progress-bar" role="progressbar" style="width: 0%">
                                 </div>
                             </div>
+                            <small id="similarity-score-text" class="text-muted">0%</small>
+                        </div>
+                        <div id="evaluation-details"></div>
+                        <button id="next-question" class="btn btn-success w-100 mt-2" style="display:none;">
+                            Next Question
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Answer References -->
+                <div class="card" id="answer-references">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0">Answer References</h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="reference-answer">
+                            <h6>Reference Answer:</h6>
+                            <div id="reference-text" class="mb-3 p-2 bg-light rounded"></div>
+                        </div>
+                        <div id="llm-answers">
+                            <h6>LLM Answers:</h6>
+                            <div id="llm-answers-list"></div>
                         </div>
                     </div>
                 </div>
@@ -246,19 +362,17 @@
         </div>
     </div>
 
-
-
-
     <!-- Loading Overlay -->
-    <div class="loading-overlay" id="loading-overlay" style="display:none">
+    <div class="loading-overlay" id="loading-overlay" style="display:none;">
         <div class="spinner-border text-primary" role="status">
             <span class="visually-hidden">Loading...</span>
         </div>
-        <p class="mt-2">Sedang memproses...</p>
+        <p class="mt-2">Processing your answer...</p>
     </div>
 @endsection
 
 @section('vendor-javascript')
+    <!-- Keep existing JS imports -->
     <script src="https://cdn.tiny.cloud/1/lvz6goxyxn405p74zr5vcn0xmwy7mmff6jf5wjqki5abvi3g/tinymce/7/tinymce.min.js"
         referrerpolicy="origin"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/js/toastr.min.js"></script>
@@ -273,19 +387,13 @@
             const token = "{{ $token }}";
             const apiUrl = "{{ env('URL_API') }}";
 
-            // Application state
-            let currentPage = 1;
-            let currentQuestionGuid = null;
-            let questionsGroupedByPage = {};
-            let highestPage = 0;
-            let selectedLanguage = null;
-            let currentThreshold = 0;
-            let isSubmitting = false;
-            let availableRegenerationAttempts = 0;
+            // Bloom's Taxonomy state
+            let currentLevel = "remembering";
+            let correctStreak = 0;
+            let currentQuestion = null;
+            let evaluationResult = null;
 
-
-
-            // Init TinyMCE editor
+            // Initialize TinyMCE
             tinymce.init({
                 selector: '#user-input',
                 height: 300,
@@ -293,444 +401,275 @@
                 plugins: 'lists link image table code help wordcount',
                 toolbar: 'undo redo | formatselect | bold italic | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image | table | code',
                 content_style: 'body { font-family: -apple-system, BlinkMacSystemFont, San Francisco, Segoe UI, Roboto, Helvetica Neue, sans-serif; font-size: 16px; }',
-                placeholder: 'Ketik jawaban Anda di sini...',
                 setup: function(editor) {
                     editor.on('change', function() {
-                        // Enable/disable send button based on content
                         const content = editor.getContent().trim();
-                        $("#send-button").prop("disabled", content === '');
+                        $("#submit-answer").prop("disabled", content === '');
                     });
                 }
             });
 
-            // Initialize toastr notification settings
-            toastr.options = {
-                closeButton: true,
-                progressBar: true,
-                positionClass: "toast-top-right",
-                timeOut: 5000
-            };
+            // Initialize the assignment
+            startAssignment();
 
-            // Loading indicator functions
-            function showLoading() {
-                $("#loading-overlay").css({
-                    position: "fixed",
-                    top: 0,
-                    left: 0,
-                    width: "100%",
-                    height: "100%",
-                    backgroundColor: "rgba(255, 255, 255, 0.8)",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    zIndex: 9999
-                }).fadeIn(300);
-            }
-
-            function hideLoading() {
-                $("#loading-overlay").fadeOut(300);
-            }
-
-
-
-            // Fetch available languages for the topic
-            function fetchLanguages() {
+            function startAssignment() {
                 showLoading();
-                return $.ajax({
+                generateQuestion();
+            }
+
+            function sendToTfidfDocument(language, topic) {
+                showLoading("Calculating TF-IDF for " + language + "...");
+                $.ajax({
+                    type: "POST",
+                    url: "{{ env('URL_API') }}/api/v1/question/tfidf",
+                    data: {
+                        'language': language,
+                        'topic_guid': topic
+                    },
+                    beforeSend: function(request) {
+                        request.setRequestHeader("Authorization", "Bearer {{ $token }}");
+                    },
+                    success: function() {
+                        hideLoading();
+                        generateQuestion();
+                    },
+                    error: function() {
+                        hideLoading();
+                        alert(`Failed to calculate TF-IDF for ${language}.`);
+                    }
+                });
+            }
+
+
+
+            function generateQuestion() {
+                // Call your Flask API to generate a question
+                $.ajax({
                     type: "GET",
-                    url: `${apiUrl}/api/v1/assignment/languages/${topicGuid}`,
+                    url: "{{ env('URL_API') }}/api/v1/question/get-tfidf-data",
+                    data: {
+                        topic_guid: topicGuid,
+                        language: "Indonesian"
+                    },
+                    contentType: "application/json",
                     beforeSend: function(request) {
                         request.setRequestHeader("Authorization", `Bearer ${token}`);
                     },
-                    complete: function() {
-                        hideLoading();
+                    success: function(tfidfData) {
+                        $.ajax({
+                            type: "POST",
+                            url: "{{ env('URL_API') }}/api/v1/question/generate",
+                            data: JSON.stringify({
+                                topic_guid: topicGuid,
+                                current_level: currentLevel,
+                                correct_streak: correctStreak,
+                                language: "indonesia" // Or get from user selection
+                            }),
+
+                            contentType: "application/json",
+                            beforeSend: function(request) {
+                                request.setRequestHeader("Authorization",
+                                    `Bearer ${token}`);
+                            },
+                            success: function(response) {
+                                console.log(response);
+                                if (response.data && response.data.length > 0) {
+                                    currentQuestion = response.data[0];
+                                    displayQuestion(currentQuestion);
+                                    updateBloomLevelUI();
+                                } else {
+                                    toastr.error(
+                                        "Failed to generate question. Please try again."
+                                    );
+                                }
+                                hideLoading();
+                            },
+                            error: function(error) {
+                                console.error("Error generating question:", error);
+                                toastr.error("Failed to generate question.");
+                                hideLoading();
+                            }
+                        });
                     }
                 });
             }
 
-            // Initialize language dropdown
-            fetchLanguages()
-                .then(response => {
-                    const languageDropdown = $("#language");
-                    if (response.data && response.data.length > 0) {
-                        response.data.forEach(language => {
-                            languageDropdown.append(
-                                `<option value="${language}">${language}</option>`
-                            );
-                        });
+            function displayQuestion(question) {
+                $("#question-text").html(question.question);
+                $("#reference-text").html(question.reference_answer);
+                $("#question-category").text(question.category || currentLevel);
+                $("#question-page").text(`Page ${question.page || 1}`);
 
-                        // Enable language selection change event
-                        $("#language").on("change", function() {
-                            selectedLanguage = $(this).val();
-                            $("#start-test").prop("disabled", !selectedLanguage);
-                        });
-                    } else {
-                        languageDropdown.append(
-                            `<option value="">No languages available</option>`
-                        );
-                        toastr.warning("No languages available for this topic.");
-                    }
-                })
-                .catch(error => {
-                    console.error("Error fetching languages:", error);
-                    toastr.error("Failed to fetch available languages.");
-                });
-
-            // Start the assignment test
-            $("#start-test").on("click", function() {
-                if (!selectedLanguage) {
-                    toastr.warning("Please select a language first.");
-                    return;
-                }
-                $(".language-selection").hide();
-                showHistorySection();
-                showLoading();
-
-                // Fetch questions for the selected language
-                fetchQuestions()
-                    .then(response => {
-                        if (response.data && response.data.length > 0) {
-                            // Group questions by page number
-                            questionsGroupedByPage = response.data.reduce((acc, question) => {
-                                const page = parseInt(question.page, 10) || 1;
-                                if (!acc[page]) acc[page] = [];
-                                acc[page].push(question);
-                                return acc;
-                            }, {});
-
-                            // Find highest page number
-                            highestPage = Math.max(...Object.keys(questionsGroupedByPage).map(page =>
-                                parseInt(page, 10)));
-
-                            // Display the first question
-                            $("#question-box").show();
-                            $("#assignment-container").show();
-                            tinymce.get("user-input").mode.set("design");
-
-                            askQuestion(questionsGroupedByPage);
-                        } else {
-                            toastr.error("No questions available for the selected language.");
-                            $("#language-selection").show();
-                        }
-                        hideLoading();
-                    })
-                    .catch(error => {
-                        console.error("Error fetching questions:", error);
-                        toastr.error("Failed to fetch questions.");
-                        $("#language-selection").show();
-                        hideLoading();
-                    });
-            });
-
-            // Fetch questions from the API
-            function fetchQuestions() {
-                console.log(currentPage);
-                return $.ajax({
-                    type: "GET",
-                    url: `${apiUrl}/api/v1/question/show/${topicGuid}/${selectedLanguage}`,
-                    beforeSend: function(request) {
-                        request.setRequestHeader("Authorization", `Bearer ${token}`);
-                    }
-                });
-            }
-
-
-            // Display a random question from the current page
-            function askQuestion(questionsGroupedByPage) {
-                const questionsOnPage = questionsGroupedByPage[currentPage];
-                if (!questionsOnPage || questionsOnPage.length === 0) {
-                    moveToNextPage();
-                    return;
-                }
-
-                // Select a random question from the current page
-                const question = questionsOnPage[Math.floor(Math.random() * questionsOnPage.length)];
-                currentQuestionGuid = question.guid;
-                currentThreshold = question.threshold || 70;
-
-                // Display the question
-                $("#question-text").html(question.question_fix);
-                $("#question-meta").html(`
-                    <strong>Page: </strong> ${currentPage}/${highestPage} | 
-                    <strong>Category:</strong> ${question.category || 'Umum'} | 
-                    <strong>Threshold:</strong> ${currentThreshold}
-                `);
-
-                // Clear previous answer
+                // Clear previous answer and evaluation
                 tinymce.get("user-input").setContent('');
-                $("#send-button").prop("disabled", true);
+                $("#evaluation-results").hide();
+                $("#next-question").hide();
+
+                // Show question and answer boxes
+                $("#question-box").show();
+                $("#assignment-container").show();
+                $("#answer-references").show();
             }
 
-            // Move to the next page of questions
-            function moveToNextPage() {
-                currentPage++;
-                if (currentPage > highestPage) {
-                    endAssignment();
-                } else {
-                    askQuestion(questionsGroupedByPage);
-                }
+            function updateBloomLevelUI() {
+                // Update level display
+                const levelNames = {
+                    'remembering': 'Remembering',
+                    'understanding': 'Understanding',
+                    'applying': 'Applying',
+                    'analyzing': 'Analyzing'
+                };
+
+                $("#bloom-level-display")
+                    .removeClass('remembering understanding applying analyzing')
+                    .addClass(currentLevel)
+                    .text(`Level: ${levelNames[currentLevel]}`);
+
+                // Update progress
+                const progressPercent = (correctStreak / 4) * 100;
+                $("#bloom-progress").css('width', `${progressPercent}%`);
+                $("#streak-counter").text(`Correct streak: ${correctStreak}/4`);
             }
 
-            // Handle end of assignment
-            function endAssignment() {
-                $("#question-box").hide();
-                $("#assignment-container").hide();
-
-                Swal.fire({
-                    title: 'Selamat!',
-                    text: 'Anda telah menyelesaikan semua pertanyaan dalam assignment ini.',
-                    icon: 'success',
-                    showCancelButton: true,
-                    confirmButtonText: 'Lihat Riwayat',
-                    cancelButtonText: 'Tutup'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        // Redirect to history page or show history
-                        window.location.href = `/assignment/history/${topicGuid}`;
-                    }
-                });
-
-            }
-
-            // Submit user's answer
-            $("#send-button").on("click", function() {
-                if (isSubmitting) return;
-
-                // Get content from TinyMCE
+            // Replace your submit-answer click handler with this updated function
+            $("#submit-answer").on("click", function() {
                 const userAnswer = tinymce.get("user-input").getContent();
                 if (!userAnswer.trim()) {
-                    toastr.error("Jawaban tidak boleh kosong!");
+                    toastr.error("Please enter your answer before submitting.");
                     return;
                 }
 
-                isSubmitting = true;
-
-                // Show loading state
-                $("#send-button").html('<i class="fas fa-spinner fa-spin me-2"></i>Mengirim...');
-                $("#send-button").prop("disabled", true);
                 showLoading();
+                $("#submit-answer").prop("disabled", true).html(
+                    '<i class="fas fa-spinner fa-spin me-2"></i>Evaluating...');
 
-                // Send answer to the API
+                // Evaluate the answer using Laravel backend
                 $.ajax({
                     type: "POST",
-                    url: `${apiUrl}/api/v1/assignment/submit`,
+                    url: `${apiUrl}/api/v1/assignment/evaluate`, // Use Laravel endpoint instead of Flask
                     data: JSON.stringify({
-                        user_id: userId,
-                        topic_guid: topicGuid,
-                        question_guid: currentQuestionGuid,
-                        answer: userAnswer,
-                        page: currentPage,
-
+                        reference_answer: currentQuestion.reference_answer,
+                        user_answer: userAnswer
                     }),
                     contentType: "application/json",
+                    beforeSend: function(request) {
+                        request.setRequestHeader("Authorization", `Bearer ${token}`);
+                    },
+                    success: function(response) {
+                        // Check for the data property from ResponseController format
+                        if (response.code === 200 && response.data) {
+                            evaluationResult = response.data;
+                            displayEvaluationResults(response.data);
 
+                            // Update Bloom's taxonomy state
+                            if (response.data.is_correct) {
+                                correctStreak++;
+                                if (correctStreak >= 4 && currentLevel !== "analyzing") {
+                                    // Move to next level
+                                    const levels = ["remembering", "understanding", "applying",
+                                        "analyzing"
+                                    ];
+                                    const currentIndex = levels.indexOf(currentLevel);
+                                    currentLevel = levels[currentIndex + 1];
+                                    correctStreak = 0;
+                                    toastr.success(`Advanced to ${currentLevel} level!`);
+                                }
+                            } else {
+                                correctStreak = 0;
+                            }
+
+                            updateBloomLevelUI();
+                        } else {
+                            toastr.error(response.message || "Failed to evaluate your answer.");
+                        }
+
+                        $("#submit-answer").prop("disabled", false).html(
+                            '<i class="fas fa-paper-plane me-2"></i>Submit Answer');
+                        hideLoading();
+                    },
+                    error: function(error) {
+                        console.error("Error evaluating answer:", error);
+                        toastr.error("Failed to evaluate your answer.");
+                        $("#submit-answer").prop("disabled", false).html(
+                            '<i class="fas fa-paper-plane me-2"></i>Submit Answer');
+                        hideLoading();
+                    }
+                });
+            
+            });
+
+            function generateQuestion() {
+                $.ajax({
+                    type: "POST",
+                    url: `${apiUrl}/api/v1/question/generate`,
+                    data: JSON.stringify({
+                        topic_guid: topicGuid,
+                        current_level: currentLevel,
+                        correct_streak: correctStreak,
+                        language: "Indonesia",
+                    }),
+                    contentType: "application/json",
                     beforeSend: function(request) {
                         request.setRequestHeader("Authorization", `Bearer ${token}`);
                     },
                     success: function(response) {
                         console.log(response);
-                        if (response.status) {
-                            currentPage = response.nextPage;
-
-                            checkPlagiarism(userId, topicGuid, currentQuestionGuid, response
-                                .data
-                                .user_answer_guid, userAnswer, response);
-
+                        if (response.code === 200 && response.data && response.data.length > 0) {
+                            currentQuestion = response.data[0];
+                            displayQuestion(currentQuestion);
+                            updateBloomLevelUI();
                         } else {
-                            isSubmitting = false;
-                            hideLoading();
-                            $("#send-button").html(
-                                '<i class="fas fa-paper-plane me-2"></i>Kirim Jawaban');
-                            $("#send-button").prop("disabled", false);
                             toastr.error(response.message ||
-                                "Terjadi kesalahan saat mengirim jawaban.");
+                                "Failed to generate question. Please try again.");
                         }
-
-                    },
-                    error: function(xhr) {
-                        isSubmitting = false;
                         hideLoading();
-                        $("#send-button").html(
-                            '<i class="fas fa-paper-plane me-2"></i>Kirim Jawaban');
-                        $("#send-button").prop("disabled", false);
-
-                        toastr.error("Gagal mengirim jawaban. Silakan coba lagi.");
-                        console.error("Error submitting answer:", xhr);
-
-                    }
-                });
-            });
-
-            function checkPlagiarism(userId, topicGuid, questionGuid, userAnswerGuid, userAnswer,
-                originalResponse) {
-
-                $.ajax({
-                    type: "POST",
-                    url: `${apiUrl}/api/v1/plagiarism/check`,
-                    data: JSON.stringify({
-                        user_id: userId,
-                        topic_guid: topicGuid,
-                        question_guid: questionGuid,
-                        user_answer_guid: userAnswerGuid,
-                        answer: userAnswer
-                    }),
-
-
-
-                    contentType: "application/json",
-                    beforeSend: function(request) {
-                        request.setRequestHeader("Authorization", `Bearer ${token}`);
-                    },
-                    success: function(plagiarismResponse) {
-                        isSubmitting = false;
-                        hideLoading();
-                        $("#send-button").html('<i class="fas fa-paper-plane me-2"></i>Kirim Jawaban');
-                        $("#send-button").prop("disabled", false);
-                        console.log(plagiarismResponse.data);
-                        if (plagiarismResponse.success) {
-                            window.location.href =
-                                `http://127.0.0.1:8003/evaluation/${ questionGuid }/${userAnswerGuid}`;
-                        } else {
-                            toastr.error(plagiarismResponse.message ||
-                                "Terjadi kesalahan saat memeriksa plagiarisme.");
-                        }
-
-
-
-
-                    },
-                    error: function(xhr) {
-                        console.error("Error checking plagiarism:", xhr);
-
-                        // Even if plagiarism check fails, continue with the flow
-                        isSubmitting = false;
-                        hideLoading();
-                        $("#send-button").html('<i class="fas fa-paper-plane me-2"></i>Kirim Jawaban');
-                        $("#send-button").prop("disabled", false);
-
-                    }
-                });
-            }
-
-
-
-            function showHistorySection() {
-                $("#history-section").show();
-                fetchHistoryData();
-            }
-
-            // Fetch history data from API
-            function fetchHistoryData() {
-                showLoading();
-                $.ajax({
-                    type: "GET",
-                    url: `${apiUrl}/api/v1/assignment/history/${userId}/${topicGuid}`,
-                    beforeSend: function(request) {
-                        request.setRequestHeader("Authorization", `Bearer ${token}`);
-                    },
-                    success: function(response) {
-                        hideLoading();
-                        if (response.success && response.data && response.data.length > 0) {
-                            renderHistoryItems(response.data);
-                            $("#no-history-message").hide();
-                        } else {
-                            $("#history-list").html(`
-                    <div class="text-center py-4 text-muted">
-                        <i class="fas fa-history fa-2x mb-2"></i>
-                        <p>Belum ada riwayat jawaban untuk topik ini.</p>
-                    </div>
-                `);
-                        }
                     },
                     error: function(error) {
+                        console.error("Error generating question:", error);
+                        toastr.error("Failed to generate question.");
                         hideLoading();
-                        console.error("Error fetching history:", error);
-                        toastr.error("Gagal mengambil data riwayat jawaban.");
                     }
                 });
             }
 
-            // Render history items
-            function renderHistoryItems(historyData) {
-                const historyListElement = $("#history-list");
-                historyListElement.empty();
+            function displayEvaluationResults(evaluation) {
+                const scorePercent = Math.round(evaluation.combined_score * 100);
 
-                historyData.forEach((item, index) => {
-                    const formattedDate = new Date(item.created_at).toLocaleString('id-ID', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    });
+                $("#similarity-score-bar").css('width', `${scorePercent}%`);
+                $("#similarity-score-text").text(`${scorePercent}% similarity`);
 
-                    const scoreClass = getSimilarityScoreClass(item.cosine_similarity);
-                    const percentageSimilarity = (item.cosine_similarity * 100).toFixed(2);
+                // Color the progress bar based on score
+                $("#similarity-score-bar")
+                    .removeClass('bg-danger bg-warning bg-success')
+                    .addClass(
+                        scorePercent >= 70 ? 'bg-success' :
+                        scorePercent >= 50 ? 'bg-warning' : 'bg-danger'
+                    );
 
-                    historyListElement.append(`
-            <div class="history-card mb-3">
-                <div class="history-header">
-                    <span class="fw-bold">Pertanyaan ${index + 1} (Page ${item.page})</span>
-                    <span class="history-date text-muted">${formattedDate}</span>
-                </div>
-                <div class="history-content">
-                    <div class="history-question mb-3">
-                        <strong>Pertanyaan:</strong>
-                        <div class="mt-2">${item.question}</div>
-                    </div>
-                    <div class="history-answer">
-                        <strong>Jawaban Anda:</strong>
-                        <div class="mt-2">${truncateAnswer(item.answer)}</div>
-                    </div>
-                </div>
-                <div class="history-footer">
-                    <div>
-                        <span class="badge ${scoreClass}">Similarity: ${percentageSimilarity}%</span>
-                        <span class="badge bg-secondary ms-1">Category: ${item.category || 'Umum'}</span>
-                    </div>
-                    <button class="btn btn-sm btn-primary view-evaluation" 
-                            data-question-guid="${item.question_guid}" 
-                            data-answer-guid="${item.guid}">
-                        <i class="fas fa-eye me-1"></i>Lihat Evaluasi
-                    </button>
-                </div>
-            </div>
-        `);
-                });
+                // Show detailed evaluation
+                $("#evaluation-details").html(`
+                    <div class="mb-2"><strong>TF-IDF Score:</strong> ${(evaluation.tfidf_score * 100).toFixed(1)}%</div>
+                    <div class="mb-2"><strong>BERT Score:</strong> ${(evaluation.bert_score * 100).toFixed(1)}%</div>
+                    <div class="mb-2"><strong>Result:</strong> ${evaluation.is_correct ? 'Correct' : 'Incorrect'}</div>
+                `);
 
-                // Add event listener for view evaluation buttons
-                $(".view-evaluation").on("click", function() {
-                    const questionGuid = $(this).data("question-guid");
-                    const answerGuid = $(this).data("answer-guid");
-                    navigateToEvaluation(questionGuid, answerGuid);
-                });
+                // Show evaluation results and next question button
+                $("#evaluation-results").show();
+                $("#next-question").show();
             }
 
-            // Get appropriate CSS class based on similarity score
-            function getSimilarityScoreClass(score) {
-                const percentage = score * 100;
-                if (percentage >= 80) return "bg-success";
-                if (percentage >= 60) return "bg-primary";
-                if (percentage >= 40) return "bg-warning";
-                return "bg-danger";
+            $("#next-question").on("click", function() {
+                showLoading();
+                generateQuestion();
+            });
+
+            function showLoading() {
+                $("#loading-overlay").fadeIn(300);
             }
 
-            // Truncate long answers for display
-            function truncateAnswer(answer, maxLength = 200) {
-                // Remove HTML tags for display in the history card
-                const plainText = answer.replace(/<[^>]*>/g, ' ');
-                if (plainText.length <= maxLength) return answer;
-                return plainText.substring(0, maxLength) +
-                    '... <span class="text-muted">(klik Lihat Evaluasi untuk detail)</span>';
+            function hideLoading() {
+                $("#loading-overlay").fadeOut(300);
             }
-
-            // Navigate to evaluation page
-            function navigateToEvaluation(questionGuid, answerGuid) {
-                window.location.href = `/evaluation/${questionGuid}/${answerGuid}`;
-            }
-
-
         });
     </script>
 @endsection
