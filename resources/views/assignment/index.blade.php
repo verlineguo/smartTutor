@@ -343,18 +343,21 @@
                 </div>
 
                 <!-- Answer References -->
-                <div class="card" id="answer-references">
-                    <div class="card-header bg-light">
-                        <h6 class="mb-0">Answer References</h6>
-                    </div>
-                    <div class="card-body">
-                        <div id="reference-answer">
-                            <h6>Reference Answer:</h6>
-                            <div id="reference-text" class="mb-3 p-2 bg-light rounded"></div>
+                
+            </div>
+            <div class="col-lg-4">
+                <div class="history-section" id="history-section">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">Riwayat Jawaban</h6>
                         </div>
-                        <div id="llm-answers">
-                            <h6>LLM Answers:</h6>
-                            <div id="llm-answers-list"></div>
+                        <div class="card-body">
+                            <div id="history-list" class="history-list">
+                                <div class="text-center py-4 text-muted" id="no-history-message">
+                                    <i class="fas fa-history fa-2x mb-2"></i>
+                                    <p>Belum ada riwayat jawaban untuk topik ini.</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

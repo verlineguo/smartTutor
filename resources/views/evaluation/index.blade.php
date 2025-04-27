@@ -476,7 +476,7 @@
                                             <a class="nav-link" data-bs-toggle="tab" href="#gemini-llm">Gemini</a>
                                         </li>
                                         <li class="nav-item">
-                                            <a class="nav-link" data-bs-toggle="tab" href="#deepseek-llm">Deepseek</a>
+                                            <a class="nav-link" data-bs-toggle="tab" href="#llama-llm">Llama</a>
                                         </li>
                                     </ul>
                                 </div>
@@ -488,8 +488,8 @@
                                         <div class="tab-pane fade" id="gemini-llm">
                                             <!-- Gemini content -->
                                         </div>
-                                        <div class="tab-pane fade" id="deepseek-llm">
-                                            <!-- Deepseek content -->
+                                        <div class="tab-pane fade" id="llama-llm">
+                                            <!-- Llama content -->
                                         </div>
 
                                     </div>
@@ -717,29 +717,7 @@
                 });
             }
 
-            // Find next question
-            function findNextQuestion(currentQuestionGuid) {
-                $.ajax({
-                    type: "GET",
-                    url: "{{ env('URL_API') }}/api/v1/question/next/" + currentQuestionGuid,
-                    beforeSend: function(request) {
-                        request.setRequestHeader("Authorization", `Bearer ${token}`);
-                    },
-
-                    success: function(response) {
-                        if (response.success && response.data.guid) {
-                            window.location.href = `/user/answer/${response.data.guid}`;
-                        } else {
-                            toastr.info("No more questions available.");
-                        }
-                    },
-                    error: function(xhr) {
-                        toastr.error("Gagal mendapatkan data evaluasi. Silakan coba lagi.");
-                        console.error("Error fetch:", xhr);
-                    }
-                });
-            }
-
+           
             // Update UI with evaluation data
             function updateUI(data) {
                 // Question info

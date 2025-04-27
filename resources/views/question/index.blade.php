@@ -279,8 +279,8 @@
                                             <textarea class="form-control" id="answer-gemini" name="answer_gemini" rows="4" readonly></textarea>
                                         </div>
                                         <div class="mb-3">
-                                            <label for="answer-deepseek" class="form-label">Deepseek Answer</label>
-                                            <textarea class="form-control" id="answer-deepseek" name="answer_deepseek" rows="4" readonly></textarea>
+                                            <label for="answer-llama" class="form-label">llama Answer</label>
+                                            <textarea class="form-control" id="answer-llama" name="answer_llama" rows="4" readonly></textarea>
                                         </div>
                                     </div>
                                     <!-- PDF Answers Tab -->
@@ -875,8 +875,8 @@
                                         .source === 'openai');
                                     var gemini = llmResult.data.find(a => a
                                         .source === 'gemini');
-                                    var deepseek = llmResult.data.find(a => a
-                                        .source === 'deepseek');
+                                    var llama = llmResult.data.find(a => a
+                                        .source === 'llama');
 
                                     // Replace textareas with formatted div elements
                                     $('#edit-llm-content').html(`
@@ -895,11 +895,11 @@
             <input type="hidden" id="answer-gemini-raw" value="${gemini ? encodeURIComponent(gemini.answer) : ''}">
         </div>
         <div class="mb-3">
-            <label class="form-label">Deepseek Answer</label>
+            <label class="form-label">LLama Answer</label>
             <div class="form-control markdown-content" style="height: auto; min-height: 150px; overflow-y: auto;">
-                ${deepseek ? marked.parse(deepseek.answer) : 'No answer available'}
+                ${llama ? marked.parse(llama.answer) : 'No answer available'}
             </div>
-            <input type="hidden" id="answer-deepseek-raw" value="${deepseek ? encodeURIComponent(deepseek.answer) : ''}">
+            <input type="hidden" id="answer-llama-raw" value="${llama ? encodeURIComponent(llama.answer) : ''}">
         </div>
     `);
 
@@ -907,7 +907,7 @@
                                 } else {
                                     $('#answer-openai').val('No answer available');
                                     $('#answer-gemini').val('No answer available');
-                                    $('#answer-deepseek').val(
+                                    $('#answer-llama').val(
                                     'No answer available');
                                 }
 
@@ -1014,7 +1014,7 @@
                                 // Show modal even if LLM answers couldn't be fetched
                                 $('#answer-openai').val('Error loading answer');
                                 $('#answer-gemini').val('Error loading answer');
-                                $('#answer-deepseek').val('Error loading answer');
+                                $('#answer-llama').val('Error loading answer');
 
                                 // Still try to load PDF answers
                                 $.ajax({

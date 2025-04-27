@@ -319,7 +319,7 @@
                                             <th>Question</th>
                                             <th>OpenAI Answer</th>
                                             <th>Gemini Answer</th>
-                                            <th>Deepseek Answer</th>
+                                            <th>LLama Answer</th>
                                         </tr>
                                     </thead>
                                 </table>
@@ -662,7 +662,10 @@
                         answer_openai: question.answer_openai,
                         answer_openai_guid: question.answer_openai_guid,
                         answer_gemini: question.answer_gemini,
-                        answer_gemini_guid: question.answer_gemini_guid
+                        answer_gemini_guid: question.answer_gemini_guid,
+                        answer_llama: question.answer_llama,
+                        answer_llama_guid: question.answer_llama_guid,
+                        
                     };
                 });
 
@@ -1009,6 +1012,43 @@
                             checkLlmCompletion();
                         }
                     });
+
+                    $.ajax({
+                        type: "POST",
+                        url: "{{ env('URL_API') }}/api/v1/llm-answer",
+                        data: {
+                            model: 'llama',
+                            prompt: question.question,
+                            question_guid: question.guid
+                        },
+                        beforeSend: function(request) {
+                            request.setRequestHeader("Authorization",
+                                "Bearer {{ $token }}");
+                        },
+                        success: function(response) {
+                            if (response.data && response.data.response) {
+                                // Update main table
+                                const table = $('#table-data').DataTable();
+                                table.rows().every(function() {
+                                    const data = this.data();
+                                    if (data.guid === question.guid) {
+                                        data.answer_llama = response.data.response;
+                                        data.answer_llama_guid = response.data.guid;
+                                        this.data(data);
+                                    }
+                                });
+                            }
+
+                            // Check if all requests completed
+                            completedLlmRequests++;
+                            checkLlmCompletion();
+                        },
+                        error: function() {
+                            completedLlmRequests++;
+                            checkLlmCompletion();
+                        }
+                    });
+
                 });
 
                 function checkLlmCompletion() {
@@ -1096,7 +1136,7 @@
                         question: data.question,
                         answer_openai: data.answer_openai || '',
                         answer_gemini: data.answer_gemini || '',
-                        other_models: '' // Add other models if needed
+                        answer_llama: data.answer_llama || '',
                     };
 
                     // Add to LLM table
@@ -1398,7 +1438,8 @@
                         question: item.question,
                         answer_openai: item.answer_openai || '',
                         answer_gemini: item.answer_gemini || '',
-                        other_models: '' // Could be populated if you have other model data
+                        answer_llama: item.answer_llama || '',
+                        // Could be populated if you have other model data
                     }));
 
                     llmTable.rows.add(llmData).draw();
@@ -1445,8 +1486,8 @@
                             className: 'text-wrap'
                         },
                         {
-                            data: 'other_models',
-                            title: 'Other Models',
+                            data: 'answer_llama',
+                            title: 'Llama Answer',
                             className: 'text-wrap'
                         }
                     ],
@@ -1636,6 +1677,11 @@
                 if (rowData.answer_gemini) {
                     appendLlmAnswer('gemini', 'Gemini', rowData.answer_gemini);
                 }
+
+                if (rowData.answer_llama) {
+                    appendLlmAnswer('llama', 'Llama', rowData.answer_llama);
+                }
+
 
                 // Add answers from other models if available
                 if (rowData.llm_answers && Array.isArray(rowData.llm_answers)) {
