@@ -1,6 +1,10 @@
 import google.generativeai as genai
 import openai
 import re
+from together import Together
+
+
+
 with open('hidden.txt') as file:
     openai.api_key = file.read()
 
@@ -8,8 +12,8 @@ with open('hidden.txt') as file:
 with open('hidden2.txt') as file:
     genai_api_key = file.read()
 
-# with open('hidden3.txt') as file:
-#     deepseek_api_key = file.read()
+with open('hidden3.txt') as file:
+    llama_api_key = file.read()
     
     
 genai.configure(api_key=genai_api_key)
@@ -77,26 +81,26 @@ def get_llm_response(model, prompt, temp=0.7, top_p=0.7, freq_penalty=0.5, pres_
             generation_config=genai.types.GenerationConfig(
                 temperature=temp,
                 top_p=top_p,
-                max_output_tokens=100
             ),
         )
-                 
-        if response.text:
-            # Batasi output maksimal 50 kata
-            max_words = 150
-            limited_text = " ".join(response.text.split()[:max_words])
-            return format_response(limited_text)
-        else:
-            return "Gemini returned an empty response."
+        try:
+            text = response.text
+        except AttributeError:
+            text = response.candidates[0].content.parts[0].text
         
-    # elif model.lower() == "deepseek":
-    #     response = deepseek_api_key.chat.completions.create(
-    #         model="deepseek-chat",
-    #         messages=[{"role": "system", "content": "You are a helpful assistant"},
-    #                   {"role": "user", "content": prompt}],
-    #         stream=False
-    #     )
-    #     return response.choices[0].message.content
+        return format_response(text)
+        
+    elif model.lower() == "llama":
+        client = Together(api_key=llama_api_key)
+
+        response = client.chat.completions.create(
+            model="meta-llama/Llama-4-Scout-17B-16E-Instruct",
+            messages=[{"role": "user", "content": enhanced_prompt}]
+        )
+        text = response.choices[0].message.content
+        return format_response(text)
+
+        
         
     else:
         return "Model not supported."

@@ -6,10 +6,14 @@ import translatePDF
 import tfidf
 import gc
 import cosine
-from similarity import cosine_similarity_score, jaccard_similarity, bert_similarity, highlight_differences, multi_pattern_search
+from similarity import cosine_similarity_score, jaccard_similarity, bert_similarity
 import os
-from answerBert import BERTQuestionAnsweringSystem
+from answerBert import BertAnsweringSystem
 from multiLLM import get_llm_response
+from evaluation import AnswerEvaluator
+from werkzeug.utils import secure_filename
+import traceback
+
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024
 
@@ -39,11 +43,10 @@ def generate():
     language = request.form.get('language') or request.json.get('language')
     pdf = request.files.get('pdf')
     tfidf_data = request.form.get('tfidf_data')
-    print("ini lagi di generate :D")
+    print(tfidf_data)
     if tfidf_data:
         tfidf_data = json.loads(tfidf_data)
     if pdf:
-        # Panggil fungsi untuk menghasilkan pertanyaan dari PDF dan TF-IDF data
         response = mainPDF.generate_questions_from_pdf(
             pdf, tfidf_data, language=language
         )
@@ -94,45 +97,75 @@ def calculate_similarity():
 @app.route('/bert_qa', methods=['POST'])
 def bert_qa():
     try:
+        # Check if PDF file is uploaded
         if 'pdf' not in request.files:
             return jsonify({'error': 'No PDF file uploaded'}), 400
             
         pdf_file = request.files['pdf']
         question = request.form.get('question')
         
+        # Check if question is provided
         if not question:
             return jsonify({'error': 'Question is required'}), 400
         
-        file_path = os.path.join("uploads", pdf_file.filename)
-        os.makedirs("uploads", exist_ok=True)
+        # Determine number of results to return (optional parameter)
+        try:
+            top_k = int(request.form.get('top_k', 3))
+        except ValueError:
+            top_k = 3
+        
+        # Save the uploaded PDF
+        file_path = os.path.join("uploads", secure_filename(pdf_file.filename))
         pdf_file.save(file_path)
         
-        qa_system = BERTQuestionAnsweringSystem()
-        document = qa_system.read_pdf(file_path)
+        # Initialize the QA system
+        qa_system = BertAnsweringSystem()
         
-        if not document:
-            return jsonify({'error': 'Failed to extract text from PDF'}), 500
-            
-        results = qa_system.answer_question(document, question)
+        # Process the query and get answers
+        results = qa_system.process_pdf_query(file_path, question, top_k)
         
+        if not results:
+            return jsonify({'error': 'Failed to generate answers'}), 500
+        
+        # Format results for API response
         formatted_results = []
         for result in results:
-            formatted_results.append({
-                'answer': result['answer'],
+            answer_data = {
+                'answer': str(result['answer']),
                 'combined_score': float(result['combined_score']),
                 'qa_score': float(result['qa_score']),
                 'retrieval_score': float(result['retrieval_score']),
-                'context': qa_system.get_context_with_highlights(result['chunk'], result['answer'])
-            })
+                'bloom_level': str(result['bloom_level']),
+                'is_valid': bool(result['is_valid'])
+            }
+            
+            # Add context with highlighting if it's not the essay result
+            if result.get('chunk') != "combined_relevant_chunks":
+                # Highlighting the answer in the context
+                chunk = result['chunk']
+                answer = result['original_answer']
+                highlighted_context = chunk.replace(answer, f"<mark>{answer}</mark>")
+                answer_data['context'] = highlighted_context
+            else:
+                answer_data['is_essay'] = True
+            
+            formatted_results.append(answer_data)
+        
+        # Clean up - remove the uploaded file if needed
+        # os.remove(file_path)  # Uncomment if you want to delete files after processing
         
         return jsonify({'answers': formatted_results}), 200
+        
     except MemoryError:
-        # Khusus untuk error memory
+        # Handle memory errors specifically
         gc.collect()
         return jsonify({"error": "Out of memory, please try with smaller PDF"}), 507
     except Exception as e:
-        app.logger.error(f"BERT QA Error: {str(e)}")
+        # Log the full error with traceback
+        app.logger.error(f"Indonesian QA Error: {str(e)}")
+        app.logger.error(traceback.format_exc())
         return jsonify({"error": "An error occurred processing the request"}), 500
+
 
 @app.route('/checkPlagiarism', methods=['POST'])
 def plagiarism_check():
@@ -147,11 +180,29 @@ def plagiarism_check():
         'cosine_similarity': cosine_similarity_score(text1, text2),
         'jaccard_similarity': jaccard_similarity(text1, text2),
         'bert_similarity': bert_similarity(text1, text2),
-        'highlighted_text': highlight_differences(text1, text2),
+        # 'highlighted_text': highlight_differences(text1, text2),
         # 'multi_pattern_matches': multi_pattern_search(text2, list(set(text1.split()) & set(text2.split())))
     }
     
     return jsonify(results)
+
+@app.route('/evaluate', methods=['POST'])
+def evaluate_answer():
+    try:
+        data = request.json
+        evaluator = AnswerEvaluator()
+        
+        result = evaluator.combined_evaluation(
+            data['reference_answer'],
+            data['user_answer'],
+            data['current_level']
+        )
+        app.logger.info(f"Evaluation Result: {result}")
+
+        return jsonify(result)
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == '__main__':

@@ -1,747 +1,600 @@
-import pdfplumber
+import numpy as np
+import pandas as pd
 import re
+import torch
+from transformers import AutoTokenizer, AutoModel, pipeline
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+from PyPDF2 import PdfReader
 import nltk
 from nltk.tokenize import sent_tokenize, word_tokenize
-from nltk.corpus import stopwords
-from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
-from sentence_transformers import SentenceTransformer, CrossEncoder
-import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
-import torch
+import logging
+import warnings
+from typing import List, Dict, Tuple, Any
+import time
 
+# Konfigurasi logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+warnings.filterwarnings('ignore')
+
+# Download NLTK resources jika belum ada
 try:
     nltk.data.find('tokenizers/punkt')
 except LookupError:
-    nltk.download('punkt', quiet=True)
-    
-try:
-    nltk.data.find('corpora/stopwords')
-except LookupError:
-    nltk.download('stopwords', quiet=True)
+    nltk.download('punkt')
 
-
-class BERTQuestionAnsweringSystem:
-    def __init__(self, 
-                 qa_model_name='bert-large-uncased-whole-word-masking-finetuned-squad',  
-                 embedding_model_name='all-MiniLM-L6-v2',  
-                 cross_encoder_name='cross-encoder/ms-marco-MiniLM-L-6-v2'):  
-        """
-        Initialize an enhanced QA system with better retrieval and extraction capabilities
-        """
-        try:
-            # QA pipeline with better settings
-            self.tokenizer = AutoTokenizer.from_pretrained(qa_model_name)
-            self.model = AutoModelForQuestionAnswering.from_pretrained(qa_model_name)
-            self.qa_pipeline = pipeline(
-                'question-answering', 
-                model=self.model, 
-                tokenizer=self.tokenizer,
-                handle_impossible_answer=True,  # Better handling of unanswerable questions
-                max_answer_length=100
-            )
-            
-            # Embedding model for semantic search - multilingual
-            self.embedding_model = SentenceTransformer(embedding_model_name)
-            
-            # Cross-encoder for answer reranking
-            self.cross_encoder = CrossEncoder(cross_encoder_name)
-            
-            # Stopwords for text cleaning - support both English and Indonesian
-            self.stopwords = set(stopwords.words('english'))
-            
-            # Add Indonesian stopwords
-            # self.indonesian_stopwords = {
-            #     'ada', 'adalah', 'adanya', 'adapun', 'agak', 'agaknya', 'agar', 'akan', 'akankah', 
-            #     'akhir', 'akhiri', 'akhirnya', 'aku', 'akulah', 'amat', 'amatlah', 'anda', 'andalah', 
-            #     'antar', 'antara', 'antaranya', 'apa', 'apaan', 'apabila', 'apakah', 'apalagi', 'apatah', 
-            #     'artinya', 'asal', 'asalkan', 'atas', 'atau', 'ataukah', 'ataupun', 'awal', 'awalnya', 
-            #     'bagai', 'bagaikan', 'bagaimana', 'bagaimanakah', 'bagaimanapun', 'bagi', 'bagian', 
-            #     'bahkan', 'bahwa', 'bahwasanya', 'baik', 'bakal', 'bakalan', 'balik', 'banyak', 'bapak', 
-            #     'baru', 'bawah', 'beberapa', 'begini', 'beginian', 'beginikah', 'beginilah', 'begitu', 
-            #     'begitukah', 'begitulah', 'begitupun', 'belakang', 'belakangan', 'belum', 'belumlah', 
-            #     'benar', 'benarkah', 'benarlah', 'berada', 'berakhir', 'berakhirlah', 'berakhirnya', 
-            #     'berapa', 'berapakah', 'berapalah', 'berapapun', 'berarti', 'berawal', 'berbagai', 
-            #     'berdatangan', 'beri', 'berikan', 'berikut', 'berikutnya', 'berjumlah', 'berkali-kali', 
-            #     'berkata', 'berkehendak', 'berkeinginan', 'berkenaan', 'berlainan', 'berlalu', 'berlangsung', 
-            #     'berlebihan', 'bermacam', 'bermacam-macam', 'bermaksud', 'bermula', 'bersama', 'bersama-sama', 
-            #     'bersiap', 'bersiap-siap', 'bertanya', 'bertanya-tanya', 'berturut', 'berturut-turut', 
-            #     'bertutur', 'berujar', 'berupa', 'besar', 'betul', 'betulkah', 'biasa', 'biasanya', 'bila', 
-            #     'bilakah', 'bisa', 'bisakah', 'boleh', 'bolehkah', 'bolehlah', 'buat', 'bukan', 'bukankah', 
-            #     'bukanlah', 'bukannya', 'bulan', 'bung', 'cara', 'caranya', 'cukup', 'cukupkah', 'cukuplah', 
-            #     'cuma', 'dahulu', 'dalam', 'dan', 'dapat', 'dari', 'daripada', 'datang', 'dekat', 'demi', 
-            #     'demikian', 'demikianlah', 'dengan', 'depan', 'di', 'dia', 'diakhiri', 'diakhirinya', 
-            #     'dialah', 'diantara', 'diantaranya', 'diberi', 'diberikan', 'diberikannya', 'dibuat', 
-            #     'dibuatnya', 'didapat', 'didatangkan', 'digunakan', 'diibaratkan', 'diibaratkannya', 
-            #     'diingat', 'diingatkan', 'diinginkan', 'dijawab', 'dijelaskan', 'dijelaskannya', 'dikarenakan',
-            #     'dikatakan', 'dikatakannya', 'dikerjakan', 'diketahui', 'diketahuinya', 'dikira', 'dilakukan', 
-            #     'dilalui', 'dilihat', 'dimaksud', 'dimaksudkan', 'dimaksudkannya', 'dimaksudnya', 'diminta', 
-            #     'dimintai', 'dimisalkan', 'dimulai', 'dimulailah', 'dimulainya', 'dimungkinkan', 'dini', 
-            #     'dipastikan', 'diperbuat', 'diperbuatnya', 'dipergunakan', 'diperkirakan', 'diperlihatkan', 
-            #     'diperlukan', 'diperlukannya', 'dipersoalkan', 'dipertanyakan', 'dipunyai', 'diri', 'dirinya', 
-            #     'disampaikan', 'disebut', 'disebutkan', 'disebutkannya', 'disini', 'disinilah', 'ditambahkan', 
-            #     'ditandaskan', 'ditanya', 'ditanyai', 'ditanyakan', 'ditegaskan', 'ditujukan', 'ditunjuk', 
-            #     'ditunjuki', 'ditunjukkan', 'ditunjukkannya', 'ditunjuknya', 'dituturkan', 'dituturkannya', 
-            #     'diucapkan', 'diucapkannya', 'diungkapkan', 'dong', 'dua', 'dulu', 'empat', 'enggak', 
-            #     'enggaknya', 'entah', 'entahlah', 'guna', 'gunakan', 'hal', 'hampir', 'hanya', 'hanyalah', 
-            #     'hari', 'harus', 'haruslah', 'harusnya', 'hendak', 'hendaklah', 'hendaknya', 'hingga', 'ia',
-            #     'ialah', 'ibarat', 'ibaratkan', 'ibaratnya', 'ibu', 'ikut', 'ingat', 'ingat-ingat', 'ingin', 
-            #     'inginkah', 'inginkan', 'ini', 'inikah', 'inilah', 'itu', 'itukah', 'itulah', 'jadi', 'jadilah',
-            #     'jadinya', 'jangan', 'jangankan', 'janganlah', 'jauh', 'jawab', 'jawaban', 'jawabnya', 'jelas', 
-            #     'jelaskan', 'jelaslah', 'jelasnya', 'jika', 'jikalau', 'juga', 'jumlah', 'jumlahnya', 'justru',
-            #     'kala', 'kalau', 'kalaulah', 'kalaupun', 'kalian', 'kami', 'kamilah', 'kamu', 'kamulah', 'kan',
-            #     'kapan', 'kapankah', 'kapanpun', 'karena', 'karenanya', 'kasus', 'kata', 'katakan', 'katakanlah',
-            #     'katanya', 'ke', 'keadaan', 'kebetulan', 'kecil', 'kedua', 'keduanya', 'keinginan', 'kelamaan',
-            #     'kelihatan', 'kelihatannya', 'kelima', 'keluar', 'kembali', 'kemudian', 'kemungkinan', 
-            #     'kemungkinannya', 'kenapa', 'kepada', 'kepadanya', 'kesampaian', 'keseluruhan', 'keseluruhannya',
-            #     'keterlaluan', 'ketika', 'khususnya', 'kini', 'kinilah', 'kira', 'kira-kira', 'kiranya', 
-            #     'kita', 'kitalah', 'kok', 'kurang', 'lagi', 'lagian', 'lah', 'lain', 'lainnya', 'lalu', 'lama',
-            #     'lamanya', 'lanjut', 'lanjutnya', 'lebih', 'lewat', 'lima', 'luar', 'macam', 'maka', 'makanya',
-            #     'makin', 'malah', 'malahan', 'mampu', 'mampukah', 'mana', 'manakala', 'manalagi', 'masa', 
-            #     'masalah', 'masalahnya', 'masih', 'masihkah', 'masing', 'masing-masing', 'mau', 'maupun', 
-            #     'melainkan', 'melakukan', 'melalui', 'melihat', 'melihatnya', 'memang', 'memastikan', 
-            #     'memberi', 'memberikan', 'membuat', 'memerlukan', 'memihak', 'meminta', 'memintakan', 
-            #     'memisalkan', 'memperbuat', 'mempergunakan', 'memperkirakan', 'memperlihatkan', 'mempersiapkan',
-            #     'mempersoalkan', 'mempertanyakan', 'mempunyai', 'memulai', 'memungkinkan', 'menaiki', 
-            #     'menambahkan', 'menandaskan', 'menanti', 'menanti-nanti', 'menantikan', 'menanya', 'menanyai',
-            #     'menanyakan', 'mendapat', 'mendapatkan', 'mendatang', 'mendatangi', 'mendatangkan', 'menegaskan',
-            #     'mengakhiri', 'mengapa', 'mengatakan', 'mengatakannya', 'mengenai', 'mengerjakan', 'mengetahui',
-            #     'menggunakan', 'menghendaki', 'mengibaratkan', 'mengibaratkannya', 'mengingat', 'mengingatkan',
-            #     'menginginkan', 'mengira', 'mengucapkan', 'mengucapkannya', 'mengungkapkan', 'menjadi', 
-            #     'menjawab', 'menjelaskan', 'menuju', 'menunjuk', 'menunjuki', 'menunjukkan', 'menunjuknya',
-            #     'menurut', 'menuturkan', 'menyampaikan', 'menyangkut', 'menyatakan', 'menyebutkan', 'merasa',
-            #     'mereka', 'merekalah', 'merupakan', 'meski', 'meskipun', 'meyakini', 'meyakinkan', 'minta',
-            #     'mirip', 'misal', 'misalkan', 'misalnya', 'mula', 'mulai', 'mulailah', 'mulanya', 'mungkin',
-            #     'mungkinkah', 'nah', 'naik', 'namun', 'nanti', 'nantinya', 'nyaris', 'nyatanya', 'oleh',
-            #     'olehnya', 'pada', 'padahal', 'padanya', 'pak', 'paling', 'panjang', 'pantas', 'para', 'pasti',
-            #     'pastilah', 'penting', 'pentingnya', 'per', 'percuma', 'perlu', 'perlukah', 'perlunya',
-            #     'pernah', 'persoalan', 'pertama', 'pertama-tama', 'pertanyaan', 'pertanyakan', 'pihak',
-            #     'pihaknya', 'pukul', 'pula', 'pun', 'punya', 'rasa', 'rasanya', 'rata', 'rupanya', 'saat',
-            #     'saatnya', 'saja', 'sajalah', 'saling', 'sama', 'sama-sama', 'sambil', 'sampai', 'sampai-sampai',
-            #     'sampaikan', 'sana', 'sangat', 'sangatlah', 'satu', 'saya', 'sayalah', 'se', 'sebab', 'sebabnya',
-            #     'sebagai', 'sebagaimana', 'sebagainya', 'sebagian', 'sebaik', 'sebaik-baiknya', 'sebaiknya',
-            #     'sebaliknya', 'sebanyak', 'sebegini', 'sebegitu', 'sebelum', 'sebelumnya', 'sebenarnya',
-            #     'seberapa', 'sebesar', 'sebetulnya', 'sebisanya', 'sebuah', 'sebut', 'sebutlah', 'sebutnya',
-            #     'secara', 'secukupnya', 'sedang', 'sedangkan', 'sedemikian', 'sedikit', 'sedikitnya', 'seenaknya',
-            #     'segala', 'segalanya', 'segera', 'seharusnya', 'sehingga', 'seingat', 'sejak', 'sejauh',
-            #     'sejenak', 'sejumlah', 'sekadar', 'sekadarnya', 'sekali', 'sekali-kali', 'sekalian', 'sekaligus',
-            #     'sekalipun', 'sekarang', 'sekarang', 'sekecil', 'seketika', 'sekiranya', 'sekitar', 'sekitarnya',
-            #     'sekurang-kurangnya', 'sekurangnya', 'sela', 'selain', 'selaku', 'selalu', 'selama', 'selama-lamanya',
-            #     'selamanya', 'selanjutnya', 'seluruh', 'seluruhnya', 'semacam', 'semakin', 'semampu', 'semampunya',
-            #     'semasa', 'semasih', 'semata', 'semata-mata', 'semaunya', 'sementara', 'semisal', 'semisalnya',
-            #     'sempat', 'semua', 'semuanya', 'semula', 'sendiri', 'sendirian', 'sendirinya', 'seolah',
-            #     'seolah-olah', 'seorang', 'sepanjang', 'sepantasnya', 'sepantasnyalah', 'seperlunya',
-            #     'seperti', 'sepertinya', 'sepihak', 'sering', 'seringnya', 'serta', 'serupa', 'sesaat',
-            #     'sesama', 'sesampai', 'sesegera', 'sesekali', 'seseorang', 'sesuatu', 'sesuatunya',
-            #     'sesudah', 'sesudahnya', 'setelah', 'setempat', 'setengah', 'seterusnya', 'setiap', 'setiba',
-            #     'setibanya', 'setidak-tidaknya', 'setidaknya', 'setinggi', 'seusai', 'sewaktu', 'siap',
-            #     'siapa', 'siapakah', 'siapapun', 'sini', 'sinilah', 'soal', 'soalnya', 'suatu', 'sudah',
-            #     'sudahkah', 'sudahlah', 'supaya', 'tadi', 'tadinya', 'tahu', 'tahun', 'tak', 'tambah',
-            #     'tambahnya', 'tampak', 'tampaknya', 'tandas', 'tandasnya', 'tanpa', 'tanya', 'tanyakan',
-            #     'tanyanya', 'tapi', 'tegas', 'tegasnya', 'telah', 'tempat', 'tengah', 'tentang', 'tentu',
-            #     'tentulah', 'tentunya', 'tepat', 'terakhir', 'terasa', 'terbanyak', 'terdahulu', 'terdapat',
-            #     'terdiri', 'terhadap', 'terhadapnya', 'teringat', 'teringat-ingat', 'terjadi', 'terjadilah',
-            #     'terjadinya', 'terkira', 'terlalu', 'terlebih', 'terlihat', 'termasuk', 'ternyata', 'tersampaikan',
-            #     'tersebut', 'tersebutlah', 'tertentu', 'tertuju', 'terus', 'terutama', 'tetap', 'tetapi',
-            #     'tiap', 'tiba', 'tiba-tiba', 'tidak', 'tidakkah', 'tidaklah', 'tiga', 'tinggi', 'toh',
-            #     'tunjuk', 'turut', 'tutur', 'tuturnya', 'ucap', 'ucapnya', 'ujar', 'ujarnya', 'umum',
-            #     'umumnya', 'ungkap', 'ungkapnya', 'untuk', 'usah', 'usai', 'waduh', 'wah', 'wahai',
-            #     'waktu', 'waktunya', 'walau', 'walaupun', 'wong', 'yaitu', 'yakin', 'yakni', 'yang'
-            # }
-            
-            self.indonesian_stopwords = {
-            'ada', 'adalah', 'adanya', 'adapun', 'agak', 'akan', 'aku', 'saya',
-            'akulah', 'anda', 'ini', 'itu', 'dan', 'yang', 'di', 'ke', 'pada',
-            'untuk', 'dari', 'dengan', 'tidak', 'kita', 'mereka', 'kami',
-            'atau', 'tetapi', 'jika', 'maka', 'oleh', 'sebagai', 'karena',
-            'ketika', 'saat', 'tentang', 'sampai', 'hingga', 'hanya', 'juga'
+class BertAnsweringSystem:
+    def __init__(self):
+        """Inisialisasi model dan komponen yang diperlukan untuk sistem QA Bahasa Indonesia."""
+        logging.info("Memulai inisialisasi sistem QA Bahasa Indonesia...")
+        
+        # Model untuk pemahaman bahasa - menggunakan model multilingual yang mendukung bahasa Indonesia
+        self.qa_model_name = "deepset/xlm-roberta-base-squad2"
+        # Model embedding untuk retrieval - model multilingual yang mendukung bahasa Indonesia
+        self.embedding_model_name = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+        
+        logging.info(f"Loading QA model: {self.qa_model_name}")
+        self.qa_pipe = pipeline('question-answering', model=self.qa_model_name, tokenizer=self.qa_model_name)
+        
+        logging.info(f"Loading embedding model: {self.embedding_model_name}")
+        self.embedding_model = SentenceTransformer(self.embedding_model_name)
+        
+        # Model BERT untuk validasi jawaban dan perhitungan relevansi
+        logging.info("Loading model BERT untuk validasi jawaban")
+        self.bert_model_name = "indobenchmark/indobert-base-p1" # Model yang mendukung bahasa Indonesia
+        self.bert_tokenizer = AutoTokenizer.from_pretrained(self.bert_model_name)
+        self.bert_model = AutoModel.from_pretrained(self.bert_model_name)
+        
+        # Konstanta untuk scoring
+        self.CHUNK_OVERLAP = 150  # Meningkatkan overlap untuk konteks lebih baik
+        self.MIN_CHUNK_SIZE = 300
+        self.MAX_CHUNK_SIZE = 800  # Meningkatkan ukuran chunk untuk lebih banyak konteks
+        self.QA_WEIGHT = 0.55
+        self.RETRIEVAL_WEIGHT = 0.45
+        
+        # Deteksi level taksonomi Bloom
+        self.bloom_keywords = {
+            'remembering': ['apa', 'siapa', 'kapan', 'dimana', 'sebutkan', 'identifikasi', 'jelaskan', 'definisikan'],
+            'understanding': ['jelaskan', 'uraikan', 'bandingkan', 'bedakan', 'interpretasikan', 'simpulkan'],
+            'applying': ['terapkan', 'gunakan', 'demonstrasikan', 'ilustrasikan', 'hitung', 'selesaikan'],
+            'analyzing': ['analisis', 'mengapa', 'bagaimana', 'klasifikasikan', 'bandingkan', 'kontras', 'sebab', 'akibat'],
+            'evaluating': ['evaluasi', 'nilai', 'kritik', 'justifikasi', 'dukung', 'tolak', 'putuskan'],
+            'creating': ['buatlah', 'rancang', 'kembangkan', 'susun', 'formulasikan', 'hipotesis']
         }
-            self.stopwords.update(self.indonesian_stopwords)
-            
-            # Store last question for reference
-            self.last_question = ""
-            
-        except Exception as e:
-            print(f"Error initializing models: {e}")
-            print("Make sure you have installed transformers, torch, and sentence-transformers")
+        
+        logging.info("Inisialisasi sistem QA Bahasa Indonesia selesai!")
 
-    def read_pdf(self, file_path: str) -> str:
-        """
-        Enhanced PDF reader with better text extraction and layout preservation
-        """
+    def detect_bloom_level(self, question: str) -> str:
+        """Mendeteksi level taksonomi Bloom dari pertanyaan."""
+        question_lower = question.lower()
+        detected_levels = {}
+        
+        for level, keywords in self.bloom_keywords.items():
+            for keyword in keywords:
+                if keyword in question_lower:
+                    if level in detected_levels:
+                        detected_levels[level] += 1
+                    else:
+                        detected_levels[level] = 1
+        
+        if not detected_levels:
+            return 'remembering'  # default level
+        
+        # Return level dengan jumlah keyword terbanyak
+        return max(detected_levels.items(), key=lambda x: x[1])[0]
+
+    def load_pdf(self, pdf_path: str) -> str:
+        """Memuat dan mengekstrak teks dari file PDF."""
+        logging.info(f"Memuat PDF dari: {pdf_path}")
+        text = ""
         try:
-            document = ''
-            with pdfplumber.open(file_path) as pdf:
-                for page in pdf.pages:
-                    # Try to extract text with custom settings for better results
-                    text = page.extract_text(x_tolerance=3, y_tolerance=3)
-                    if text:
-                        # Better paragraph handling
-                        lines = text.split('\n')
-                        current_paragraph = []
-                        
-                        for line in lines:
-                            line = line.strip()
-                            if not line:  # Empty line indicates paragraph break
-                                if current_paragraph:
-                                    document += ' '.join(current_paragraph) + "\n\n"
-                                    current_paragraph = []
-                            else:
-                                # Check if this line is likely a continuation of previous
-                                if current_paragraph and not line[0].isupper() and not line[0].isdigit():
-                                    current_paragraph.append(line)
-                                else:
-                                    # If previous paragraph exists, add it
-                                    if current_paragraph:
-                                        document += ' '.join(current_paragraph) + "\n\n"
-                                    # Start new paragraph
-                                    current_paragraph = [line]
-                        
-                        # Add final paragraph if exists
-                        if current_paragraph:
-                            document += ' '.join(current_paragraph) + "\n\n"
-
-            if not document:
-                raise ValueError("No text was extracted from the PDF")
+            pdf_reader = PdfReader(pdf_path)
+            for page in pdf_reader.pages:
+                page_text = page.extract_text()
+                if page_text:  # Pastikan teks tidak kosong
+                    text += page_text + " "
             
-            # Apply enhanced PDF cleanup
-            document = self.fix_pdf_extraction_issues(document)
-            return document
+            # Menangani karakter khusus dan spacing
+            text = re.sub(r'\s+', ' ', text)
+            text = text.strip()
+            
+            logging.info(f"Berhasil mengekstrak {len(text)} karakter dari PDF")
+            return text
         except Exception as e:
-            print(f"Error reading PDF: {e}")
-            return ""
+            logging.error(f"Gagal memuat PDF: {str(e)}")
+            raise
 
-    def fix_pdf_extraction_issues(self, text):
-        """
-        Advanced PDF extraction fixes with better handling of various issues
-        """
-        # Fix CamelCase and hyphenation
-        text = re.sub(r'([a-z])([A-Z])', r'\1 \2', text)
+    def preprocess_text(self, text: str) -> str:
+        """Pra-pemrosesan teks untuk meningkatkan kualitas hasil."""
+        # Membersihkan teks
+        text = re.sub(r'\n+', ' ', text)  # Menghapus newlines
+        text = re.sub(r'\s+', ' ', text)  # Menghapus whitespace berlebih
+        text = re.sub(r'[^\w\s.,?!:;()\[\]{}"\'-]', '', text)  # Menghapus karakter aneh
         
-        # Fix missing spaces after punctuation
-        text = re.sub(r'([.,;:!?\)])([a-zA-Z0-9])', r'\1 \2', text)
-        text = re.sub(r'([a-zA-Z0-9])(\()', r'\1 \2', text)
-        
-        # Fix spaces around citations and references like [6]
-        text = re.sub(r'(\w)(\[\d+\])', r'\1 \2', text)
-        text = re.sub(r'(\[\d+\])(\w)', r'\1 \2', text)
-        
-        # Fix hyphenated words at line breaks that should be joined
-        text = re.sub(r'(\w+)-\s*\n\s*(\w+)', r'\1\2', text)
-        
-        # Fix split words (common OCR issue)
-        text = re.sub(r'(\w+)\s+(?=[a-z]{1,3}\s+[A-Z])', r'\1', text)
-        
-        # Handle bulleted lists better
-        text = re.sub(r'(\n\s*[•·-]\s*)', r'\n• ', text)
-        
-        # Handle page numbers and headers/footers
-        text = re.sub(r'\n\s*\d+\s*\n', r'\n', text)
-        
-        # Fix tables (basic approach)
-        text = re.sub(r'(\S)\s{3,}(\S)', r'\1 | \2', text)
-        
-        # Remove excessive whitespace
-        text = re.sub(r'\s+', ' ', text)
-        
-        # Fix common PDF extraction errors for Indonesian
-        text = text.replace(' nya ', ' -nya ')
-        text = text.replace(' lah ', ' -lah ')
-        text = text.replace(' pun ', ' -pun ')
-        
-        # Fix common spacing issues around punctuation
-        text = text.replace(' .', '.')
-        text = text.replace(' ,', ',')
-        text = text.replace(' :', ':')
-        text = text.replace(' ;', ';')
-        text = text.replace('( ', '(')
-        text = text.replace(' )', ')')
+        # Normalisasi tanda baca
+        text = re.sub(r'\.+', '.', text)  # Mengganti multiple dots dengan single dot
+        text = re.sub(r'\s+([.,;:!?])', r'\1', text)  # Menghapus space sebelum tanda baca
         
         return text.strip()
 
-    def preprocess_text(self, text: str) -> str:
-        """
-        Enhanced text preprocessing with better content preservation
-        """
-        # Keep more special characters that might be important for context
-        text = re.sub(r'[^\w\s\.,;:!?\'"\(\)\[\]\-–—]', ' ', text)
-        
-        # Fix CamelCase issues (words without spaces)
-        text = re.sub(r'([a-z])([A-Z])', r'\1 \2', text)
-        
-        # Better paragraph handling - preserve section breaks
-        paragraphs = re.split(r'\n\s*\n', text)
-        processed_paragraphs = []
-        
-        for para in paragraphs:
-            # Keep section headers (usually short lines followed by empty lines)
-            if len(para.strip()) < 100 and para.strip().isupper():
-                processed_paragraphs.append(para.strip())
-                continue
-                
-            # Clean paragraph
-            clean_para = re.sub(r'\s+', ' ', para).strip()
-            if clean_para:
-                processed_paragraphs.append(clean_para)
-                
-        return '\n\n'.join(processed_paragraphs)
-    
-    def create_semantic_chunks(self, text: str, chunk_size: int = 450, overlap: int = 200) -> list:
-        """
-        Create larger chunks with more context and better semantic meaning preservation
-        """
-        # Split into paragraphs first to preserve structure
-        paragraphs = text.split('\n\n')
+    def chunk_text(self, text: str) -> List[str]:
+        """Membagi teks menjadi chunk dengan overlap untuk konteks yang lebih baik."""
+        logging.info("Membagi teks menjadi chunk...")
+        sentences = sent_tokenize(text)
         chunks = []
-        current_chunk = []
-        current_size = 0
+        current_chunk = ""
         
-        for paragraph in paragraphs:
-            paragraph = paragraph.strip()
-            if not paragraph:
-                continue
-                
-            # Check if it's a section header
-            is_header = len(paragraph) < 100 and (paragraph.isupper() or 
-                                              paragraph.endswith(':') or 
-                                              not paragraph.endswith('.'))
-            
-            # Get approximate size (word count)
-            paragraph_size = len(paragraph.split())
-            
-            # Handle section headers separately to preserve document structure
-            if is_header:
-                # If we have content in the current chunk, save it before the new section
+        for sentence in sentences:
+            # Menambahkan kalimat ke chunk saat ini jika masih dalam batas ukuran
+            if len(current_chunk) + len(sentence) <= self.MAX_CHUNK_SIZE:
+                current_chunk += " " + sentence if current_chunk else sentence
+            else:
+                # Jika chunk sudah cukup besar, simpan dan mulai chunk baru
                 if current_chunk:
-                    chunks.append('\n\n'.join(current_chunk))
-                    current_chunk = []
-                    current_size = 0
-                
-                current_chunk.append(paragraph)
-                current_size = paragraph_size
-                continue
-            
-            # If adding this whole paragraph keeps us under chunk_size, add it all
-            if current_size + paragraph_size <= chunk_size:
-                current_chunk.append(paragraph)
-                current_size += paragraph_size
-            else:
-                # Process sentence by sentence
-                sentences = sent_tokenize(paragraph)
-                
-                # If a single sentence is too long, we need to handle it specially
-                if len(sentences) == 1 and paragraph_size > chunk_size:
-                    if current_chunk:
-                        chunks.append('\n\n'.join(current_chunk))
-                    # Split very long sentence into chunks (last resort)
-                    words = paragraph.split()
-                    for i in range(0, len(words), chunk_size):
-                        chunks.append(' '.join(words[i:i+chunk_size]))
-                    current_chunk = []
-                    current_size = 0
-                    continue
-                
-                for sentence in sentences:
-                    sentence_size = len(sentence.split())
-                    
-                    # If adding this sentence exceeds chunk size and we already have content
-                    if current_size + sentence_size > chunk_size and current_chunk:
-                        # Join current chunk and add to chunks
-                        chunks.append('\n\n'.join(current_chunk))
-                        
-                        # For overlap, keep some paragraphs from the end
-                        # that contain approximately 'overlap' words
-                        words_so_far = 0
-                        overlap_start = len(current_chunk)
-                        
-                        for i in range(len(current_chunk)-1, -1, -1):
-                            para_words = len(current_chunk[i].split())
-                            words_so_far += para_words
-                            if words_so_far >= overlap:
-                                overlap_start = i
-                                break
-                        
-                        current_chunk = current_chunk[overlap_start:]
-                        current_size = sum(len(p.split()) for p in current_chunk)
-                    
-                    # Add current sentence
-                    if not current_chunk:
-                        current_chunk = [sentence]
-                    else:
-                        if sentence_size > chunk_size//2:  # If sentence is very large
-                            current_chunk.append(sentence)  # Add as separate paragraph
-                        else:
-                            # Try to maintain paragraph structure
-                            if current_chunk[-1].endswith(('.', '!', '?')):
-                                current_chunk.append(sentence)
-                            else:
-                                current_chunk[-1] = current_chunk[-1] + ' ' + sentence
-                    current_size += sentence_size
+                    chunks.append(current_chunk.strip())
+                current_chunk = sentence
         
-        # Add the last chunk if it has content
+        # Menambahkan chunk terakhir jika tidak kosong
         if current_chunk:
-            chunks.append('\n\n'.join(current_chunk))
+            chunks.append(current_chunk.strip())
             
-        return chunks
-    
-    def retrieve_relevant_chunks(self, question: str, chunks: list, top_k: int = 8) -> list:
-        """
-        Enhanced retrieval with better semantic search
-        """
-        # Clean and enhance question
-        processed_question = self.enhance_question(question)
-        
-        # Encode the question and chunks
-        question_embedding = self.embedding_model.encode([processed_question])[0]
-        chunk_embeddings = self.embedding_model.encode(chunks)
-        
-        # Calculate similarities
-        similarities = cosine_similarity([question_embedding], chunk_embeddings)[0]
-        
-        # Get top-k chunks
-        top_indices = np.argsort(similarities)[-top_k:][::-1]
-        
-        # Return relevant chunks with scores
-        return [{"chunk": chunks[i], "relevance": float(similarities[i])} for i in top_indices]
-    
-    def enhance_question(self, question: str) -> str:
-        """
-        Enhance question to improve retrieval
-        """
-        # Clean the question
-        question = question.strip()
-        
-        # Add directive for better answers if not present
-        directives = ["berikan", "jelaskan", "explain", "give", "provide", "describe"]
-        if not any(question.lower().startswith(d) for d in directives) and not question.endswith('?'):
-            # Add question mark if missing
-            if not question.endswith('?'):
-                question += '?'
-            
-            # Detect language and add appropriate directive
-            if any(w in question.lower() for w in self.indonesian_stopwords):
-                question = f"Jelaskan secara lengkap: {question}"
+        # Menambahkan overlap antara chunk untuk konteks yang lebih baik
+        overlapped_chunks = []
+        for i in range(len(chunks)):
+            if i < len(chunks) - 1:
+                # Dapatkan beberapa kalimat dari chunk berikutnya
+                next_sentences = sent_tokenize(chunks[i+1])
+                overlap_text = " ".join(next_sentences[:3]) if len(next_sentences) >= 3 else chunks[i+1][:self.CHUNK_OVERLAP]
+                overlapped_chunks.append(chunks[i] + " " + overlap_text)
             else:
-                question = f"Explain thoroughly: {question}"
+                overlapped_chunks.append(chunks[i])
         
-        return question
-    
-    def extract_full_answer(self, context: str, question: str, answer_span: str) -> str:
-        """
-        Extract a more complete answer with better context preservation
-        """
-        # First check if the answer is already a complete sentence or paragraph
-        if answer_span.strip().endswith(('.', '!', '?')) and len(answer_span.split()) > 10:
-            # Check if it starts with lowercase and no capital letter
-            if answer_span[0].islower() and not any(c.isupper() for c in answer_span):
-                # Probably incomplete - find containing sentence
-                pass
+        # Tambahan: pastikan chunk tidak terlalu kecil dengan menggabungkan chunk yang pendek
+        final_chunks = []
+        current_chunk = ""
+        for chunk in overlapped_chunks:
+            if len(current_chunk) + len(chunk) <= self.MAX_CHUNK_SIZE * 1.2:
+                current_chunk += " " + chunk if current_chunk else chunk
             else:
-                # It's likely complete
-                return answer_span
+                if current_chunk:
+                    final_chunks.append(current_chunk.strip())
+                current_chunk = chunk
+        
+        if current_chunk:
+            final_chunks.append(current_chunk.strip())
+        
+        logging.info(f"Teks dibagi menjadi {len(final_chunks)} chunk")
+        return final_chunks
+
+    def get_embeddings(self, texts: List[str]) -> np.ndarray:
+        """Menghasilkan embeddings untuk list teks menggunakan model embedding."""
+        return self.embedding_model.encode(texts)
+
+    def calculate_relevance(self, question_embedding: np.ndarray, chunk_embeddings: np.ndarray) -> List[float]:
+        """Menghitung skor relevansi antara pertanyaan dan setiap chunk berdasarkan cosine similarity."""
+        similarity_scores = cosine_similarity([question_embedding], chunk_embeddings)[0]
+        return similarity_scores
+
+    def validate_answer(self, question: str, answer: str, context: str) -> Tuple[bool, float]:
+        """Memvalidasi jawaban menggunakan BERT untuk mengukur konsistensi."""
+        try:
+            # Encode question + context dan question + answer
+            inputs_context = self.bert_tokenizer(question, context, return_tensors="pt", truncation=True, max_length=512)
+            inputs_answer = self.bert_tokenizer(question, answer, return_tensors="pt", truncation=True, max_length=512)
             
-        # Try to find the complete sentence(s) containing the answer
+            # Get embeddings
+            with torch.no_grad():
+                outputs_context = self.bert_model(**inputs_context)
+                outputs_answer = self.bert_model(**inputs_answer)
+                
+            # Get CLS token embeddings
+            context_embedding = outputs_context.last_hidden_state[:, 0, :].numpy()
+            answer_embedding = outputs_answer.last_hidden_state[:, 0, :].numpy()
+            
+            # Hitung cosine similarity
+            similarity = cosine_similarity(context_embedding, answer_embedding)[0][0]
+            
+            # Jawaban valid jika similarity diatas threshold tertentu
+            valid = similarity > 0.65
+            return valid, similarity
+        except Exception as e:
+            logging.warning(f"Error validasi jawaban: {str(e)}")
+            return True, 0.7  # Default fallback
+
+    def generate_essay_answer(self, question: str, relevant_chunks: List[str], bloom_level: str) -> str:
+        """
+        Menghasilkan jawaban esai berdasarkan konteks yang relevan dan level taksonomi Bloom.
+        """
+        try:
+            # Gabungkan chunk-chunk yang relevan dengan batasan ukuran
+            combined_context = " ".join(relevant_chunks)
+            if len(combined_context) > 1500:
+                combined_context = combined_context[:1500]
+            
+            # Buat prompt yang sesuai dengan level taksonomi Bloom
+            if bloom_level in ['remembering', 'understanding']:
+                prompt = f"Berdasarkan informasi berikut, berikan jawaban detail dan komprehensif untuk pertanyaan: '{question}'. Jawaban harus lengkap dan informatif."
+            elif bloom_level == 'applying':
+                prompt = f"Berdasarkan informasi berikut, jelaskan secara lengkap bagaimana menerapkan konsep dalam pertanyaan: '{question}'. Sertakan contoh dan aplikasi praktis."
+            elif bloom_level == 'analyzing':
+                prompt = f"Berdasarkan informasi berikut, lakukan analisis mendalam untuk pertanyaan: '{question}'. Identifikasi komponen utama, hubungan antar konsep, dan berikan pemahaman yang mendalam."
+            elif bloom_level in ['evaluating', 'creating']:
+                prompt = f"Berdasarkan informasi berikut, berikan evaluasi kritis dan menyeluruh untuk pertanyaan: '{question}'. Sertakan argumen yang didukung bukti, kemungkinan solusi, dan kesimpulan."
+            else:
+                prompt = f"Berdasarkan informasi berikut, berikan jawaban komprehensif untuk pertanyaan: '{question}'."
+            
+            # Gunakan pipeline QA untuk mendapatkan jawaban awal
+            qa_result = self.qa_pipe(question=prompt, context=combined_context)
+            initial_answer = qa_result['answer']
+            
+            # Perluasan jawaban: Dapatkan jawaban lainnya dari chunk berbeda untuk memperkaya
+            additional_answers = []
+            for chunk in relevant_chunks[:3]:  # Ambil 3 chunk paling relevan
+                try:
+                    result = self.qa_pipe(question=question, context=chunk)
+                    if result['answer'] not in [initial_answer] + additional_answers:
+                        additional_answers.append(result['answer'])
+                except:
+                    continue
+            
+            # Gabungkan jawaban-jawaban untuk membuat esai yang lebih kaya
+            essay_parts = [initial_answer] + additional_answers
+            
+            # Gabungkan semua bagian menjadi esai yang koheren
+            if bloom_level in ['remembering', 'understanding']:
+                essay = self._construct_essay_remembering(question, essay_parts)
+            elif bloom_level == 'applying':
+                essay = self._construct_essay_applying(question, essay_parts, combined_context)
+            elif bloom_level == 'analyzing':
+                essay = self._construct_essay_analyzing(question, essay_parts, combined_context)
+            else:
+                essay = self._construct_essay_default(question, essay_parts)
+            
+            # Pastikan jawaban memiliki panjang minimum untuk esai (minimal 150 kata)
+            if len(word_tokenize(essay)) < 150:
+                # Tambahkan kalimat elaborasi jika terlalu pendek
+                essay = self._expand_answer(essay, combined_context, bloom_level)
+            
+            return essay
+            
+        except Exception as e:
+            logging.warning(f"Error generating essay: {str(e)}")
+            # Fallback ke jawaban sederhana jika generasi esai gagal
+            combined_context = " ".join(relevant_chunks[:2])
+            qa_result = self.qa_pipe(question=question, context=combined_context)
+            return self._expand_answer(qa_result['answer'], combined_context, "remembering")
+    
+    def _construct_essay_remembering(self, question: str, parts: List[str]) -> str:
+        """Menyusun esai untuk level remembering dan understanding."""
+        # Pembukaan
+        opening = f"Untuk menjawab pertanyaan '{question}', perlu dipahami beberapa konsep penting. "
+        
+        # Isi utama - gabungkan semua bagian dengan transisi yang tepat
+        main_content = ""
+        for i, part in enumerate(parts):
+            if i == 0:
+                main_content += part
+            else:
+                transition_phrases = [
+                    "Selain itu, ", "Lebih lanjut, ", "Penting juga untuk dicatat bahwa ", 
+                    "Dalam konteks ini, ", "Berdasarkan informasi yang ada, "
+                ]
+                transition = transition_phrases[i % len(transition_phrases)]
+                main_content += " " + transition + part[0].lower() + part[1:]
+        
+        # Penutup
+        closing = " Dengan demikian, dapat disimpulkan bahwa konsep ini merupakan aspek penting dalam memahami topik tersebut."
+        
+        essay = opening + main_content + closing
+        return essay
+    
+    def _construct_essay_applying(self, question: str, parts: List[str], context: str) -> str:
+        """Menyusun esai untuk level applying."""
+        # Cari kata kunci dari konteks untuk digunakan sebagai contoh aplikasi
+        keywords = re.findall(r'\b[A-Z][a-z]{5,}\b', context)
+        examples = [k for k in keywords if len(k) > 5][:3]
+        
+        # Pembukaan
+        opening = f"Dalam mengaplikasikan konsep yang ditanyakan dalam '{question}', kita perlu memahami prinsip-prinsip dasar dan bagaimana penerapannya dalam situasi nyata. "
+        
+        # Isi utama
+        main_content = " ".join(parts)
+        
+        # Tambahkan contoh aplikasi
+        application = " Penerapan konsep ini dapat dilihat dalam beberapa konteks. "
+        if examples:
+            application += f"Misalnya dalam kasus {', '.join(examples[:-1])}" 
+            if len(examples) > 1:
+                application += f" dan {examples[-1]}" 
+            application += ", prinsip-prinsip tersebut menjadi sangat relevan. "
+        
+        # Penutup
+        closing = " Dengan demikian, pemahaman yang mendalam tentang konsep ini memungkinkan kita untuk mengaplikasikannya secara efektif dalam berbagai situasi."
+        
+        essay = opening + main_content + application + closing
+        return essay
+    
+    def _construct_essay_analyzing(self, question: str, parts: List[str], context: str) -> str:
+        """Menyusun esai untuk level analyzing."""
+        # Pembukaan dengan penekanan pada analisis
+        opening = f"Analisis terhadap pertanyaan '{question}' memerlukan pemahaman mendalam tentang berbagai aspek yang saling berkaitan. "
+        
+        # Isi utama dengan struktur yang lebih analitis
+        main_parts = []
+        for i, part in enumerate(parts):
+            if i == 0:
+                main_parts.append(f"Pertama, {part}")
+            elif i == 1:
+                main_parts.append(f"Kedua, {part[0].lower()}{part[1:]}")
+            elif i == 2:
+                main_parts.append(f"Ketiga, {part[0].lower()}{part[1:]}")
+            else:
+                main_parts.append(f"Selain itu, {part[0].lower()}{part[1:]}")
+        
+        main_content = " ".join(main_parts)
+        
+        # Temukan hubungan atau implikasi
+        implications = " Beberapa implikasi penting dari analisis ini antara lain adalah pemahaman yang lebih mendalam tentang konsep yang dibahas, kemampuan untuk menerapkannya dalam konteks yang lebih luas, dan pengetahuan tentang keterkaitannya dengan aspek-aspek lain."
+        
+        # Penutup dengan kesimpulan analitis
+        closing = " Berdasarkan analisis di atas, dapat disimpulkan bahwa masalah ini memiliki kompleksitas yang memerlukan pemahaman dari berbagai sudut pandang."
+        
+        essay = opening + main_content + implications + closing
+        return essay
+    
+    def _construct_essay_default(self, question: str, parts: List[str]) -> str:
+        """Menyusun esai default untuk level lainnya."""
+        # Pembukaan
+        opening = f"Dalam menjawab pertanyaan '{question}', terdapat beberapa aspek penting yang perlu diperhatikan. "
+        
+        # Isi
+        main_content = " ".join(parts)
+        
+        # Penutup
+        closing = " Dengan memahami konsep-konsep tersebut, kita dapat memperoleh gambaran yang lebih komprehensif tentang topik yang dibahas."
+        
+        essay = opening + main_content + closing
+        return essay
+    
+    def _expand_answer(self, answer: str, context: str, bloom_level: str) -> str:
+        """Memperluas jawaban untuk memastikan panjang memadai untuk esai."""
+        # Ekstrak kalimat-kalimat dari konteks yang mungkin relevan
         sentences = sent_tokenize(context)
         
-        # Find sentences containing the answer_span
-        containing_sentences = [s for s in sentences if answer_span in s]
+        # Buat embedding untuk jawaban
+        answer_embedding = self.embedding_model.encode(answer)
         
-        if containing_sentences:
-            # If it's an essay question, we might want to include surrounding sentences
-            # Check if question suggests an essay answer (look for keywords)
-            essay_keywords = ['explain', 'describe', 'discuss', 'elaborate', 'analyze', 'why',
-                              'compare', 'contrast', 'evaluate', 'jelaskan', 'terangkan', 'mengapa',
-                              'bahas', 'bandingkan', 'analisis', 'bagaimana', 'how']
-            
-            is_essay_question = any(keyword in question.lower() for keyword in essay_keywords)
-            
-            # For essay questions, include more context
-            if is_essay_question:
-                # Find the index of the first containing sentence
-                for i, sentence in enumerate(sentences):
-                    if answer_span in sentence:
-                        # Include sentences before and after for context
-                        # Adjust the range based on the complexity of the question
-                        question_complexity = sum(1 for k in essay_keywords if k in question.lower())
-                        context_range = min(5, 2 + question_complexity)  # More context for complex questions
-                        
-                        start_idx = max(0, i - context_range)
-                        end_idx = min(len(sentences), i + context_range + 1)
-                        
-                        return ' '.join(sentences[start_idx:end_idx])
-            
-            # For non-essay questions or fallback
-            return ' '.join(containing_sentences)
+        # Cari kalimat yang mirip dengan jawaban
+        sentence_embeddings = self.embedding_model.encode(sentences)
+        similarities = cosine_similarity([answer_embedding], sentence_embeddings)[0]
         
-        # If we can't find the sentence, try to extract a paragraph
-        paragraphs = context.split('\n\n')
-        for paragraph in paragraphs:
-            if answer_span in paragraph:
-                # Check if the paragraph is too long
-                para_sentences = sent_tokenize(paragraph)
-                if len(para_sentences) > 12:  # Increased threshold for better context
-                    # Find the sentence with the answer and include some context
-                    for i, sentence in enumerate(para_sentences):
-                        if answer_span in sentence:
-                            start_idx = max(0, i - 3)
-                            end_idx = min(len(para_sentences), i + 4)
-                            return ' '.join(para_sentences[start_idx:end_idx])
-                return paragraph
+        # Ambil 3-5 kalimat yang paling relevan tapi belum ada di jawaban
+        relevant_sentences = []
+        for idx in similarities.argsort()[-10:][::-1]:
+            if sentences[idx] not in answer and len(relevant_sentences) < 5:
+                relevant_sentences.append(sentences[idx])
         
-        # If all else fails, return the original answer span
-        return answer_span
-    
-    def validate_answer(self, answer: str, question: str) -> bool:
+        # Tambahkan paragraf berdasarkan level bloom
+        if bloom_level in ['remembering', 'understanding']:
+            expanded = f"{answer} Penting untuk dicatat bahwa {relevant_sentences[0] if relevant_sentences else 'konsep ini memiliki aspek-aspek penting'}. "
+            if len(relevant_sentences) > 1:
+                expanded += f"Selain itu, {relevant_sentences[1]}. "
+            expanded += "Pemahaman yang mendalam tentang topik ini sangat penting dalam konteks pembelajaran yang lebih luas."
+            
+        elif bloom_level == 'applying':
+            expanded = f"{answer} Dalam praktiknya, {relevant_sentences[0] if relevant_sentences else 'konsep ini dapat diterapkan dalam berbagai situasi'}. "
+            if len(relevant_sentences) > 1:
+                expanded += f"Contoh penerapan lainnya adalah ketika {relevant_sentences[1].lower() if relevant_sentences[1][0].isupper() else relevant_sentences[1]}. "
+            expanded += "Kemampuan untuk mengaplikasikan konsep ini dalam berbagai konteks menunjukkan pemahaman yang mendalam."
+            
+        elif bloom_level == 'analyzing':
+            expanded = f"{answer} Analisis lebih lanjut menunjukkan bahwa {relevant_sentences[0] if relevant_sentences else 'terdapat beberapa komponen kunci dalam topik ini'}. "
+            if len(relevant_sentences) > 1:
+                expanded += f"Jika kita mengamati lebih detail, {relevant_sentences[1].lower() if relevant_sentences[1][0].isupper() else relevant_sentences[1]}. "
+            expanded += "Dengan memahami keterhubungan antar konsep, kita dapat memperoleh perspektif yang lebih holistik."
+            
+        else:
+            expanded = f"{answer} Perlu dipertimbangkan juga bahwa {relevant_sentences[0] if relevant_sentences else 'terdapat beberapa aspek penting dalam topik ini'}. "
+            if len(relevant_sentences) > 1:
+                expanded += f"{relevant_sentences[1]} "
+            if len(relevant_sentences) > 2:
+                expanded += f"Lebih lanjut, {relevant_sentences[2]}. "
+            expanded += "Dengan mempertimbangkan berbagai aspek ini, kita dapat memperoleh pemahaman yang komprehensif tentang topik yang dibahas."
+        
+        return expanded
+
+    def answer_question(self, context: str, question: str, top_k: int = 3) -> List[Dict[str, Any]]:
         """
-        Validate if an answer is complete and good quality
+        Menjawab pertanyaan berdasarkan konteks dengan mengembalikan top-k jawaban terbaik.
+        Dirancang khusus untuk menghasilkan jawaban esai yang komprehensif.
+        
+        Args:
+            context (str): Teks konteks lengkap (dari PDF)
+            question (str): Pertanyaan dalam bahasa Indonesia
+            top_k (int): Jumlah jawaban terbaik yang akan dikembalikan
+            
+        Returns:
+            List[Dict]: Daftar top-k jawaban dengan skor dan metadata terkait
         """
-        # Skip validation for very short questions - they might have short answers
-        if len(question.split()) < 5:
-            return True
-            
-        # Check if answer is too short (adjusted for complexity)
-        question_words = len(question.split())
-        min_answer_words = min(3, question_words // 3)
+        logging.info(f"Menjawab pertanyaan: '{question}'")
         
-        # Too short (basic heuristic)
-        if len(answer.split()) < min_answer_words:
-            return False
-            
-        # Check if answer ends abruptly (no ending punctuation)
-        if not answer.strip().endswith(('.', '!', '?', '"', '\'', ')', ']', ':')):
-            return False
-            
-        # Check if answer starts with conjunctions or other words suggesting incompleteness
-        starting_words = ['dan', 'atau', 'tetapi', 'namun', 'karena', 'sebab', 'sehingga', 
-                          'and', 'or', 'but', 'however', 'because', 'therefore', 'thus',
-                          'although', 'meskipun', 'walaupun', 'since', 'so', 'for', 'nor', 'yet']
-                          
-        # First word check (but allow for quoted text)
-        first_word = answer.lower().strip().split()[0] if answer.strip() else ""
-        if first_word and first_word[0] not in "\"'([{" and any(first_word == word for word in starting_words):
-            return False
-            
-        return True
-    
-    def format_answer_text(self, text: str) -> str:
-        """
-        Format answer text for better readability
-        """        
-        # Fix CamelCase (words without spaces)
-        text = re.sub(r'([a-z])([A-Z])', r'\1 \2', text)
+        # Deteksi level taksonomi Bloom
+        bloom_level = self.detect_bloom_level(question)
+        logging.info(f"Terdeteksi level taksonomi Bloom: {bloom_level}")
         
-        # Fix missing spaces after punctuation
-        text = re.sub(r'([.,;:!?])([a-zA-Z])', r'\1 \2', text)
-        
-        # Fix common spacing issues
-        text = text.replace(' .', '.').replace(' ,', ',').replace(' :', ':')
-        text = text.replace(' ;', ';').replace('( ', '(').replace(' )', ')')
-        
-        # Handle quotes more consistently
-        text = re.sub(r'([\'"])(\s+)', r'\1', text)  # No space after opening quote
-        text = re.sub(r'(\s+)([\'"])', r'\2', text)  # No space before closing quote
-        
-        # Normalize whitespace
-        text = re.sub(r'\s+', ' ', text).strip()
-        
-        # Make first letter uppercase if it's a complete sentence
-        if text and text[0].isalpha() and text[0].islower() and text[-1] in '.!?':
-            text = text[0].upper() + text[1:]
-            
-        return text
-    
-    def rerank_results(self, results, question):
-        """
-        Rerank results using cross-encoder
-        """
-        if not results or len(results) <= 1:
-            return results
-            
-        # Prepare pairs for cross-encoder
-        pairs = [(question, result['answer']) for result in results]
-        
-        # Get cross-encoder scores
-        rerank_scores = self.cross_encoder.predict(pairs)
-        
-        # Update scores
-        for i, result in enumerate(results):
-            # Balance between retrieval confidence and answer quality
-            old_score = result['combined_score']
-            cross_encoder_score = float(rerank_scores[i])
-            
-            # Combine scores (weighted average)
-            result['reranker_score'] = cross_encoder_score
-            result['final_score'] = 0.5 * old_score + 0.5 * cross_encoder_score
-            
-        # Sort by final score
-        results.sort(key=lambda x: x['final_score'], reverse=True)
-        
-        return results
-    
-    def answer_question(self, context: str, question: str, top_k: int = 3) -> list:
-        """
-        Answer a question given a context, with improved ranking and extraction
-        """
-        if not context:
-            print("Context is empty. Cannot answer the question.")
-            return []
-            
-        # Store current question
-        self.last_question = question
-        
-        # Preprocess the context
+        # Preprocess context dan bagi menjadi chunk
         processed_context = self.preprocess_text(context)
+        chunks = self.chunk_text(processed_context)
         
-        # Create semantic chunks with larger size for better context
-        chunks = self.create_semantic_chunks(processed_context, chunk_size=450, overlap=200)
+        # Mendapatkan embeddings
+        question_embedding = self.embedding_model.encode(question)
+        chunk_embeddings = self.get_embeddings(chunks)
         
-        # Retrieve relevant chunks with improved scoring
-        relevant_chunks = self.retrieve_relevant_chunks(question, chunks, top_k=min(8, len(chunks)))
+        # Menghitung relevance scores
+        relevance_scores = self.calculate_relevance(question_embedding, chunk_embeddings)
         
-        # Get answers from each relevant chunk
-        all_results = []
-        for chunk_info in relevant_chunks:
-            chunk = chunk_info["chunk"]
-            relevance = chunk_info["relevance"]
+        # Urutkan chunk berdasarkan relevansi
+        sorted_chunks_with_scores = sorted(zip(chunks, relevance_scores), key=lambda x: x[1], reverse=True)
+        
+        # Ambil chunk paling relevan untuk digunakan dalam generasi jawaban esai
+        top_relevant_chunks = [chunk for chunk, _ in sorted_chunks_with_scores[:5]]
+        
+        # Generate jawaban esai dari chunk-chunk yang relevan
+        essay_answer = self.generate_essay_answer(question, top_relevant_chunks, bloom_level)
+        
+        # Proses jawaban reguler dari setiap chunk untuk mendapatkan top-k
+        results = []
+        for i, (chunk, relevance) in enumerate(sorted_chunks_with_scores):
+            if i >= min(10, len(chunks)):  # Batasi hanya 10 chunk teratas
+                break
+                
+            logging.info(f"Mengevaluasi chunk {i+1}/{min(10, len(chunks))} (relevance: {relevance:.4f})")
             
+            # Gunakan QA pipeline untuk mendapatkan jawaban dari chunk
             try:
-                # Handle overly long chunks by splitting if necessary
-                if len(chunk.split()) > 500:  # If chunk is very large
-                    subchunks = self.create_semantic_chunks(chunk, chunk_size=400, overlap=100)
-                    # Use the most relevant subchunk
-                    subchunk_scores = cosine_similarity(
-                        [self.embedding_model.encode([question])[0]], 
-                        self.embedding_model.encode(subchunks)
-                    )[0]
-                    best_subchunk_idx = np.argmax(subchunk_scores)
-                    chunk = subchunks[best_subchunk_idx]
+                qa_result = self.qa_pipe(question=question, context=chunk)
+                answer = qa_result['answer']
                 
-                # Get answer from QA pipeline with better handling of impossible answers
-                qa_result = self.qa_pipeline({
-                    'question': question,
-                    'context': chunk,
-                })
+                # Untuk jawaban dari chunk, tambahkan konteks jika terlalu pendek
+                if len(word_tokenize(answer)) < 20:
+                    # Cari kalimat dari chunk yang berisi jawaban
+                    sentences = sent_tokenize(chunk)
+                    for sentence in sentences:
+                        if answer in sentence and sentence != answer:
+                            answer = sentence
+                            break
                 
-                # If confidence is too low, might be impossible question
-                if qa_result['score'] < 0.1:
-                    answer = "No answer found in the given context."
-                    is_valid = False
-                    combined_score = 0.1
+                # Validasi jawaban menggunakan BERT
+                is_valid, validation_score = self.validate_answer(question, answer, chunk)
+                
+                # Menghitung skor gabungan
+                qa_score = qa_result['score']
+                
+                # Berikan bobot lebih untuk jawaban yang lebih panjang (untuk mendukung format esai)
+                length_bonus = min(0.2, 0.01 * len(word_tokenize(answer)))
+                
+                combined_score = (self.QA_WEIGHT * qa_score) + (self.RETRIEVAL_WEIGHT * relevance) + length_bonus
+                
+                # Penyesuaian tambahan berdasarkan validasi BERT
+                if is_valid:
+                    combined_score *= (1.0 + 0.2 * validation_score)
                 else:
-                    # Extract a more complete answer
-                    full_answer = self.extract_full_answer(chunk, question, qa_result['answer'])
-                    
-                    # Format the answer for better readability
-                    formatted_answer = self.format_answer_text(full_answer)
-                    
-                    # Validate the answer
-                    is_valid = self.validate_answer(formatted_answer, question)
-                    
-                    # Adjust score based on answer quality
-                    answer_quality = 1.0 if is_valid else 0.5
-                    
-                    # Combine QA confidence with retrieval relevance and answer quality
-                    combined_score = 0.5 * qa_result['score'] + 0.4 * relevance + 0.1 * answer_quality
-                    
-                    answer = formatted_answer
+                    combined_score *= 0.7
                 
-                all_results.append({
+                # Tambahkan hasil ke daftar
+                results.append({
                     'answer': answer,
                     'original_answer': qa_result['answer'],
                     'qa_score': qa_result['score'],
                     'retrieval_score': relevance,
                     'combined_score': combined_score,
                     'chunk': chunk,
-                    'is_valid': is_valid
+                    'is_valid': is_valid,
+                    'bloom_level': bloom_level
                 })
                 
             except Exception as e:
-                print(f"Error processing chunk: {e}")
+                logging.warning(f"Error pada chunk {i+1}: {str(e)}")
+                continue
         
-        # Additional reranking with cross-encoder for better results
-        all_results = self.rerank_results(all_results, question)
+        # Tambahkan jawaban esai sebagai hasil teratas
+        essay_result = {
+            'answer': essay_answer,
+            'original_answer': essay_answer[:50] + "...",  # Untuk referensi saja
+            'qa_score': 0.95,  # Nilai tinggi karena ini adalah jawaban esai komprehensif
+            'retrieval_score': 0.95,
+            'combined_score': 0.95,  # Prioritaskan jawaban esai
+            'chunk': "combined_relevant_chunks",
+            'is_valid': True,
+            'bloom_level': bloom_level,
+            'is_essay': True
+        }
         
-        # Filter out invalid answers if we have enough valid ones
-        valid_results = [r for r in all_results if r['is_valid']]
+        # Gabungkan essay result dengan hasil regular dan pilih top-k
+        all_results = [essay_result] + results
+        top_results = sorted(all_results, key=lambda x: x['combined_score'], reverse=True)[:top_k]
         
-        if len(valid_results) >= top_k:
-            return valid_results[:top_k]
-        else:
-            # Fall back to all results if not enough valid ones
-            return all_results[:top_k]
-    
-    def process_pdf_question(self, pdf_path: str, question: str, top_k: int = 3):
+        logging.info(f"Berhasil menghasilkan {len(top_results)} jawaban terbaik")
+        return top_results
+
+    def postprocess_answers(self, answers: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
-        Process a question for a specific PDF file
+        Memperbaiki format dan kualitas jawaban akhir.
         """
-        # Read the PDF with improved extraction
-        context = self.read_pdf(pdf_path)
-        
-        if not context:
-            print("Failed to extract text from PDF.")
+        for i, answer_data in enumerate(answers):
+            # Perbaiki kapitalisasi dan tanda baca
+            answer = answer_data['answer']
+            
+            # Pastikan jawaban diakhiri dengan tanda baca yang tepat
+            if not answer.endswith(('.', '!', '?')):
+                answer += '.'
+            
+            # Pastikan huruf pertama kapital
+            if answer and len(answer) > 0:
+                answer = answer[0].upper() + answer[1:] if answer else answer
+            
+            # Hapus karakter khusus yang tidak diinginkan
+            answer = re.sub(r'[^\w\s.,?!:;()\[\]{}"\'-]', '', answer)
+            
+            # Perbaiki spasi setelah tanda baca
+            answer = re.sub(r'([.,;:!?])([A-Za-z])', r'\1 \2', answer)
+            
+            # Perbaiki kesalahan umum dalam bahasa Indonesia
+            answer = re.sub(r'\bdi bawah ini\b', 'berikut', answer)
+            answer = re.sub(r'\badalah merupakan\b', 'adalah', answer)
+            
+            answers[i]['answer'] = answer
+            
+        return answers
+
+    def process_pdf_query(self, pdf_path: str, question: str, top_k: int = 3) -> List[Dict[str, Any]]:
+        """
+        Fungsi utilitas untuk memproses query dari PDF dalam satu langkah.
+        """
+        try:
+            # Load dan proses PDF
+            context = self.load_pdf(pdf_path)
+            
+            # Dapatkan jawaban
+            results = self.answer_question(context, question, top_k)
+            
+            # Post-process jawaban
+            final_results = self.postprocess_answers(results)
+            
+            return final_results
+        except Exception as e:
+            logging.error(f"Error memproses query PDF: {str(e)}")
             return []
-            
-        # Get answers
-        return self.answer_question(context, question, top_k)
+
+
+# Contoh penggunaan
+if __name__ == "__main__":
+    qa_system = IndonesianQASystem()
     
-    def print_answers(self, results: list):
-        """
-        Print answers in a reader-friendly format
-        """
-        if not results:
-            print("No answers found.")
-            return
-            
-        print("\n===== ANSWERS =====\n")
-        for i, result in enumerate(results):
-            score_key = 'final_score' if 'final_score' in result else 'combined_score'
-            print(f"Answer {i+1} (Score: {result[score_key]:.2f}):")
-            print("-" * 50)
-            print(result['answer'])
-            print("\n" + "-" * 50)
-            
-        # Print best answer with context
-        best = results[0]
-        print("\nBEST ANSWER:")
-        print("=" * 50)
-        print(best['answer'])
-        print("\nFrom context:")
-        print("-" * 50)
-        highlighted = self.get_context_with_highlights(self.format_answer_text(best['chunk']), best['original_answer'])
-        print(highlighted)
-        print("=" * 50)
+    # Contoh dengan file PDF
+    pdf_path = "translated_67ff25827deef.pdf"
     
-    def get_context_with_highlights(self, chunk: str, answer: str) -> str:
-        """
-        Return context with highlighted answer for better readability
-        """
-        # Format the answer for better matching
-        formatted_answer = self.format_answer_text(answer)
-        
-        if formatted_answer in chunk:
-            highlighted = chunk.replace(formatted_answer, f"**{formatted_answer}**")
-            return highlighted
-        
-        # Try with original answer if formatted doesn't match
-        if answer in chunk:
-            highlighted = chunk.replace(answer, f"**{answer}**")
-            return highlighted
-            
-        # If exact match fails, try to find the approximate position
-        words = answer.split()
-        if len(words) >= 3:
-            # Use first and last words as anchors
-            first_word = words[0]
-            last_word = words[-1]
-            
-            start_pos = chunk.find(first_word)
-            end_pos = chunk.find(last_word, start_pos) + len(last_word)
-            
-            if start_pos >= 0 and end_pos > start_pos:
-                approx_context = chunk[:start_pos] + f"**{chunk[start_pos:end_pos]}**" + chunk[end_pos:]
-                return approx_context
-            
-        # Return the original if highlighting fails
-        return chunk
+    # Contoh pertanyaan berbagai level taksonomi Bloom
+    pertanyaan_samples = [
+        "Apa pengertian dari machine learning?",  # Remembering
+        "Jelaskan bagaimana machine learning bekerja?",  # Understanding
+        "Bagaimana cara menerapkan konsep machine learning dalam spam filtering?",  # Applying
+        "Analisis perbandingan antara supervised learning dan unsupervised learning.",  # Analyzing
 
-
-
+    ]
+    
+    # Proses salah satu pertanyaan
+    question = pertanyaan_samples[1]  # Pilih salah satu pertanyaan
+    print(f"\nMemproses pertanyaan: {question}")
+    
+    # Dapatkan dan tampilkan jawaban
+    results = qa_system.process_pdf_query(pdf_path, question)
+    
+    print("\n===== Hasil Top 3 Jawaban =====")
+    for i, result in enumerate(results):
+        print(f"\nJawaban #{i+1} (Skor: {result['combined_score']:.4f}, Level Bloom: {result['bloom_level']}):")
+        print(f"- {result['answer']}")
+        print(f"- Valid: {result['is_valid']}")
+        print(f"- Panjang jawaban: {len(word_tokenize(result['answer']))} kata")
+        if 'is_essay' in result and result['is_essay']:
+            print("- [Jawaban dalam format esai]")

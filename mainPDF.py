@@ -1,8 +1,10 @@
 # !pip install openai
 # !pip install pdfplumber
 # !pip install sklearn
-import google.generativeai as genai
+# import google.generativeai as genai
 import json
+import collections
+from typing import List, Dict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 import pdfplumber
@@ -13,14 +15,14 @@ with open('hidden.txt') as file:
     openai.api_key = file.read()
 
 
-with open('hidden2.txt') as file:
-    genai_api_key = file.read()
+# with open('hidden2.txt') as file:
+    # genai_api_key = file.read()
 
 
 # Setup API Client
 # genai.configure(api_key=GENAI_API_KEY)
 # deepseek_client = openai.OpenAI(api_key=DEEPSEEK_API_KEY)
-genai.configure(api_key=genai_api_key)
+# genai.configure(api_key=genai_api_key)
 
 
 # Fungsi untuk ekstraksi teks per halaman dari PDF
@@ -79,15 +81,24 @@ def generate_questions(prompt, page_text, temp=0.7, top_p=0.7, freq_penalty=0.5,
 
 def validate_json(data):
     required_keys = {"question", "category", "question_nouns"}
-    valid_categories = {"remembering", "understanding"}
-
-    if "questions" not in data or not isinstance(data["questions"], list):
+    valid_categories = {"remembering", "understanding", "applying", "analyzing"}
+    
+    if not isinstance(data, dict) or "questions" not in data:
         return False
-
-    for item in data["questions"]:
-        if not required_keys.issubset(item.keys()) or item["category"] not in valid_categories:
+        
+    questions = data["questions"]
+    if not isinstance(questions, list) or len(questions) != 8:
+        return False
+    
+    category_counts = collections.defaultdict(int)
+    for q in questions:
+        if not all(k in q for k in required_keys):
             return False
-    return True
+        if q["category"] not in valid_categories:
+            return False
+        category_counts[q["category"]] += 1
+    
+    return all(count == 2 for count in category_counts.values())
 
 # Template untuk pembuatan pertanyaan
 
@@ -100,43 +111,69 @@ def generate_prompt(content, noun_list=None):
     template += """
 
             ### Template Pertanyaan:
-                Berikut adalah template pertanyaan yang dapat digunakan:
+            Berikut adalah template pertanyaan yang dapat digunakan:
 
-                #### Remembering (Mengingat):
-                1. Apa itu …?
-                2. Di mana …?
-                3. Bagaimana ___ terjadi?
-                4. Mengapa …?
-                5. Bagaimana Anda akan menunjukkan …?
-                6. Yang mana …?
-                7. Bagaimana …?
-                8. Kapan ___ terjadi?
-                9. Bagaimana Anda akan menjelaskan …?
-                10. Bagaimana Anda akan menggambarkan..?
-                11. Bisakah Anda mengingat …?
-                12. Bisakah Anda memilih …?
-                13. Bisakah Anda menyebutkan tiga …?
-                14. Siapa yang …?
+            #### Remembering (Mengingat):
+            1. Apa itu …?
+            2. Di mana …?
+            3. Bagaimana ___ terjadi?
+            4. Mengapa …?
+            5. Bagaimana Anda akan menunjukkan …?
+            6. Yang mana …?
+            7. Bagaimana …?
+            8. Kapan ___ terjadi?
+            9. Bagaimana Anda akan menjelaskan …?
+            10. Bagaimana Anda akan menggambarkan..?
+            11. Bisakah Anda mengingat …?
+            12. Bisakah Anda memilih …?
+            13. Bisakah Anda menyebutkan tiga …?
+            14. Siapa yang …?
 
-                #### Understanding (Memahami):
-                1. Bagaimana Anda akan mengklasifikasikan jenis …?
-                2. Bagaimana Anda akan membandingkan …? Kontraskan …?
-                3. Akankah Anda menyatakan atau menafsirkan dengan kata-kata Anda sendiri …?
-                4. Bagaimana Anda akan memperbaiki makna …?
-                5. Fakta atau ide apa yang menunjukkan …?
-                6. Apa ide utama dari …?
-                7. Pernyataan mana yang mendukung …?
-                8. Bisakah Anda menjelaskan apa yang sedang terjadi …?
-                9. Apa yang dimaksud …?
-                10. Apa yang dapat Anda katakan tentang …?
-                11. Mana yang merupakan jawaban terbaik …?
-                12. Bagaimana Anda akan merangkum …?
+            #### Understanding (Memahami):
+            1. Bagaimana Anda akan mengklasifikasikan jenis …?
+            2. Bagaimana Anda akan membandingkan …? Kontraskan …?
+            3. Akankah Anda menyatakan atau menafsirkan dengan kata-kata Anda sendiri …?
+            4. Bagaimana Anda akan memperbaiki makna …?
+            5. Fakta atau ide apa yang menunjukkan …?
+            6. Apa ide utama dari …?
+            7. Pernyataan mana yang mendukung …?
+            8. Bisakah Anda menjelaskan apa yang sedang terjadi …?
+            9. Apa yang dimaksud …?
+            10. Apa yang dapat Anda katakan tentang …?
+            11. Mana yang merupakan jawaban terbaik …?
+            12. Bagaimana Anda akan merangkum …?
+            
+            #### Applying (Menerapkan):
+            1. Bagaimana Anda akan menggunakan ... dalam situasi nyata?
+            2. Teknik apa yang akan Anda gunakan untuk menyelesaikan ...?
+            3. Apa contoh nyata dari konsep ... dalam kehidupan sehari-hari?
+            4. Bagaimana konsep ... dapat diterapkan di bidang ...?
+            5. Dalam situasi seperti ..., bagaimana Anda akan menerapkan ...?
+            6. Alat atau metode apa yang cocok untuk menerapkan ...?
+            7 Berikan skenario di mana ... dapat digunakan secara efektif.
+            8 Apa langkah-langkah praktis untuk menerapkan ...?
+            9. Bagaimana Anda akan menyusun solusi menggunakan prinsip ...?
+            10. Bagaimana Anda mengadaptasi ... untuk digunakan di lingkungan yang berbeda?
+            11. Apa saja tantangan yang mungkin dihadapi saat menerapkan ...?
+            12. Jika Anda diberikan masalah ..., bagaimana Anda akan menyelesaikannya menggunakan ...?
+                        
+            ### Analyzing (Menganalisis):
+            1. Apa asumsi yang mendasari konsep ...?
+            2. Apa perbedaan antara ... dan ... dalam konteks ...?
+            3. Apa struktur logis dari penjelasan tentang ...?
+            4. Bagaimana bagian-bagian dari ... saling berhubungan?
+            5. Apa penyebab dan akibat dari ...?
+            6. Bagaimana Anda mengelompokkan informasi tentang ...?
+            7. Apa bukti yang mendukung atau melemahkan ...?
+            8. Bandingkan pendekatan A dan B dalam menyelesaikan ..., mana yang lebih efektif dan mengapa?
+            9. Apa pola yang dapat diidentifikasi dalam ...?
+            10. Apa kelemahan dalam argumen mengenai ...?
+            11. Bagaimana Anda mengevaluasi keakuratan informasi tentang ...?
+            12. Dalam struktur sistem ..., apa peran masing-masing komponen dan bagaimana mereka saling memengaruhi?
 
-        Dari masing-masing kategori di atas, buat 2 pertanyaan understanding dan 2 pertanyaan remembering SEHINGGA TOTAL SELURUH PERTANYAAN ADALAH 4 SOAL !!. JANGAN bertanya tentang sejarah yang hanya menyangkut waktu dan juga JANGAN MENGGUNAKAN TEMPLATE PERTANYAAN YANG SAMA LEBIH DARI 2X, tetapi Perluas/Perdalam materi berdasarkan kata-kata kunci yang dimasukkan pengguna.
+        Dari masing-masing kategori di atas, buat 2 pertanyaan remembering, 2 pertanyaan understanding, 2 pertanyaan applying, dan 2 pertanyaan analyzing SEHINGGA TOTAL SELURUH PERTANYAAN ADALAH 8 SOAL !!. JANGAN bertanya tentang sejarah yang hanya menyangkut waktu dan juga JANGAN MENGGUNAKAN TEMPLATE PERTANYAAN YANG SAMA LEBIH DARI 2X, tetapi Perluas/Perdalam materi berdasarkan kata-kata kunci yang dimasukkan pengguna.
         setelah Mengenerate pertanyaan. ekstrak semua nouns pada pertanyaan tersebut dan masukkan ke "question_nouns".
         FORMAT RESPONSE HARUS DALAM BENTUK JSON yang dapat di DECODE !!!  BERIKUT MERUPAKAN CONTOHNYA !!! :
-        
-         CONTOH JIKA BUKAN BAHASA JEPANG :
 
          "questions":[
                       {
@@ -156,98 +193,65 @@ def generate_prompt(content, noun_list=None):
                       }
                   ]
 
-        CONTOH JIKA BAHASA JEPANG
-
-        "questions": [
-                        {
-                            "question": "教師あり学習手法とは何ですか？",
-                            "category": "remembering",
-                            "question_nouns": ["学習手法", "アプローチ", "機械学習", "モデル", "データ", "入力", "出力"]
-                        },
-                        {
-                            "question": "機械学習において適切なモデルをどのように選択しますか？",
-                            "category": "remembering",
-                            "question_nouns": ["モデル", "機械学習", "データ", "目標", "性能", "複雑さ", "一般化", "適応"]
-                        },
-                        {
-                            "question": "機械学習において交差検証が重要なのはなぜですか？",
-                            "category": "understanding",
-                            "question_nouns": ["交差検証", "モデル", "性能", "データ", "サブセット"]
-                        }
-                    ]
-
         """
     return template
-
-# Fungsi utama untuk memproses halaman PDF dan menghasilkan JSON
-
 
 MAX_RETRY = 3  # Batas percobaan untuk regenerasi pertanyaan
 
 # Fungsi utama untuk memproses halaman PDF dan menghasilkan JSON
 
 
-def process_page(page_num, text, content, nouns, tfidf_terms, tfidf_embeddings, retry_count=0):
-    # Buat prompt dan dapatkan respons pertanyaan
-    prompt = generate_prompt(content, nouns)
-    response = generate_questions(prompt, text)
-
-    # # Proses tfidf_terms untuk mendapatkan embedding n-gram
-    # combined_terms = tfidf_terms['uni'] + \
-    #     tfidf_terms['bi'] + tfidf_terms['tri']
-    # ngrams = [term['N-gram']
-    #           for term in combined_terms if isinstance(term, dict) and 'N-gram' in term]
-    # tfidf_embeddings = [get_embedding(ngram) for ngram in ngrams]
-
-    try:
-        # Parsing response JSON
-        data = json.loads(response)
-
-        # Validasi struktur JSON; jika gagal, lakukan regenerasi
-        if not validate_json(data):
-            raise ValueError(f"Invalid JSON structure for page {page_num}")
-
-        questions_data = []
-        question_noun_embeddings = {}
-
-        # Buat embedding dari setiap question_noun satu kali
-        for question in data['questions']:
-            for noun in question['question_nouns']:
-                if noun not in question_noun_embeddings:
-                    question_noun_embeddings[noun] = get_embedding(noun)
-
-        # Proses setiap pertanyaan
-        for question in data['questions'][:2]:
-            question_text = question['question']
-            question_embedding = get_embedding(question_text)
-
-
-            # Hitung avg_similarity menggunakan embedding yang sudah dihitung
-            avg_similarity = sum(
-                cosine_sim(question_noun_embeddings[n], t_embedding)
-                for n in question['question_nouns'] for t_embedding in tfidf_embeddings
-            ) / (len(question['question_nouns']) * len(tfidf_embeddings))
-
-            question['cosine_q&d'] = avg_similarity
-            question['page_number'] = page_num + 1
-
-            questions_data.append(question)
+def process_page(page_num, text, content, nouns, tfidf_embeddings):
+    MAX_ATTEMPTS = 3
+    questions = []
+    
+    for attempt in range(MAX_ATTEMPTS):
+        try:
+            prompt = generate_prompt(content, nouns)
+            response = generate_questions(prompt, text[:3000])  # Limit input size
             
+            # Basic validation before JSON parse
+            if not response.strip().startswith("{"):
+                response = "{" + response.split("{", 1)[-1]  # Fix common formatting issue
             
+            data = json.loads(response)
+            
+            if validate_json(data):
+                # Process all 8 questions (not just 2)
+                page_questions = []
+                for q in data['questions']:
+                    q['page_number'] = page_num + 1
+                    q['cosine_q&d'] = calculate_similarity(q, tfidf_embeddings)
+                    page_questions.append(q)
+                
+                # Ensure we got 2 per category
+                categories = collections.defaultdict(int)
+                for q in page_questions:
+                    categories[q['category']] += 1
+                
+                if all(count >= 2 for count in categories.values()):
+                    questions.extend(page_questions)
+                    break
+                
+        except Exception as e:
+            print(f"Attempt {attempt+1} failed: {str(e)}")
+            if attempt == MAX_ATTEMPTS - 1:
+                print(f"Failed after {MAX_ATTEMPTS} attempts for page {page_num}")
+    
+    return questions
 
-        data['questions'] = questions_data
-        return data
-
-    except (json.JSONDecodeError, ValueError) as e:
-        print(f"Error processing page {page_num}: {e}")
-        if retry_count < MAX_RETRY:
-            print(
-                f"Retrying page {page_num} (Attempt {retry_count + 1}) due to validation failure.")
-            return process_page(page_num, text, content, nouns, tfidf_terms, tfidf_embeddings, retry_count + 1)
-        else:
-            print(
-                f"Failed to process page {page_num} after {MAX_RETRY} attempts due to validation failure.")
-            return None
+def calculate_similarity(question, tfidf_embeddings):
+    # Simplified similarity calculation
+    noun_embeddings = [get_embedding(noun) for noun in question['question_nouns']]
+    if not noun_embeddings or not tfidf_embeddings:
+        return 0
+    
+    similarities = []
+    for noun_emb in noun_embeddings:
+        for tfidf_emb in tfidf_embeddings:
+            similarities.append(cosine_sim(noun_emb, tfidf_emb))
+    
+    return sum(similarities) / len(similarities) if similarities else 0
 
 
 # Fungsi utama yang memproses seluruh halaman dalam PDF dan mengembalikan JSON
@@ -272,32 +276,28 @@ def generate_questions_from_pdf(pdf_file, tfidf_data, top_n=10, language="Indone
               for term in combined_terms if isinstance(term, dict) and 'N-gram' in term]
     tfidf_embeddings = [get_embedding(ngram) for ngram in ngrams]
     # Inisialisasi ThreadPoolExecutor untuk memproses halaman secara paralel
-    with ThreadPoolExecutor() as executor:
+    with ThreadPoolExecutor(max_workers=3) as executor:
         futures = []
 
         # Buat future untuk setiap halaman PDF yang akan diproses
         for page_num, page_text in enumerate(texts):
-            # Urutkan berdasarkan Cosine Similarity, lalu ambil top 10
-            combined_terms = tfidf_data['uni'] + \
-                tfidf_data['bi'] + tfidf_data['tri']
+            nouns = [term['N-gram'] for term in 
+                   sorted(tfidf_data['uni'] + tfidf_data['bi'] + tfidf_data['tri'],
+                   key=lambda x: x['Cosine Similarity'], reverse=True)[:top_n]]
+            
+            futures.append(executor.submit(
+                process_page, page_num, page_text, content, nouns, tfidf_embeddings
+            ))
+        
+        for future in tqdm(as_completed(futures), total=len(futures)):
+            all_questions.extend(future.result())
 
-            # Urutkan berdasarkan Cosine Similarity dan ambil top N
-            top_tfidf_terms = sorted(
-                combined_terms, key=lambda x: x['Cosine Similarity'], reverse=True)[:top_n]
-            # print(top_tfidf_terms)
-            # Konversi kolom 'N-gram' menjadi list
-            nouns = [term['N-gram'] for term in top_tfidf_terms]
-
-            # Submit setiap halaman untuk diproses secara paralel
-            futures.append(executor.submit(process_page, page_num,
-                           page_text, content, nouns, tfidf_data, tfidf_embeddings))
-
-        # Tampilkan progress bar saat setiap future selesai diproses
-        with tqdm(total=len(futures), desc="Generating Questions", leave=False) as pbar:
-            for future in as_completed(futures):
-                result = future.result()
-                if result:
-                    all_questions.extend(result['questions'])
-                pbar.update(1)
-
-    return json.dumps(all_questions, ensure_ascii=False, indent=4)
+        unique_questions = []
+        seen = set()
+        for q in all_questions:
+            ident = (q['question'], q['category'])
+            if ident not in seen:
+                seen.add(ident)
+                unique_questions.append(q)
+        
+        return json.dumps(unique_questions, ensure_ascii=False, indent=2)
