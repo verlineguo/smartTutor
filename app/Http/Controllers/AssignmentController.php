@@ -7,15 +7,19 @@ use App\Models\Question;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use App\Models\AnswerUser;
+use App\Models\Gram;
 use App\Models\PageNoun;
 use App\Models\Plagiarism;
 use App\Models\Topic;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
 class AssignmentController extends Controller
 {
+    
+
     public function getAvailableLanguages($topicGuid)
     {
         // Ambil bahasa unik dari tabel pertanyaan berdasarkan topik
@@ -83,7 +87,6 @@ class AssignmentController extends Controller
                     'cosine_similarity' => $item->cosine,
                     'jaccard_similarity' => $item->jaccard,
                     'bert_score' => $item->bert,
-                    'highlighted_text' => $item->highlighted_text,
                     'average' => ($item->cosine + $item->jaccard + $item->bert) / 3,
                 ];
             }
@@ -106,8 +109,8 @@ class AssignmentController extends Controller
     public function getUserProgress($userId, $topicGuid)
     {
         try {
-            // First get questions that belong to this topic
-            $topicQuestions = Question::where('topic_id', $topicGuid)->pluck('guid');
+            // Get questions for this topic
+            $topicQuestions = Question::where('topic_guid', $topicGuid)->pluck('guid');
 
             if ($topicQuestions->isEmpty()) {
                 return response()->json([
@@ -116,8 +119,11 @@ class AssignmentController extends Controller
                 ]);
             }
 
-            // Find the most recent answer submitted by this user for any question in this topic
-            $latestAnswer = AnswerUser::where('user_id', $userId)->whereIn('question_guid', $topicQuestions)->orderBy('created_at', 'desc')->first();
+            // Find the most recent answer by this user
+            $latestAnswer = AnswerUser::where('user_id', $userId)
+                ->whereIn('question_guid', $topicQuestions)
+                ->orderBy('created_at', 'desc')
+                ->first();
 
             if (!$latestAnswer) {
                 return response()->json([
@@ -126,15 +132,17 @@ class AssignmentController extends Controller
                 ]);
             }
 
-            // Get the question to determine language
+            // Get the question to determine language and level
             $question = Question::where('guid', $latestAnswer->question_guid)->first();
 
-            // Return language and last page information
+            // Return language, last page, and level information
             return response()->json([
                 'success' => true,
                 'data' => [
                     'language' => $question->language,
                     'lastPage' => $latestAnswer->page,
+                    'currentLevel' => $question->category ?? 'remembering',
+                    'correctStreak' => $latestAnswer->streak ?? 0
                 ],
             ]);
         } catch (\Exception $e) {
@@ -148,30 +156,51 @@ class AssignmentController extends Controller
         }
     }
 
-    public function getAnswerHistory($userId, $topicGuid)
+    // Get history of answers for a user and topic
+    public function getHistory($userId, $topicGuid)
     {
         try {
-            $history = AnswerUser::where('user_id', $userId)
-                ->where('topic_guid', $topicGuid)
-                ->join('questions', 'answer_user.question_guid', '=', 'questions.guid')
-                ->orderBy('answer_user.created_at', 'desc')
-                ->get(['answer_user.*', 'questions.question', 'questions.question_fix', 'questions.threshold']);
+            $history = AnswerUser::with([
+                'question' => function ($query) use ($topicGuid) {
+                    $query->where('topic_guid', $topicGuid)->select('guid', 'question_fix', 'category');
+                },
+            ])
+                ->where('user_id', $userId)
+                ->whereHas('question', function ($query) use ($topicGuid) {
+                    $query->where('topic_guid', $topicGuid);
+                })
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'guid' => $item->guid,
+                        'answer' => $item->answer,
+                        'question_guid' => $item->question_guid,
+                        'page' => $item->page,
+                        'cosine_similarity' => $item->cosine_similarity,
+                        'created_at' => $item->created_at,
+                        'question' => $item->question->question_fix ?? null,
+                        'category' => $item->question->category ?? null,
+                        'streak' => $item->streak ?? 0,
+                    ];
+                });
 
             return response()->json([
-                'status' => 'success',
+                'success' => true,
                 'data' => $history,
             ]);
         } catch (\Exception $e) {
             return response()->json(
                 [
-                    'status' => 'error',
-                    'message' => $e->getMessage(),
+                    'success' => false,
+                    'message' => 'Failed to retrieve history: ' . $e->getMessage(),
                 ],
                 500,
             );
         }
     }
 
+    // Submit and evaluate an answer
     public function submitAnswer(Request $request)
     {
         // Validate request
@@ -179,8 +208,9 @@ class AssignmentController extends Controller
             'user_id' => 'required|string',
             'question_guid' => 'required|string',
             'answer' => 'required|string',
-            'page' => 'required|integer',
             'topic_guid' => 'required|string',
+            'current_level' => 'required|string',
+            'correct_streak' => 'required|integer',
         ]);
 
         if ($validator->fails()) {
@@ -213,103 +243,78 @@ class AssignmentController extends Controller
             $userAnswer->user_id = $request->user_id;
             $userAnswer->question_guid = $request->question_guid;
             $userAnswer->answer = $request->answer;
-            $userAnswer->page = $request->page;
+            $userAnswer->current_level = $request->current_level;
+            $userAnswer->streak = $request->correct_streak;
             $userAnswer->save();
 
-            $question = Question::where('guid', $request->question_guid)->first();
-            if (!$question) {
-                return response()->json(
-                    [
-                        'status' => false,
-                        'message' => 'Question not found',
-                    ],
-                    404,
-                );
-            }
+       
+            // Evaluate the answer
+            $evaluationResult = $this->evaluateAnswer([
+                'reference_answer' => $question->answer_fix,
+                'user_answer' => $request->answer,
+                'current_level' => $request->current_level,
+            ]);
+    
 
-            $pdfAnswer = AnswerPDF::where('guid', $question->answer_pdf_guid)->first();
-            if (!$pdfAnswer) {
-                return response()->json(
-                    [
-                        'status' => false,
-                        'message' => 'PDF answer not found',
-                    ],
-                    404,
-                );
-            }
-
-            $similarityResult = $this->calculateCosineSimilarity($request->answer, $pdfAnswer->answer, $question->page, $question->topic_guid, $question->language, $question->question_fix);
-
-            $similarity_score = $similarityResult['similarity_score'];
-
-            $noun_cosine_data = $similarityResult['noun_cosine_data'];
-
-            $userAnswer->update(['cosine_similarity' => $similarity_score]);
-
-            $similarityMessage = '<p><strong>Cosine Similarity Score:</strong> ' . number_format($similarity_score, 2) . '%</p>';
-            // Menambahkan data cosine similarity per noun
-            if (!empty($noun_cosine_data)) {
-                // Sorting noun_cosine_data berdasarkan cosine_answer
-                $noun_cosine_data = collect($noun_cosine_data)->sortByDesc('cosine_similarity')->values()->toArray();
-
-                $similarityMessage .= '<ul>';
-                foreach ($noun_cosine_data as $nounData) {
-                    $similarityMessage .= '<li><strong>Noun:</strong> ' . htmlspecialchars($nounData['noun']) . ' - <strong>Similarity Page:</strong> ' . number_format($nounData['cosine_similarity'] * 100, 2) . '% - ';
+            $isCorrect = $evaluationResult['is_correct'] ?? false;
+            $currentStreak = $request->correct_streak;
+            $currentLevel = $request->current_level;
+            
+            // Handle streak and level progression
+            if ($isCorrect) {
+                $currentStreak++;
+                // Check if should level up
+                if ($currentStreak >= 4) {
+                    $levels = ["remembering", "understanding", "applying", "analyzing"];
+                    $currentIndex = array_search($currentLevel, $levels);
+                    
+                    if ($currentIndex < count($levels) - 1) {
+                        $currentLevel = $levels[$currentIndex + 1];
+                        $currentStreak = 0;
+                    }
                 }
-                $similarityMessage .= '</ul>';
-            }
-            if ($similarity_score >= $question->threshold) {
-                return response()->json([
-                    'status' => 'success',
-                    'nextPage' => $request->page + 1,
-                    'similarityMessage' => $similarityMessage,
-                    'similarity_score' => $similarity_score,
-                    'threshold' => $question->threshold,
-                    'noun_cosine_data' => $noun_cosine_data,
-                    'data' => [
-                        'user_answer_guid' => $userAnswer->guid,
-                    ],
-                ]);
             } else {
-                $askedQuestions = AnswerUser::join('questions', 'answer_user.question_guid', '=', 'questions.question_guid')
-                ->where('answer_user.user_id', $request->user_id)
-                ->where('questions.topic_guid', $request->topic_guid)
-                ->where('answer_user.page', $request->page)
-                ->pluck('answer_user.question_guid')
-                ->toArray();
-                $remainingQuestions = Question::where('topic_guid', $request->topic_guid)->where('page', $request->page)->where('language', $question->language)->whereNotIn('guid', $askedQuestions)->get();
-
-                if ($remainingQuestions->isEmpty()) {
-                    // No questions left - offer regeneration
-                    return response()->json([
-                        'status' => 'no_questions_left',
-                        'message' => 'No remaining questions. Would you like to regenerate with GPT?',
-                        'similarityMessage' => $similarityMessage,
-                        'similarity_score' => $similarity_score,
-                        'threshold' => $question->threshold,
-                        'data' => [
-                            'user_answer_guid' => $userAnswer->guid,
-                        ],
-                    ]);
-                } else {
-                    // Get next random question
-                    $nextQuestion = $remainingQuestions->random();
-
-                    // Return retry response
-                    return response()->json([
-                        'status' => 'retry',
-                        'nextQuestion' => $nextQuestion->question_fix,
-                        'nextQuestionGuid' => $nextQuestion->guid,
-                        'similarityMessage' => $similarityMessage,
-                        'similarity_score' => $similarity_score,
-                        'threshold' => $question->threshold,
-                        'noun_cosine_data' => $noun_cosine_data,
-                        'data' => [
-                            'user_answer_guid' => $userAnswer->guid,
-                        ],
-                    ]);
+                // Decrease streak on failure
+                $currentStreak = max(0, $currentStreak - 1);
+                
+                // Drop level if streak is zero and not at lowest level
+                if ($currentStreak == 0 && $currentLevel !== "remembering") {
+                    $levels = ["remembering", "understanding", "applying", "analyzing"];
+                    $currentIndex = array_search($currentLevel, $levels);
+                    $currentLevel = $levels[max(0, $currentIndex - 1)];
                 }
             }
+            
+            
+            // Update user answer with evaluation results
+            $userAnswer->update([
+                'is_correct' => $evaluationResult['is_correct'],
+                'streak' => $currentStreak,
+                'evaluation_scores' => $evaluationResult['combined_score'],
+            ]);
+
+            
+
+            // Get next question based on user's new level
+            $nextQuestion = $this->getNextQuestion(
+                $request->user_id, 
+                $request->topic_guid, 
+                $question->language, 
+                $currentLevel
+            );
+
+            return response()->json([
+                'status' => 'success',
+                'is_correct' => $evaluationResult['is_correct'],
+                'new_streak' => $currentStreak,
+                'new_level' => $currentLevel,
+                'nextQuestion' => $nextQuestion ? $nextQuestion->question_fix : null,
+                'nextQuestionGuid' => $nextQuestion ? $nextQuestion->guid : null,
+                'evaluation' => $evaluationResult,
+                'data' => [
+                    'user_answer_guid' => $userAnswer->guid,
+                ],
+            ]);
         } catch (\Exception $e) {
             Log::error('Error processing submission: ' . $e->getMessage());
 
@@ -324,193 +329,80 @@ class AssignmentController extends Controller
         }
     }
 
-
-    public function regenerateQuestions(Request $request)
-    {
-        set_time_limit(2000);
-
-        // Validasi input dari pengguna
-        $validated = $request->validate([
-            'user_id' => 'required|string',
-            'topic_guid' => 'required|string',
-            'page' => 'required|integer',
-            'regenerate' => 'required|string',  // Validate regenerate as string ('true' or 'false')
-        ]);
-
-        // Convert regenerate string ('true'/'false') to boolean
-        $isRegenerate = filter_var($validated['regenerate'], FILTER_VALIDATE_BOOLEAN);
-
-        // Ambil topik berdasarkan topic_guid
-        $topic = Topic::where('guid', $validated['topic_guid'])->first();
-        if (!$topic) {
-            return response()->json(['status' => 'error', 'message' => 'Topic not found.']);
-        }
-
-        // Ambil attempt terakhir yang digunakan oleh user_id untuk topik ini
-        $userLastAttempt = Question::where('user_id', $validated['user_id'])
-            ->where('topic_guid', $validated['topic_guid'])
-            ->max('attempt'); // Cari nilai attempt tertinggi
-
-        // Tentukan attempt saat ini
-        $currentAttempt = $userLastAttempt ? $userLastAttempt + 1 : 1;
-
-        // Cek apakah attempt yang diizinkan masih ada
-        if ($currentAttempt > $topic->max_attempt_gpt) {
-            return response()->json([
-                'status' => 'no_attempts_left',
-                'message' => 'You have reached the maximum attempts for this topic. Proceeding without regeneration.',
-            ]);
-        }
-
-        // Jika regenerasi diinginkan dan masih ada sisa attempt
-        if ($isRegenerate) {
-            // Proses regenerasi pertanyaan
-            $askedQuestions = AnswerUser::where('user_id', $validated['user_id'])
-                ->where('topic_guid', $validated['topic_guid'])
-                ->where('page', $validated['page'])
-                ->pluck('question_guid')
-                ->toArray();
-
-            // Ambil pertanyaan yang sudah diajukan berdasarkan GUID
-            $existingQuestions = Question::whereIn('guid', $askedQuestions)
-                ->pluck('question_fix')
-                ->toArray();
-
-            // Ambil path file PDF dari topik
-            $pdf_file_path = $topic->file_path;
-
-            // Menentukan path lengkap menggunakan storage_path
-            $full_pdf_path = storage_path('app/public/' . $pdf_file_path);
-
-            // Memeriksa apakah file PDF ada
-            if (!file_exists($full_pdf_path)) {
-                // Mengembalikan response error jika file tidak ditemukan
-                return response()->json(['status' => 'error', 'message' => 'PDF file not found at ' . $full_pdf_path]);
-            }
-
-            // Mengambil konten file PDF
-
-            // Ambil data terakhir dari tabel chathistory untuk user_id dan topic_guid yang sesuai
-            $lastAnswer = AnswerUser::where('user_id', $validated['user_id'])
-                ->where('topic_guid', $validated['topic_guid'])
-                ->orderBy('created_at', 'desc')
-                ->first();
-
-            // Jika ada record chathistory terakhir, ambil question_guid-nya
-            if ($lastAnswer) {
-                $questionGuidFromHistory = $lastAnswer->question_guid;
-
-                // Cari threshold berdasarkan question_guid dari tabel question
-                $lastQuestion = Question::where('guid', $questionGuidFromHistory)->first();
-                $language = $lastQuestion->language;
-
-                // Tentukan nilai threshold dari pertanyaan terakhir
-                $threshold = $lastQuestion ? $lastQuestion->threshold : null;
-            } else {
-                // Jika tidak ada record chathistory, threshold bisa null atau nilai default lainnya
-                $threshold = null;
-            }
-
-            // Kirim file PDF ke Flask untuk mendapatkan pertanyaan baru
-            $response = Http::attach('pdf', file_get_contents($full_pdf_path), 'file.pdf')
-                ->timeout(1500)
-                ->post(env('FLASK_API_URL') . '/regenerate', [
-                    'page' => $validated['page'],
-                    'language' => $language,
-                    'existing_questions' => json_encode($existingQuestions), // Encode array to JSON
-                ]);
-
-
-
-            Log::info('Flask API Response:', [
-                'status' => $response->status(),
-                'body' => $response->body(),
-                'json' => $response->json() // Bisa dicatat dalam format JSON jika diperlukan
-            ]);
-
-            // Periksa apakah API Flask berhasil
-            if ($response->failed()) {
-                return response()->json(['status' => 'error', 'message' => 'Failed to regenerate questions.']);
-            }
-
-            // Ambil pertanyaan baru dari response Flask
-            $newQuestion = $response->json()['data']['questions'][0];
-
-            // Simpan pertanyaan baru ke database dengan increment attempt
-
-            $question = Question::create([
-                'question' => $newQuestion['question'],
-                'question_fix' => $newQuestion['question'],
-                'answer_openai' => $newQuestion['answer_openai'],
-                'answer_fix' => $newQuestion['answer'],
-                'topic_guid' => $validated['topic_guid'],
-                'category' => $newQuestion['category'],
-                'user_id' => $validated['user_id'],
-                'page' => $validated['page'],
-                'attempt' => $currentAttempt, // Increment attempt untuk setiap user
-                'language' => $language,
-                'weight' => 0,
-                'threshold' => $threshold, // Menggunakan threshold dari pertanyaan terakhir
-            ]);
-            $nextQuestionMessage = '<div class="bot-message">
-                Retry required! <br>
-                <strong>Page:</strong> ' . $validated['page'] . ' <br>
-                <strong>Threshold:</strong> ' . ($question->threshold ?? "N/A") . ' <br>
-                <strong>Message:</strong> ' . $question->question_fix . '
-            </div>';
-
-                // Kirim respons sukses dengan pertanyaan baru
-                return response()->json([
-                'status' => 'success',
-                'message' => 'Questions have been regenerated successfully.',
-                'newQuestion' => [
-                    'message' => $nextQuestionMessage,
-                    'question_guid' => $question->guid,
-                ],
-            ]);
-        }
-    }
-
-
-    protected function calculateCosineSimilarity($user_answer, $actual_answer, $page, $topic_guid, $language, $question)
+    
+    protected function evaluateAnswer($data)
     {
         try {
-            // Ambil semua nouns dan nilai cosine untuk halaman yang relevan
-            $pageNouns = PageNoun::where('topic_guid', $topic_guid)->where('language', $language)->where('page', $page)->get();
+            $evaluationResponse = Http::timeout(60)
+                ->post(env('FLASK_API_URL') . '/evaluate', [
+                    'reference_answer' => $data['reference_answer'],
+                    'user_answer' => $data['user_answer'],
+                    'current_level' => $data['current_level'],
+                ]);
 
-            $nounsData = $pageNouns
-                ->map(function ($item) {
-                    return [
-                        'noun' => $item->noun,
-                        'cosine_similarity' => $item->cosine,
-                    ];
-                })
-                ->toArray();
-
-
-            $response = Http::post(env('FLASK_API_URL') . '/cosine_similarity', [
-                'user_answer' => $user_answer,
-                'actual_answer' => $actual_answer,
-            ]);
-
-            if ($response->failed()) {
-                throw new \Exception('Failed to calculate cosine similarity');
+            if ($evaluationResponse->failed()) {
+                Log::error('Flask API Evaluation Error', [
+                    'status' => $evaluationResponse->status(),
+                    'response' => $evaluationResponse->body(),
+                ]);
+                
+                return [
+                    'is_correct' => false,
+                    'score' => 0,
+                    'feedback' => 'Error evaluating answer'
+                ];
             }
 
-            $responseData = $response->json();
-
-            $similarity_score = $responseData['similarity_score'];
-
-            // Default noun similarities jika tidak ada
+            return $evaluationResponse->json();
+        } catch (\Exception $e) {
+            Log::error('Evaluation Error', [
+                'message' => $e->getMessage(),
+            ]);
 
             return [
-                'similarity_score' => $similarity_score * 100,
-                'noun_cosine_data' => $nounsData,
+                'is_correct' => false,
+                'score' => 0,
+                'feedback' => 'Error: ' . $e->getMessage()
             ];
-        } catch (\Exception $e) {
-            Log::error('Error calculating cosine similarity: ' . $e->getMessage());
         }
     }
+    
+    // Get next question based on student's level
+    protected function getNextQuestion($userId, $topicGuid, $language, $level)
+    {
+        // Find questions already answered by this user
+        $answeredQuestions = AnswerUser::where('answer_user.user_id', $userId)
+            ->join('questions', 'answer_user.question_guid', '=', 'questions.guid')
+            ->where('questions.topic_guid', $topicGuid)
+            ->where('questions.category', $level)
+            ->pluck('questions.guid')
+            ->toArray();
+            
+        // Get questions that match the current level and haven't been answered yet
+        $availableQuestions = Question::where('topic_guid', $topicGuid)
+            ->where('language', $language)
+            ->where('category', $level)
+            ->whereNotIn('guid', $answeredQuestions)
+            ->get();
+            
+        if ($availableQuestions->isEmpty()) {
+            // If no new questions available, recycle old ones
+            $availableQuestions = Question::where('topic_guid', $topicGuid)
+                ->where('language', $language)
+                ->where('category', $level)
+                ->get();
+        }
+        
+        // Return a random question from available ones
+        if ($availableQuestions->isNotEmpty()) {
+            return $availableQuestions->random();
+        }
+        
+        return null;
+    }
+    
+    
+
 
 
 }

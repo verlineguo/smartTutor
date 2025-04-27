@@ -250,7 +250,8 @@ Route::group([
     $router->post('/submit', [AssignmentController::class, 'submitAnswer']);
     $router->post('/plagiarism/check', [AssignmentController::class, 'checkPlagiarism']);
     $router->get('/answers/alternatives/{questionGuid}', [AssignmentController::class, 'getAlternativeAnswers']);
-    $router->get('/history/{userId}/{topicGuid}/{questionGuid}', [AssignmentController::class, 'getAnswerHistory']);
+    $router->get('/history/{userId}/{topicGuid}', [AssignmentController::class, 'getHistory']);
+    $router->post('/evaluate', [AssignmentController::class, 'evaluateAnswer']);
 });
 
 

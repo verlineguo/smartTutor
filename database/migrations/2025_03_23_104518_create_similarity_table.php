@@ -14,8 +14,8 @@ return new class extends Migration
         Schema::create('similarity', function (Blueprint $table) {
             $table->uuid('guid')->primary();
             $table->char('user_answer_guid', 50);
-            $table->enum('llm_type', ['openai', 'gemini', 'deepseek']);
-            $table->enum('algorithm', ['cosine', 'jaccard', 'bert', 'sequence_matcher', 'aho_corasick']);
+            $table->enum('llm_type', ['openai', 'gemini', 'llama']);
+            $table->enum('algorithm', ['cosine', 'jaccard', 'bert', 'sequence_matcher']);
             $table->float('similarity_score'); 
             $table->timestamps();
 

@@ -100,7 +100,6 @@ class EvaluationController extends Controller
                     'cosine_similarity' => $record->cosine_similarity,
                     'jaccard_similarity' => $record->jaccard_similarity,
                     'bert_score' => $record->bert_score,
-                    'highlighted_text' => $record->highlighted_text,
                     'average' => $average
                 ];
             }
@@ -208,7 +207,6 @@ class EvaluationController extends Controller
                     'cosine_similarity' => $record->cosine,
                     'jaccard_similarity' => $record->jaccard,
                     'bert_score' => $record->bert,
-                    'highlighted_text' => $record->highlighted_text,
                     'average' => $average
                 ];
             }

@@ -68,7 +68,7 @@ class PlagiarismController extends Controller
                     'cosine_similarity' => $plagiarismData['cosine_similarity'],
                     'jaccard_similarity' => $plagiarismData['jaccard_similarity'],
                     'bert_score' => $plagiarismData['bert_similarity'],
-                    'highlighted_text' => $plagiarismData['highlighted_text'],
+                    // 'highlighted_text' => $plagiarismData['highlighted_text'],
                     // 'sequence_matching' => json_encode([
                     //     'highlighted_text' => $plagiarismData['highlighted_text'],
                     //     'pattern_matches' => $plagiarismData['multi_pattern_matches']
@@ -124,7 +124,7 @@ class PlagiarismController extends Controller
                     'cosine_similarity' => 0,
                     'jaccard_similarity' => 0,
                     'bert_similarity' => 0,
-                    'highlighted_text' => '',
+                    // 'highlighted_text' => '',
                     // 'multi_pattern_matches' => []
                 ];
             }
@@ -135,7 +135,7 @@ class PlagiarismController extends Controller
                 'cosine_similarity' => 0,
                 'jaccard_similarity' => 0,
                 'bert_similarity' => 0,
-                'highlighted_text' => '',
+                // 'highlighted_text' => '',
                 // 'multi_pattern_matches' => []
             ];
         }

@@ -20,7 +20,10 @@ class AnswerUser extends Model
         'question_guid',
         'answer',
         'page',
-        'cosine_similarity'
+        'is_correct',
+    'streak',
+    'evaluation_scores',
+    'current_level'
     ];
 
     protected $casts = [

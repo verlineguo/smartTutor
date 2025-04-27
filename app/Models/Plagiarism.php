@@ -21,7 +21,7 @@ class Plagiarism extends Model
         'cosine_similarity',
         'jaccard_similarity',
         'bert_score',
-        'sequence_matching'
+        // 'sequence_matching'
     ];
 
     protected $casts = [
