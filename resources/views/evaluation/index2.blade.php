@@ -124,17 +124,17 @@
             font-weight: 500;
             background-color: #f8f9fa;
         }
-
+        
         .metric-badge.success {
             background-color: rgba(40, 167, 69, 0.2);
             color: #28a745;
         }
-
+        
         .metric-badge.warning {
             background-color: rgba(255, 193, 7, 0.2);
             color: #ffc107;
         }
-
+        
         .metric-badge.danger {
             background-color: rgba(220, 53, 69, 0.2);
             color: #dc3545;
@@ -222,6 +222,7 @@
             height: 100px;
             border-radius: 50%;
             border: 6px solid #e9ecef;
+            border-top-color: #cb0c9f;
             position: relative;
             margin-bottom: 10px;
         }
@@ -250,66 +251,53 @@
             margin-bottom: 10px;
             transition: all 0.3s;
         }
-
+        
         .detection-method-value {
             font-size: 18px;
             font-weight: bold;
         }
-
+        
         .detection-method-name {
             font-weight: 500;
             margin-bottom: 3px;
         }
 
         .strategy-badges {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
 
-        .strategy-badge {
-            background-color: #e3f2fd;
-            color: #0d6efd;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 14px;
-            display: inline-flex;
-            align-items: center;
-        }
+.strategy-badge {
+    background-color: #e3f2fd;
+    color: #0d6efd;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+}
 
-        .plagiarism-highlight {
-            padding: 2px;
-            border-radius: 3px;
-            position: relative;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .plagiarism-highlight:hover {
-            transform: scale(1.02);
-            box-shadow: 0 0 4px rgba(0, 0, 0, 0.2);
-            z-index: 100;
-        }
 
         .plagiarism-very-high {
-            background-color: #ff4d4d;
-            /* Red */
-            color: white;
+            background-color: #ff4d4d; /* Red for very high similarity */
+            color: #fff;
         }
 
+        /* Plagiarism highlighting */
         .plagiarism-high {
-            background-color: #ff9933;
-            /* Orange */
+            background-color: #ff9933; 
+    
         }
 
         .plagiarism-medium {
             background-color: #ffffcc;
-            /* Yellow */
+       
         }
 
         .plagiarism-low {
             background-color: rgba(40, 167, 69, 0.3);
-            /* Green */
+           
         }
 
         /* Comparison panels */
@@ -353,12 +341,6 @@
             padding: 0 2px;
         }
 
-        .tooltip-inner {
-            max-width: 300px;
-            text-align: left;
-            padding: 8px;
-        }
-
         .similarity-tooltip .tooltip-text {
             visibility: hidden;
             width: 200px;
@@ -387,38 +369,29 @@
             border-color: rgba(25, 135, 84, 0.5);
             box-shadow: 0 0 8px rgba(25, 135, 84, 0.2);
         }
-
+        
         .threshold-exceeded .detection-method-value {
             color: #dc3545;
         }
-
+        
 
         .chart-circle {
             width: 120px;
             height: 120px;
             border-radius: 50%;
-            background: conic-gradient(#28a745 0% var(--percentage, 0%),
-                    #f0f0f0 var(--percentage, 0%) 100%);
+            background: conic-gradient(
+                #28a745 0% var(--percentage, 0%),
+                #f0f0f0 var(--percentage, 0%) 100%
+            );
             margin: 0 auto 10px;
             position: relative;
         }
-
-        .chart-circle.low {
-            background: conic-gradient(#28a745 0% var(--percentage, 0%), #f0f0f0 var(--percentage, 0%) 100%);
-        }
-
-        .chart-circle.medium {
-            background: conic-gradient(#ffc107 0% var(--percentage, 0%), #f0f0f0 var(--percentage, 0%) 100%);
-        }
-
-        .chart-circle.high {
-            background: conic-gradient(#fd7e14 0% var(--percentage, 0%), #f0f0f0 var(--percentage, 0%) 100%);
-        }
-
-        .chart-circle.very-high {
-            background: conic-gradient(#dc3545 0% var(--percentage, 0%), #f0f0f0 var(--percentage, 0%) 100%);
-        }
-
+        
+        .chart-circle.low { background: conic-gradient(#28a745 0% var(--percentage, 0%), #f0f0f0 var(--percentage, 0%) 100%); }
+        .chart-circle.medium { background: conic-gradient(#ffc107 0% var(--percentage, 0%), #f0f0f0 var(--percentage, 0%) 100%); }
+        .chart-circle.high { background: conic-gradient(#fd7e14 0% var(--percentage, 0%), #f0f0f0 var(--percentage, 0%) 100%); }
+        .chart-circle.very-high { background: conic-gradient(#dc3545 0% var(--percentage, 0%), #f0f0f0 var(--percentage, 0%) 100%); }
+        
 
         .chart-circle::before {
             content: '';
@@ -466,44 +439,6 @@
             border-width: 5px;
             border-style: solid;
             border-color: #333 transparent transparent transparent;
-        }
-
-
-        @media (max-width: 992px) {
-            .content-split {
-                grid-template-columns: 1fr;
-            }
-
-            .score-overview,
-            .plagiarism-overview {
-                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            }
-
-            .detection-method {
-                margin-bottom: 15px;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .custom-tabs {
-                flex-wrap: wrap;
-            }
-
-            .custom-tab-item {
-                margin-bottom: 5px;
-            }
-
-            .comparison-panel {
-                flex-direction: column;
-            }
-
-            .comparison-side {
-                padding: 0 !important;
-                border-right: none !important;
-                border-bottom: 1px solid #e0e0e0;
-                padding-bottom: 20px !important;
-                margin-bottom: 20px;
-            }
         }
     </style>
 @endsection
@@ -763,23 +698,19 @@
                                 <div class="card-body">
                                     <div class="legend-container d-flex flex-wrap gap-3">
                                         <div class="legend-item d-flex align-items-center">
-                                            <div class="legend-color bg-danger me-2" style="width: 20px; height: 20px;">
-                                            </div>
+                                            <div class="legend-color bg-danger me-2" style="width: 20px; height: 20px;"></div>
                                             <span>Very High Match (>90%)</span>
                                         </div>
                                         <div class="legend-item d-flex align-items-center">
-                                            <div class="legend-color bg-warning me-2" style="width: 20px; height: 20px;">
-                                            </div>
+                                            <div class="legend-color bg-warning me-2" style="width: 20px; height: 20px;"></div>
                                             <span>High Match (80-90%)</span>
                                         </div>
                                         <div class="legend-item d-flex align-items-center">
-                                            <div class="legend-color me-2"
-                                                style="width: 20px; height: 20px; background-color: #ffc;"></div>
+                                            <div class="legend-color me-2" style="width: 20px; height: 20px; background-color: #ffc;"></div>
                                             <span>Medium Match (70-80%)</span>
                                         </div>
                                         <div class="legend-item d-flex align-items-center">
-                                            <div class="legend-color bg-success me-2"
-                                                style="width: 20px; height: 20px; opacity: 0.5;"></div>
+                                            <div class="legend-color bg-success me-2" style="width: 20px; height: 20px; opacity: 0.5;"></div>
                                             <span>Low Match (50-70%)</span>
                                         </div>
                                     </div>
@@ -855,7 +786,6 @@
                 timeOut: 5000
             };
 
-            $('[data-bs-toggle="tooltip"]').tooltip();
 
 
             function showLoading() {
@@ -919,9 +849,9 @@
                 });
             }
 
+            
 
-
-
+            
 
 
             // Update UI with evaluation data
@@ -986,7 +916,6 @@
             }
 
 
-            // Update the tab switching handler to rebuild tooltips on tab change
             $("#llm-tabs .nav-link").on("click", function(e) {
                 const targetId = $(this).attr("href"); // e.g., "#openai-llm"
                 const llmSource = targetId.replace("-llm", "").replace("#", ""); // e.g., "openai"
@@ -997,39 +926,10 @@
                 if (selectedData) {
                     // Update detection methods section with this LLM's data
                     updateDetectionMethods(selectedData);
-
-                    // Display strategies for this specific model
-                    displayStrategies(selectedData.detected_strategies || []);
-
-                    // Update chart with the selected LLM's data
-                    updateChart(selectedData.average * 100);
-
-                    // Update the plagiarism source text
-                    $(".plagiarism-source").text(
-                        `AI Similarity Score (${capitalizeFirstLetter(llmSource)})`);
-
-                    // Update metric badge
-                    updatePlagiarismMetricBadge(selectedData.average);
-
-                    // Clear any existing tooltips before switching tabs
-                    $('[data-bs-toggle="tooltip"]').tooltip('dispose');
-
-                    // Make sure tooltips are properly initialized for the active tab after it's visible
-                    setTimeout(() => {
-                        // Only initialize tooltips for the current tab's elements
-                        $(targetId).find(
-                                `[data-bs-toggle="tooltip"][data-llm-source="${llmSource}"]`)
-                            .tooltip({
-                                html: true,
-                                container: 'body',
-                                trigger: 'hover',
-                                placement: 'top'
-                            });
-                    }, 300);
                 }
             });
 
-
+            
             function updatePlagiarismBadge(level) {
                 const badge = $(".score-card:nth-child(2) .score-metric .metric-badge");
                 badge.removeClass("success warning");
@@ -1043,21 +943,20 @@
                 }
             }
 
-
+            
+            // Function to load plagiarism data
             function loadPlagiarismData(questionGuid, answerGuid) {
                 $.ajax({
                     type: "GET",
                     url: "{{ env('URL_API') }}/api/v1/evaluation/plagiarism/" + questionGuid + "/" +
                         answerGuid,
+
                     beforeSend: function(request) {
                         showLoading();
                         request.setRequestHeader("Authorization", `Bearer ${token}`);
-
-                        // Dispose all tooltips before loading new data
-                        $('[data-bs-toggle="tooltip"]').tooltip('dispose');
                     },
                     success: function(response) {
-                        console.log("Plagiarism data loaded:", response);
+                        console.log(response);
                         if (response.success) {
                             plagiarismData = response.data;
                             if (plagiarismData.length > 0) {
@@ -1071,22 +970,18 @@
                                 // Update tabs with all LLM data
                                 updateComparisonTabs(plagiarismData);
 
-                                // Process the main answer panel after a delay to ensure DOM is ready
-                                setTimeout(() => {
-                                    const answerContainer = $(
-                                        "#your-answer .text-container #userAnswer");
-                                    highlightPlagiarizedText(answerContainer, highestItem
-                                        .sentence_results, highestItem.source);
-                                }, 500);
+                                // Display detailed results for the highest similarity item
+                                displayPlagiarismResults(highestItem);
                             } else {
                                 toastr.info("No plagiarism data found for this answer.");
                             }
+
                         } else {
                             toastr.error("Failed to load plagiarism data: " + response.message);
                         }
                     },
                     error: function(xhr) {
-                        toastr.error("Failed to load evaluation data. Please try again.");
+                        toastr.error("Gagal mendapatkan data evaluasi. Silakan coba lagi.");
                         console.error("Error fetch:", xhr);
                     },
                     complete: function() {
@@ -1094,6 +989,7 @@
                     }
                 });
             }
+
 
             function updatePlagiarismUI(data) {
                 // Temukan skor tertinggi untuk ditampilkan di overview
@@ -1135,13 +1031,13 @@
                 }
             }
 
-
+            
 
 
             function updateChart(percentage) {
                 const chartCircle = $(".chart-circle");
                 chartCircle.css('--percentage', `${percentage}%`);
-
+                
                 // Add color based on percentage
                 chartCircle.removeClass("low medium high very-high");
                 if (percentage < 50) {
@@ -1206,7 +1102,7 @@
                 $("#detection-methods").html(methodsHtml);
                 highlightTopMethod(llmData);
             }
-
+            
             function highlightTopMethod(llmData) {
                 const methods = {
                     'cosine': llmData.cosine_similarity * llmData.method_weights.cosine,
@@ -1249,78 +1145,69 @@
                 });
             }
 
-            function stripHtmlTags(htmlContent) {
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = htmlContent;
-                return tempDiv.textContent || tempDiv.innerText || '';
-            }
-
             function updateComparisonTabs(data) {
-                // Process each AI source
+    // First, load the user answer once instead of multiple times
+    $.ajax({
+        type: "GET",
+        url: "{{ env('URL_API') }}/api/v1/evaluation/plagiarism/" + questionGuid + "/" + answerGuid,
+        async: true,
+        beforeSend: function(request) {
+            request.setRequestHeader("Authorization", `Bearer ${token}`);
+        },
+        success: function(response) {
+            if (response.success) {
+                const userAnswer = response.data.answer;
+                
+                // After getting user answer, update all tabs
                 data.forEach((item) => {
                     const tabId = `#${item.source}-llm`;
                     const tabContent = $(tabId);
 
                     if (tabContent.length) {
-                        // Create comparison panel with unique ID for this model's user answer content
-                        const uniqueId = `user-answer-${item.source}-content`;
-
+                        // Create comparison panel with the user answer we already loaded
                         const comparisonHTML = `
-                <div class="comparison-panel">
-                    <div class="comparison-side">
-                        <div class="comparison-header">
-                            <span><i class="fas fa-user me-2"></i>Your Answer</span>
-                        </div>
-                        <div class="comparison-content user-answer-content" id="${uniqueId}">
-                            ${$("#userAnswer").html()}
-                        </div>
-                    </div>
-                    <div class="comparison-side">
-                        <div class="comparison-header">
-                            <span><i class="fas fa-robot me-2"></i>${capitalizeFirstLetter(item.source)}</span>
-                            <span class="badge bg-${getScoreColor(item.average)}">${(item.average * 100).toFixed(1)}% Match</span>
-                        </div>
-                        <div class="comparison-content">
-                            <div class="markdown-content">${marked.parse(item.answer || '')}</div>
-                        </div>
-                    </div>
-                </div>
-            `;
+                            <div class="comparison-panel">
+                                <div class="comparison-side">
+                                    <div class="comparison-header">
+                                        <span><i class="fas fa-user me-2"></i>Your Answer</span>
+                                    </div>
+                                    <div class="comparison-content user-answer-content">
+                                        ${userAnswer}
+                                    </div>
+                                </div>
+                                <div class="comparison-side">
+                                    <div class="comparison-header">
+                                        <span><i class="fas fa-robot me-2"></i>${capitalizeFirstLetter(item.source)}</span>
+                                        <span>${(item.average * 100).toFixed(1)}% Match</span>
+                                    </div>
+                                    <div class="comparison-content">
+                                        <div class="markdown-content">${marked.parse(item.answer || '')}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
 
                         tabContent.html(comparisonHTML);
 
-                        // Apply highlights with a timeout to ensure DOM is ready
+                        // Apply highlights if detailed data is available
                         if (item.sentence_results && item.sentence_results.length > 0) {
-                            console.log(
-                                `Processing highlights for ${item.source} with ${item.sentence_results.length} results`
-                                );
-                            setTimeout(() => {
-                                // Target specific container for this model only
-                                const specificContainer = $(`#${uniqueId}`);
-                                // Apply highlights to this specific container - pass the source name
-                                highlightPlagiarizedText(specificContainer, item.sentence_results,
-                                    item.source);
-                            }, 300);
+                            highlightPlagiarizedText(
+                                tabContent.find(".comparison-side:first-child .comparison-content"),
+                                item.sentence_results
+                            );
                         }
                     }
                 });
-
-                // Initialize the tabs if not already done
-                if ($("#llm-tabs .nav-link.active").length === 0) {
-                    $("#llm-tabs .nav-link:first").tab('show');
-                }
+            } else {
+                toastr.error("Failed to load user answer for comparison");
             }
-
-
-
-            // Helper function to get color class based on score
-            function getScoreColor(score) {
-                if (score < 0.5) return "success";
-                if (score < 0.7) return "warning";
-                return "danger";
-            }
-
-
+        },
+        error: function(xhr) {
+            toastr.error("Failed to load user answer for comparison");
+            console.error("Error fetching user answer:", xhr);
+        }
+    });
+}
 
             function displayPlagiarismResults(data) {
                 // Display detected strategies
@@ -1330,8 +1217,7 @@
                 if (data.sentence_results && data.sentence_results.length > 0) {
                     $.ajax({
                         type: "GET",
-                        url: "{{ env('URL_API') }}/api/v1/evaluation/plagiarism/" + questionGuid + "/" +
-                            answerGuid,
+                        url: "{{ env('URL_API') }}/api/v1/evaluation/plagiarism/" + questionGuid + "/" + answerGuid,
                         beforeSend: function(request) {
                             request.setRequestHeader("Authorization", `Bearer ${token}`);
                         },
@@ -1346,198 +1232,108 @@
                 }
             }
 
+            function highlightPlagiarizedText(container, sections) {
+    if (!sections || sections.length === 0) return;
 
+    // Get the HTML content to work with
+    let content = container.html();
+    if (!content) return;
 
+    // Sort sections from longest to shortest to avoid nested replacements
+    sections.sort((a, b) => {
+        const textA = a.student_text || a.text;
+        const textB = b.student_text || b.text;
+        return textB.length - textA.length;
+    });
 
+    // Process each section
+    sections.forEach(section => {
+        // Get text from section with appropriate property
+        const sectionText = section.student_text || section.text;
+        if (!sectionText || sectionText.trim() === '') return;
 
-            // Update the highlightPlagiarizedText function to properly scope tooltips to specific LLM sources
-            function highlightPlagiarizedText(container, sentenceResults, source = null) {
-                if (!sentenceResults || sentenceResults.length === 0) {
-                    console.log("No sentence results to highlight");
-                    return;
-                }
+        // Check if this section is plagiarized - default to considering it plagiarized
+        // if there's no explicit flag but it has a weighted score
+        const isPlagiarized = section.is_plagiarized !== undefined ? 
+            section.is_plagiarized : (section.weighted_score > 0.5);
 
-                // Working with container's HTML content
-                let contentHtml = container.html();
-                if (!contentHtml) {
-                    console.log("No content to highlight");
-                    return;
-                }
+        if (isPlagiarized) {
+            // Determine highlight class based on score
+            let highlightClass;
+            const score = section.weighted_score || 0.5; // Default if no score
 
-                // Sort by score to process highest matches first
-                sentenceResults.sort((a, b) => b.weighted_score - a.weighted_score);
-
-                // Store already processed HTML segments to avoid re-highlighting
-                let processedSegments = [];
-
-                // Process each sentence result
-                for (let i = 0; i < sentenceResults.length; i++) {
-                    const result = sentenceResults[i];
-
-                    // Skip empty results
-                    if (!result.student_text || result.student_text.trim() === '') {
-                        continue;
-                    }
-
-                    // Clean and normalize the text to find
-                    const textToFind = result.student_text.replace(/\s+/g, ' ').trim();
-
-                    // Skip if text is too short or already processed
-                    if (textToFind.length < 5 || processedSegments.includes(textToFind)) {
-                        continue;
-                    }
-
-                    // Add to processed segments
-                    processedSegments.push(textToFind);
-
-                    // Escape special regex characters
-                    const safePattern = textToFind
-                        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-                        .replace(/\s+/g, '\\s+');
-
-                    try {
-                        // Determine highlight class based on score
-                        let highlightClass = '';
-                        const score = result.weighted_score || 0;
-
-                        if (score > 0.9) highlightClass = 'bg-danger text-white'; // Very High Match (>85%)
-                        else if (score > 0.7) highlightClass = 'bg-warning'; // High Match (70-85%)
-                        else if (score > 0.5) highlightClass = 'bg-warning opacity-75'; // Medium Match (50-70%)
-                        else if (score > 0.3) highlightClass = 'bg-success opacity-50'; // Low Match (30-50%)
-                        else highlightClass = 'bg-light text-secondary'; // Very Low Match (<30%)
-
-                        // Create detailed tooltip content with individual scores
-                        const tooltipContent = `
-                <div class="tooltip-content">
-                    <strong>Similarity: ${(score * 100).toFixed(1)}%</strong><br>
-                    <strong>Source: ${source ? capitalizeFirstLetter(source) : 'Main'}</strong><br>
-                    <hr style="margin: 5px 0">
-                    <span>BERT: ${(result.individual_scores?.bert * 100 || 0).toFixed(1)}%</span><br>
-                    <span>Cosine: ${(result.individual_scores?.cosine * 100 || 0).toFixed(1)}%</span><br>
-                    <span>Jaccard: ${(result.individual_scores?.jaccard * 100 || 0).toFixed(1)}%</span><br>
-                    <span>Levenshtein: ${(result.individual_scores?.levenshtein * 100 || 0).toFixed(1)}%</span><br>
-                    <span>N-gram: ${(result.individual_scores?.ngram * 100 || 0).toFixed(1)}%</span>
-                </div>
-            `.replace(/\n/g, '').replace(/\s{2,}/g, ' ');
-
-                        // Generate a unique ID for this highlight that includes the source information
-                        const highlightId =
-                            `highlight-${source || 'main'}-${i}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-
-                        // Create a regex pattern that works with HTML content
-                        // This approach makes sure we don't match text inside tags
-                        const htmlRegex = new RegExp(`(${safePattern})(?![^<>]*>)`, 'gi');
-
-                        // Apply highlighting with proper tooltip attributes and include source data
-                        contentHtml = contentHtml.replace(htmlRegex, function(match) {
-                            return `<span class="plagiarism-highlight ${highlightClass}" 
-                    id="${highlightId}"
-                    data-bs-toggle="tooltip" 
-                    data-bs-html="true"
-                    data-bs-placement="top"
-                    data-llm-source="${source || 'main'}"
-                    data-bs-title="${tooltipContent.replace(/"/g, '&quot;')}"
-                    data-llm-match="${encodeURIComponent(result.best_match || '')}">${match}</span>`;
-                        });
-                    } catch (e) {
-                        console.error("Error highlighting text:", e, "for pattern:", textToFind);
-                    }
-                }
-
-                // Update the container HTML
-                container.html(contentHtml);
-
-                // Initialize Bootstrap tooltips with specific selector for this LLM source
-                setTimeout(() => {
-                    // Find tooltips specifically for this source
-                    const tooltipSelector = source ?
-                        `[data-bs-toggle="tooltip"][data-llm-source="${source}"]` :
-                        '[data-bs-toggle="tooltip"][data-llm-source="main"]';
-
-                    // Dispose any existing tooltips for this source first
-                    container.find(tooltipSelector).tooltip('dispose');
-
-                    // Initialize tooltips with custom options
-                    container.find(tooltipSelector).tooltip({
-                        html: true,
-                        container: 'body',
-                        trigger: 'hover',
-                        placement: 'top'
-                    });
-
-                    // Add event listeners for hover effects to highlight LLM matches
-                    container.find(`.plagiarism-highlight[data-llm-source="${source || 'main'}"]`).each(
-                        function() {
-                            const highlightEl = $(this);
-                            const encodedLlmMatch = highlightEl.attr('data-llm-match');
-                            const llmSource = highlightEl.attr('data-llm-source') || 'main';
-
-                            if (encodedLlmMatch && encodedLlmMatch !== 'undefined') {
-                                const llmMatch = decodeURIComponent(encodedLlmMatch);
-
-                                // On mouseenter, find and highlight the LLM match in the current tab only
-                                highlightEl.on('mouseenter', function() {
-                                    // Find the tab pane that this highlight belongs to
-                                    const tabId = llmSource === 'main' ? '' :
-                                        `#${llmSource}-llm`;
-                                    const visibleTab = tabId ? $(tabId) : $('.tab-pane.active');
-                                    const llmPanel = visibleTab.find(
-                                        '.comparison-content:not(.user-answer-content)');
-
-                                    if (llmPanel.length) {
-                                        // Try to find the match in the LLM content
-                                        try {
-                                            // Create a safe pattern for the LLM match
-                                            const safeLlmPattern = llmMatch
-                                                .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-                                                .replace(/\s+/g, '\\s+');
-
-                                            // Replace with highlighted version (only in text, not in tags)
-                                            const llmRegex = new RegExp(
-                                                `(${safeLlmPattern})(?![^<>]*>)`, 'gi');
-                                            const originalContent = llmPanel.html();
-                                            const highlightedLlmContent = originalContent
-                                                .replace(
-                                                    llmRegex,
-                                                    '<span class="llm-match-highlight bg-info text-white">$1</span>'
-                                                );
-
-                                            // Only update if a match was found
-                                            if (originalContent !== highlightedLlmContent) {
-                                                llmPanel.html(highlightedLlmContent);
-                                            }
-                                        } catch (e) {
-                                            console.error("Error highlighting LLM match:", e);
-                                        }
-                                    }
-                                });
-
-                                // On mouseleave, remove the LLM highlight
-                                highlightEl.on('mouseleave', function() {
-                                    $('.llm-match-highlight').each(function() {
-                                        const highlightedText = $(this).text();
-                                        $(this).replaceWith(highlightedText);
-                                    });
-                                });
-                            }
-                        });
-                }, 500);
+            if (score > 0.9) {
+                highlightClass = "plagiarism-very-high";
+            } else if (score > 0.8) {
+                highlightClass = "plagiarism-high";
+            } else if (score > 0.7) {
+                highlightClass = "plagiarism-medium";
+            } else {
+                highlightClass = "plagiarism-low";
             }
 
+            // Create tooltip content
+            let tooltipContent = `<strong>Similarity Score: ${(score * 100).toFixed(1)}%</strong><br>`;
 
-            // Helper function to escape regex special characters
-            function escapeRegExp(string) {
+            // If individual_scores exist, add to tooltip
+            if (section.individual_scores) {
+                const scores = typeof section.individual_scores === 'string' ?
+                    JSON.parse(section.individual_scores) : section.individual_scores;
+
+                Object.entries(scores).forEach(([method, score]) => {
+                    tooltipContent += `${capitalizeFirstLetter(method)}: ${(score * 100).toFixed(1)}%<br>`;
+                });
+            }
+
+            // Add matched text if available
+            if (section.best_match) {
+                tooltipContent += `<br><strong>Matched with:</strong><br>"${section.best_match.substring(0, 100)}${section.best_match.length > 100 ? '...' : ''}"`;
+            }
+
+            try {
+                // Safely escape for regex
+                const safeText = escapeRegExp(sectionText);
+                
+                // Create replacement HTML with tooltip
+                const replacement = `<span class="similarity-tooltip ${highlightClass}" data-bs-toggle="tooltip" data-bs-html="true" data-bs-placement="top" title="${encodeURIComponent(tooltipContent)}">${sectionText}</span>`;
+                
+                // Replace text with highlighted version
+                content = content.replace(new RegExp(safeText, 'g'), replacement);
+            } catch (e) {
+                console.error("Error highlighting text:", e);
+                console.error("Text that caused the error:", sectionText);
+            }
+        }
+    });
+
+    // Update content
+    container.html(content);
+    
+    // Initialize tooltips
+    setTimeout(() => {
+        try {
+            container.find('[data-bs-toggle="tooltip"]').each(function() {
+                const tooltip = $(this);
+                tooltip.attr('title', decodeURIComponent(tooltip.attr('title')));
+                new bootstrap.Tooltip(tooltip, {
+                    html: true,
+                    container: 'body',
+                    trigger: 'hover'
+                });
+            });
+        } catch (e) {
+            console.error("Error initializing tooltips:", e);
+        }
+    }, 100);
+}
+
+
+             // Helper function untuk escape karakter khusus dalam regex
+             function escapeRegExp(string) {
                 return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             }
-
-            function cleanText(text) {
-                return text.replace(/\s+/g, ' ').replace(/&nbsp;/g, ' ').trim();
-            }
-
-
-
-
-
+            
+            
 
 
 
@@ -1570,37 +1366,37 @@
             }
 
 
-
+            
             function formatDate(dateString) {
                 const date = new Date(dateString);
                 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                 return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
             }
 
-            $(".custom-tab-link[data-target='answer-tab']").on("click", function(e) {
+            // Tab switching
+            $(".custom-tab-link").on("click", function(e) {
                 e.preventDefault();
+                const targetId = $(this).data("target");
 
                 // Hide all tabs and remove active class
                 $(".tab-container").hide();
                 $(".custom-tab-link").removeClass("active");
 
                 // Show selected tab and add active class
-                $("#answer-tab").show();
+                $("#" + targetId).show();
                 $(this).addClass("active");
 
-                // Reload userAnswer content
-                if (evaluationData && evaluationData.userAnswer) {
-                    $("#userAnswer").html(evaluationData.userAnswer.answer);
-                } else {
-                    $("#userAnswer").html("No answer available.");
+                // Load data for specific tabs if needed
+                if (targetId === "plagiarism-tab") {
+                    loadPlagiarismData(questionGuid, answerGuid);
                 }
             });
 
 
 
-
-
-
+        
+            
+           
 
             function updateDetectionMethodsFromWeights(weights, thresholds) {
                 const methodsHtml = `
