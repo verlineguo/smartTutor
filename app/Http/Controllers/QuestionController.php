@@ -436,20 +436,16 @@ class QuestionController extends Controller
 
                 if (isset($questionData['all_pdf_answers']) && is_array($questionData['all_pdf_answers'])) {
                     foreach ($questionData['all_pdf_answers'] as $pdfAnswer) {
-                        $answerPdf = AnswerPDF::create([
+                        AnswerPDF::create([
                             'question_guid' => $question->guid,
                             'answer' => $pdfAnswer['answer'],
                             'combined_score' => $pdfAnswer['combined_score'] ?? 0,
                             'qa_score' => $pdfAnswer['qa_score'] ?? 0,
                             'retrieval_score' => $pdfAnswer['retrieval_score'] ?? 0,
+                            'page_references' => json_encode($pdfAnswer['page_references'] ?? []), // Simpan page_references
                         ]);
 
-                        // If this is the best answer, update the question with the reference
-                        if (isset($questionData['pdf_answer']) && $questionData['pdf_answer'] == $pdfAnswer['answer']) {
-                            $question->answer_pdf_guid = $answerPdf->guid;
-                            $question->answer_fix = $answerPdf->answer;
-                            $question->save();
-                        }
+                
                     }
                 }
 
@@ -606,7 +602,6 @@ class QuestionController extends Controller
             ->select(
                 'questions.guid', // Keep the questions guid separate
                 'questions.question',
-                'questions.answer_pdf_guid',
                 'questions.question_fix',
                 'questions.answer_fix',
                 'questions.weight',

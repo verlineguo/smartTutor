@@ -21,12 +21,16 @@ class Plagiarism extends Model
         'cosine_similarity',
         'jaccard_similarity',
         'bert_score',
-        // 'sequence_matching'
+        'levenshtein_similarity',
+        'ngram_similarity',
+        'thresholds', // New field
+        'method_weights', // New field
+        'detected_strategies',
     ];
 
     protected $casts = [
         'created_at' => 'datetime',
-        'updated_at' => 'datetime'
+        'updated_at' => 'datetime',
     ];
 
     public function userAnswer()
@@ -38,5 +42,4 @@ class Plagiarism extends Model
     {
         return $this->belongsTo(AnswerLlm::class, 'ai_answer_guid', 'guid');
     }
-
 }

@@ -237,16 +237,6 @@ class AssignmentController extends Controller
                 );
             }
 
-            // Store user answer
-            $userAnswer = new AnswerUser();
-            $userAnswer->guid = (string) Str::uuid();
-            $userAnswer->user_id = $request->user_id;
-            $userAnswer->question_guid = $request->question_guid;
-            $userAnswer->answer = $request->answer;
-            $userAnswer->current_level = $request->current_level;
-            $userAnswer->streak = $request->correct_streak;
-            $userAnswer->save();
-
        
             // Evaluate the answer
             $evaluationResult = $this->evaluateAnswer([
@@ -257,6 +247,7 @@ class AssignmentController extends Controller
     
 
             $isCorrect = $evaluationResult['is_correct'] ?? false;
+            $combinedScore = $evaluationResult['combined_score'] ?? 0;
             $currentStreak = $request->correct_streak;
             $currentLevel = $request->current_level;
             
@@ -284,14 +275,17 @@ class AssignmentController extends Controller
                     $currentLevel = $levels[max(0, $currentIndex - 1)];
                 }
             }
-            
-            
-            // Update user answer with evaluation results
-            $userAnswer->update([
-                'is_correct' => $evaluationResult['is_correct'],
-                'streak' => $currentStreak,
-                'evaluation_scores' => $evaluationResult['combined_score'],
-            ]);
+
+            $userAnswer = new AnswerUser();
+            $userAnswer->guid = (string) Str::uuid();
+            $userAnswer->user_id = $request->user_id;
+            $userAnswer->question_guid = $request->question_guid;
+            $userAnswer->answer = $request->answer;
+            $userAnswer->current_level = $currentLevel;
+            $userAnswer->streak = $currentStreak;
+            $userAnswer->is_correct = $isCorrect;
+            $userAnswer->evaluation_scores = $combinedScore;
+            $userAnswer->save();
 
             
 
@@ -348,7 +342,7 @@ class AssignmentController extends Controller
                 
                 return [
                     'is_correct' => false,
-                    'score' => 0,
+                    'combined_score' => 0,
                     'feedback' => 'Error evaluating answer'
                 ];
             }
@@ -361,7 +355,7 @@ class AssignmentController extends Controller
 
             return [
                 'is_correct' => false,
-                'score' => 0,
+                'combined_score' => 0,
                 'feedback' => 'Error: ' . $e->getMessage()
             ];
         }

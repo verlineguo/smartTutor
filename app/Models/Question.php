@@ -84,6 +84,10 @@ class Question extends Model
     {
         return $this->hasMany(Answer::class);
     }
+    public function answers()
+    {
+        return $this->hasMany(AnswerUser::class, 'question_guid', 'guid');
+    }
     /**
      * ANSWER PDF OBJECT
      */

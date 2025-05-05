@@ -108,7 +108,6 @@ class TopicController extends Controller
         // Ambil chat history untuk user dan topic tertentu
         $answerUsers = AnswerUser::whereIn('question_guid', $questionGuids)
         ->where('user_id', $userId)
-        ->orderBy('page', 'asc') // Urutkan berdasarkan halaman
         ->get();
 
         // Ambil jumlah halaman dari tabel questions
