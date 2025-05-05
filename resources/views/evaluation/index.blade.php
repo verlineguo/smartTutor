@@ -2,6 +2,13 @@
 
 @section('add-css')
     <style>
+        .reference-note {
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-left: 4px solid #cb0c9f;
+    border-radius: 5px;
+    margin-top: 20px;
+}
         /* Essential styling - removed redundant or unused styles */
         .card {
             border-radius: 10px;
@@ -156,32 +163,12 @@
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
         }
 
-        .keywords-tag {
-            display: inline-block;
-            background-color: #e9ecef;
-            color: #495057;
-            padding: 4px 12px;
-            border-radius: 20px;
-            margin-right: 8px;
-            margin-bottom: 8px;
-            font-size: 0.85rem;
-        }
-
-        .keywords-tag.found {
-            background-color: #d1e7dd;
-            color: #0f5132;
-        }
-
-        .keywords-tag.missing {
-            background-color: #f8d7da;
-            color: #842029;
-        }
 
         .action-buttons {
             display: flex;
             justify-content: flex-end;
             align-items: center;
-            margin-top: 20px;
+            margin-top: -20px;
         }
 
         .nav-tabs .nav-link {
@@ -591,17 +578,12 @@
                                 <div class="card-header">
                                     <ul class="nav nav-tabs card-header-tabs" id="answer-tabs">
                                         <li class="nav-item">
-                                            <a class="nav-link active" data-bs-toggle="tab" href="#your-answer">Your
-                                                Answer</a>
+                                            <a class="nav-link active" data-bs-toggle="tab" href="#your-answer">Jawaban Anda</a>
                                         </li>
                                         <li class="nav-item">
-                                            <a class="nav-link" data-bs-toggle="tab" href="#reference-answer">Reference
-                                                Answer</a>
+                                            <a class="nav-link" data-bs-toggle="tab" href="#reference-answer">Jawaban Referensi</a>
                                         </li>
-                                        <li class="nav-item">
-                                            <a class="nav-link" data-bs-toggle="tab" href="#keywords-analysis">Keywords
-                                                Analysis</a>
-                                        </li>
+                                      
                                     </ul>
                                 </div>
                                 <div class="card-body">
@@ -646,42 +628,13 @@
                                             </div>
                                         </div>
                                         <div class="tab-pane fade" id="reference-answer">
-                                            <div class="content-split">
                                                 <div class="text-container">
-                                                    <h6 class="mb-3">Reference Answer:</h6>
+                                                    <h6 class="mb-3">Jawaban PDF:</h6>
                                                     <p></p>
-                                                </div>
-                                                <div class="card">
-                                                    <div class="card-header">
-                                                        <h6 class="mb-0">Key Concepts</h6>
-                                                    </div>
-                                                    <div class="card-body">
-                                                        {{-- <div class="keywords-container">
-                                                            @foreach ($keywords as $keyword)
-                                                                <span class="keywords-tag {{ $keyword['found'] ? 'found' : 'missing' }}">{{ $keyword['keyword'] }}</span>
-                                                            @endforeach
-                                                        </div> --}}
-                                                    </div>
-                                                </div>
+    
                                             </div>
                                         </div>
-                                        <div class="tab-pane fade" id="keywords-analysis">
-                                            <div class="text-container">
-                                                <h6 class="mb-3">Keywords Analysis:</h6>
-                                                <table class="table table-bordered table-hover">
-                                                    <thead class="table-light">
-                                                        <tr>
-                                                            <th>Keyword</th>
-                                                            <th>Found in Answer</th>
-                                                            <th>Importance</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
+                                       
                                     </div>
                                 </div>
                             </div>
@@ -793,10 +746,6 @@
 
                     <!-- Action buttons -->
                     <div class="action-buttons">
-
-                        <button id="download-report" class="btn btn-outline-primary me-2">
-                            <i class="fas fa-download me-2"></i>Download Report
-                        </button>
                         <button id="next-question" class="btn btn-primary me-4">
                             Next Question<i class="fas fa-arrow-right ms-2"></i>
                         </button>
@@ -944,9 +893,9 @@
                 updatePlagiarismBadge(data.plagiarismLevel);
 
                 // AI similarity
-                $("#ai-similarity-score").text(
-                    `${parseFloat(data.highestAISimilarity || data.plagiarismLevel).toFixed(1)}%`);
-                $(".score-card:nth-child(3) .score-metric .metric-badge").text(data.plagiarismSource);
+                $("#ai-similarity-score").text(`${parseFloat(data.highestAISimilarity).toFixed(1)}%`);
+
+                $(".score-card:nth-child(3) .score-metric .metric-badge").text(data.highestAISource);
 
                 // User answer
                 $("#your-answer .text-container #userAnswer").html(data.userAnswer.answer);
@@ -961,16 +910,39 @@
                     .removeClass('bg-success bg-danger')
                     .addClass(data.userAnswer.is_correct ? 'bg-success' : 'bg-danger');
 
-                // Reference answer
-                if (data.referenceAnswer && data.referenceAnswer.answer) {
-                    $("#reference-answer .text-container p").text(data.referenceAnswer.answer);
+                // Reference answers
+                if (data.referenceAnswers && data.referenceAnswers.length > 0) {
+                    const referenceContainer = $("#reference-answer .text-container");
+                    referenceContainer.empty(); // Kosongkan kontainer sebelum menambahkan data baru
+
+                    data.referenceAnswers.forEach((reference, index) => {
+                        const pageReferences = Array.isArray(reference.page_references) && reference.page_references.length > 0
+                            ? reference.page_references.join(', ')
+                            : 'No page references available';
+
+                        referenceContainer.append(`
+                            <div class="reference-answer-item mb-3">
+                                <h6 class="mb-1">Jawaban Referensi PDF ${index + 1}:</h6>
+                                <p>${reference.answer}</p>
+                                <small class="text-muted">Combined Score: ${(reference.combined_score * 100).toFixed(2)}%</small>
+                                <br>
+                                <small class="text-muted">Page References: ${pageReferences}</small>
+                            </div>
+                        `);
+                    });
+                    
+    // Tambahkan catatan di luar elemen .text-container
+    $("#reference-answer").append(`
+        <div class="reference-note mt-4">
+            <p class="text-muted fst-italic">
+                Catatan: Jawaban referensi di atas dihasilkan sepenuhnya oleh sistem dan belum tentu sepenuhnya benar. Harap Jangan terlalu menaruh harapan 🙏.
+            </p>
+        </div>
+    `);
                 } else {
-                    $("#reference-answer .text-container p").text('No reference answer available.');
+                    $("#reference-answer .text-container").html('<p>No reference answers available.</p>');
                 }
 
-                // Keywords
-                updateKeywords(data.keywords);
-                updateKeywordsTable(data.keywords);
             }
 
 
@@ -1269,7 +1241,7 @@
                 <div class="comparison-panel">
                     <div class="comparison-side">
                         <div class="comparison-header">
-                            <span><i class="fas fa-user me-2"></i>Your Answer</span>
+                            <span><i class="fas fa-user me-2"></i>Jawaban Anda</span>
                         </div>
                         <div class="comparison-content user-answer-content" id="${uniqueId}">
                             ${$("#userAnswer").html()}
@@ -1533,42 +1505,6 @@
             function cleanText(text) {
                 return text.replace(/\s+/g, ' ').replace(/&nbsp;/g, ' ').trim();
             }
-
-
-
-
-
-
-
-
-            function updateKeywords(keywords) {
-                const container = $(".keywords-container");
-                container.empty();
-
-                keywords.forEach(keyword => {
-                    container.append(`
-            <span class="keywords-tag ${keyword.found ? 'found' : 'missing'}">${keyword.keyword}</span>
-        `);
-                });
-            }
-
-            function updateKeywordsTable(keywords) {
-                const tableBody = $("#keywords-analysis table tbody");
-                tableBody.empty();
-
-                keywords.forEach(keyword => {
-                    tableBody.append(`
-            <tr>
-                <td>${keyword.keyword}</td>
-                <td>
-                    <i class="fas fa-${keyword.found ? 'check text-success' : 'times text-danger'}"></i>
-                </td>
-                <td>${keyword.importance}</td>
-            </tr>
-        `);
-                });
-            }
-
 
 
             function formatDate(dateString) {

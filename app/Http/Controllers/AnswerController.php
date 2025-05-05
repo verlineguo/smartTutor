@@ -33,7 +33,7 @@ class AnswerController extends Controller
         if ($topic['data']) {
             $name = $topic['data']['name'];
             $code = $topic['data']['course_code'];
-            return view('assignment.index3', compact('token', 'guid', 'name', 'id', 'code', 'session'));
+            return view('assignment.index', compact('token', 'guid', 'name', 'id', 'code', 'session'));
         } else {
             return redirect('/dashboard');
         }

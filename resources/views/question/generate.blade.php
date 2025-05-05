@@ -265,25 +265,7 @@
 
             <!-- Tabs and Table -->
             <div class="card" id="card-block">
-                <div class="card-header">
-                    <ul class="nav nav-tabs card-header-tabs question-tabs" id="question-tabs" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link active" id="all-questions-tab" data-bs-toggle="tab"
-                                data-bs-target="#all-questions" type="button" role="tab"
-                                aria-controls="all-questions" aria-selected="true">All Questions</button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="llm-comparison-tab" data-bs-toggle="tab"
-                                data-bs-target="#llm-comparison" type="button" role="tab"
-                                aria-controls="llm-comparison" aria-selected="false">LLM Comparison</button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="pdf-answers-tab" data-bs-toggle="tab"
-                                data-bs-target="#pdf-answers" type="button" role="tab" aria-controls="pdf-answers"
-                                aria-selected="false">PDF Answers & Scores</button>
-                        </li>
-                    </ul>
-                </div>
+                
                 <div class="card-body">
                     <div class="tab-content" id="questionsTabContent">
                         <!-- All Questions Tab -->
@@ -308,59 +290,6 @@
                             </div>
                         </div>
 
-                        <!-- LLM Comparison Tab -->
-                        <div class="tab-pane fade" id="llm-comparison" role="tabpanel"
-                            aria-labelledby="llm-comparison-tab">
-                            <div class="table-responsive">
-                                <table class="table" id="llm-table">
-                                    <thead>
-                                        <tr>
-                                            <th>No</th>
-                                            <th>Question</th>
-                                            <th>OpenAI Answer</th>
-                                            <th>Gemini Answer</th>
-                                            <th>LLama Answer</th>
-                                        </tr>
-                                    </thead>
-                                </table>
-                            </div>
-                        </div>
-
-                        <!-- User Answers Tab -->
-                        <div class="tab-pane fade" id="user-answers" role="tabpanel" aria-labelledby="user-answers-tab">
-                            <div class="table-responsive">
-                                <table class="table" id="user-answers-table">
-                                    <thead>
-                                        <tr>
-                                            <th>No</th>
-                                            <th>Question</th>
-                                            <th>User Answer</th>
-                                            <th>User</th>
-                                            <th>Cosine Similarity</th>
-                                            <th>Timestamp</th>
-                                        </tr>
-                                    </thead>
-                                </table>
-                            </div>
-                        </div>
-
-                        <!-- PDF Answers Tab -->
-                        <div class="tab-pane fade" id="pdf-answers" role="tabpanel" aria-labelledby="pdf-answers-tab">
-                            <div class="table-responsive">
-                                <table class="table" id="pdf-answers-table">
-                                    <thead>
-                                        <tr>
-                                            <th>No</th>
-                                            <th>Question</th>
-                                            <th>PDF Answer</th>
-                                            <th>Combined Score</th>
-                                            <th>QA Score</th>
-                                            <th>Retrieval Score</th>
-                                        </tr>
-                                    </thead>
-                                </table>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -542,6 +471,34 @@
                 </div>
             </div>
         </div>
+
+        <!-- Preview PDF Answers Modal -->
+        <div class="modal fade" id="previewPdfAnswersModal" tabindex="-1" aria-labelledby="previewPdfAnswersModalLabel"
+            aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="previewPdfAnswersModalLabel">PDF Answers</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <h6>Question:</h6>
+                            <p id="previewPdfQuestionText" class="p-2 bg-light rounded"></p>
+                        </div>
+                        <div class="mb-3">
+                            <div class="accordion" id="pdfAnswersAccordion">
+                                <!-- PDF Answers will be added here dynamically -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <div id="loading-overlay" style="display: none;">
@@ -580,7 +537,6 @@
             // Fungsi untuk handle submit form
             let completedRequests = 0; // Jumlah operasi yang sudah selesai
             let totalRequests = 0; // Total operasi yang akan dijalankan
-            initializeDataTables();
 
             $('#threshold-input').on('input', function() {
                 $('#threshold-value').text($(this).val() + '%');
@@ -658,6 +614,7 @@
                         combined_score: question.combined_score,
                         qa_score: question.qa_score,
                         retrieval_score: question.retrieval_score,
+                        page_references: question.page_references,
                         // Include LLM answers
                         answer_openai: question.answer_openai,
                         answer_openai_guid: question.answer_openai_guid,
@@ -665,7 +622,7 @@
                         answer_gemini_guid: question.answer_gemini_guid,
                         answer_llama: question.answer_llama,
                         answer_llama_guid: question.answer_llama_guid,
-                        
+
                     };
                 });
 
@@ -838,8 +795,6 @@
                         getBertAnswers(response.data, topic, language)
                             .then(questionsWithAnswers => {
                                 // Update tabel dengan jawaban yang dihasilkan
-                                updatePdfAnswersTable(questionsWithAnswers);
-
 
                                 toastr.success('Questions and answers generated successfully.');
                                 showLoading("generate answer with LLM")
@@ -865,59 +820,6 @@
                 });
             }
 
-            function updatePdfAnswersTable(questionsWithAnswers) {
-                if (!$.fn.DataTable.isDataTable('#pdf-answers-table')) {
-                    $('#pdf-answers-table').DataTable({
-                        columns: [{
-                                data: 'index',
-                                title: 'No'
-                            },
-                            {
-                                data: 'question',
-                                title: 'Question',
-                                className: 'text-wrap',
-                            },
-                            {
-                                data: 'pdf_answer',
-                                title: 'PDF Answer',
-                                className: 'text-wrap'
-                            },
-                            {
-                                data: 'combined_score',
-                                title: 'Combined Score',
-                                render: function(data) {
-                                    return data ? parseFloat(data).toFixed(2) : '0.00';
-                                }
-                            },
-                            {
-                                data: 'qa_score',
-                                title: 'QA Score',
-                                render: function(data) {
-                                    return data ? parseFloat(data).toFixed(2) : '0.00';
-                                }
-                            },
-                            {
-                                data: 'retrieval_score',
-                                title: 'Retrieval Score',
-                                render: function(data) {
-                                    return data ? parseFloat(data).toFixed(2) : '0.00';
-                                }
-                            }
-                        ],
-                        searching: true,
-                        paging: true,
-                        info: true
-                    });
-                }
-
-                // Filter questions to only those with PDF answers
-                const answeredQuestions = questionsWithAnswers.filter(q => q.pdf_answer);
-
-                if (answeredQuestions.length > 0) {
-                    const pdfTable = $('#pdf-answers-table').DataTable();
-                    pdfTable.clear().rows.add(answeredQuestions).draw();
-                }
-            }
 
             function processGeneratedData(data, language, defaultThreshold) {
                 // Append necessary fields to make data compatible with all tables
@@ -929,8 +831,6 @@
                     item.threshold = item.threshold || defaultThreshold;
 
                 });
-
-                populateOtherTables(data);
             }
 
             function processQuestionsWithLLM(questions) {
@@ -1057,181 +957,16 @@
                         const table = $('#table-data').DataTable();
                         table.draw();
                         hideLoading();
-                        // Sync data to the LLM comparison table
-                        syncLlmAnswersToComparisonTable();
+            
 
                         toastr.success('LLM answers generated successfully.');
                     }
                 }
             }
 
-            function getLLMAnswer(model, prompt, questionGuid) {
-                $.ajax({
-                    type: "POST",
-                    url: "{{ env('URL_API') }}/api/v1/llm-answer", // Laravel endpoint
-                    data: {
-                        model: model,
-                        prompt: prompt,
-                        question_guid: questionGuid
-                    },
-                    beforeSend: function(request) {
-                        request.setRequestHeader("Authorization", "Bearer {{ $token }}");
-                    },
-                    success: function(response) {
-                        if (response.data && response.data.response) {
-                            console.log(`Response from ${model}:`, response.data.response);
+            
 
-                            // Update tabel dengan jawaban
-                            const table = $('#table-data').DataTable();
-                            table.rows().every(function() {
-                                const data = this.data();
-                                if (data.guid === questionGuid) {
-                                    data[`answer_${model}`] = response
-                                        .response; // Simpan jawaban di kolom yang sesuai
-                                    this.data(data).draw(false);
-                                }
-                            });
-                            if ($.fn.DataTable.isDataTable('#llm-table')) {
-                                const llmTable = $('#llm-table').DataTable();
-                                llmTable.rows().every(function() {
-                                    const llmData = this.data();
-                                    if (llmData.question === prompt) {
-                                        llmData[`answer_${model}`] = response.data.response;
-                                        this.data(llmData).draw(false);
-                                    }
-                                });
-                            }
-                            toastr.success(`Response from ${model} received successfully.`);
-
-                        } else {
-                            toastr.error(`No response from ${model}.`);
-                        }
-                    },
-                    error: function(xhr) {
-                        toastr.error(`Failed to get response from ${model}: ${xhr.responseText}`);
-                    }
-                });
-            }
-
-
-            function syncLlmAnswersToComparisonTable() {
-                // Only proceed if both tables exist
-                if (!$.fn.DataTable.isDataTable('#table-data') || !$.fn.DataTable.isDataTable('#llm-table')) {
-                    return;
-                }
-
-                const mainTable = $('#table-data').DataTable();
-                const llmTable = $('#llm-table').DataTable();
-
-                // Clear the LLM table first
-                llmTable.clear();
-
-                // Add data from main table to LLM table
-                mainTable.rows().every(function() {
-                    const data = this.data();
-
-                    // Create a new row for the LLM table
-                    const llmData = {
-                        index: data.index,
-                        question: data.question,
-                        answer_openai: data.answer_openai || '',
-                        answer_gemini: data.answer_gemini || '',
-                        answer_llama: data.answer_llama || '',
-                    };
-
-                    // Add to LLM table
-                    llmTable.row.add(llmData);
-                });
-
-                // Draw the updated table
-                llmTable.draw();
-            }
-
-            function updatePdfAnswersTable(questions) {
-                const table = $('#pdf-answers-table');
-                table.DataTable().clear().destroy();
-
-                const rows = questions.map((question, index) => {
-                    // Default answer display (best answer)
-                    let answerDisplay =
-                        `<div class="pdf-answer-content">${question.pdf_answer || 'No answer available'}</div>`;
-                    let scoreDisplay = `
-            <div>Combined: ${question.combined_score ? question.combined_score.toFixed(4) : 'N/A'}</div>
-            <div>QA: ${question.qa_score ? question.qa_score.toFixed(4) : 'N/A'}</div>
-            <div>Retrieval: ${question.retrieval_score ? question.retrieval_score.toFixed(4) : 'N/A'}</div>
-        `;
-
-                    // If we have multiple answers, add a dropdown
-                    if (question.all_pdf_answers && question.all_pdf_answers.length > 1) {
-                        const selectId = `answer-select-${index}`;
-
-                        // Create dropdown with all answers
-                        let selectOptions = '<option value="-1">Select alternate answer...</option>';
-                        question.all_pdf_answers.forEach((answer, answerIndex) => {
-                            selectOptions +=
-                                `<option value="${answerIndex}">Answer ${answerIndex + 1} (Score: ${answer.combined_score.toFixed(4)})</option>`;
-                        });
-
-                        // Add dropdown to the display
-                        answerDisplay = `
-                <div class="pdf-answer-content mb-2">${question.pdf_answer || 'No answer available'}</div>
-                <div class="alternate-answers">
-                    <select class="form-select answer-selector" id="${selectId}" data-question-index="${index}">
-                        ${selectOptions}
-                    </select>
-                </div>
-            `;
-                    }
-
-                    return [
-                        index + 1,
-                        question.question,
-                        answerDisplay,
-                        `<div class="scores-container">${scoreDisplay}</div>`,
-                        question.qa_score ? question.qa_score.toFixed(4) : 'N/A',
-                        question.retrieval_score ? question.retrieval_score.toFixed(4) : 'N/A'
-                    ];
-                });
-
-                // Initialize DataTable with the new rows
-                const dataTable = table.DataTable({
-                    data: rows,
-                    responsive: true,
-                    pageLength: 10,
-                    lengthMenu: [
-                        [5, 10, 25, 50, -1],
-                        [5, 10, 25, 50, "All"]
-                    ]
-                });
-
-                // Add event listeners for answer selection
-                $('.answer-selector').on('change', function() {
-                    const questionIndex = $(this).data('question-index');
-                    const answerIndex = parseInt($(this).val());
-
-                    if (answerIndex >= 0) {
-                        // Get the selected answer data
-                        const question = questions[questionIndex];
-                        const selectedAnswer = question.all_pdf_answers[answerIndex];
-
-                        // Update the displayed answer and scores
-                        const answerContainer = $(this).closest('tr').find('.pdf-answer-content');
-                        const scoresContainer = $(this).closest('tr').find('.scores-container');
-
-                        answerContainer.html(selectedAnswer.answer);
-                        scoresContainer.html(`
-                <div>Combined: ${selectedAnswer.combined_score.toFixed(4)}</div>
-                <div>QA: ${selectedAnswer.qa_score.toFixed(4)}</div>
-                <div>Retrieval: ${selectedAnswer.retrieval_score.toFixed(4)}</div>
-            `);
-
-                        // Reset dropdown
-                        $(this).val(-1);
-                    }
-                });
-            }
-
-
+      
             function getBertAnswers(questions, topic, language) {
                 const promises = questions.map(question => {
                     return new Promise((resolve, reject) => {
@@ -1286,7 +1021,6 @@
 
                 return Promise.all(promises)
                     .then(updatedQuestions => {
-                        updatePdfAnswersTable(updatedQuestions);
                         return updatedQuestions;
                     })
 
@@ -1308,7 +1042,6 @@
             let lastIndex = 0; // Variabel untuk menyimpan nomor terakhir
 
             function loadDataToTable(data, language, defaultThreshold) {
-
 
                 // Tampilkan container tabel
                 $('#table-container').show();
@@ -1390,6 +1123,9 @@
                                 <button class="btn btn-sm btn-info preview-llm-btn" data-id="${row.guid}">
                                     <i class="fas fa-eye"></i> LLM
                                 </button>
+                                <button class="btn btn-sm btn-primary preview-pdf-btn" data-id="${row.guid}">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
                                 
                             </div>
                         `;
@@ -1427,121 +1163,7 @@
                 updateFilterOptions();
             }
 
-            function populateOtherTables(data) {
-                // Populate LLM Comparison table
-                if ($.fn.DataTable.isDataTable('#llm-table')) {
-                    const llmTable = $('#llm-table').DataTable();
-
-                    // Transform data for LLM table
-                    const llmData = data.map(item => ({
-                        index: item.index,
-                        question: item.question,
-                        answer_openai: item.answer_openai || '',
-                        answer_gemini: item.answer_gemini || '',
-                        answer_llama: item.answer_llama || '',
-                        // Could be populated if you have other model data
-                    }));
-
-                    llmTable.rows.add(llmData).draw();
-                }
-
-                // Populate PDF Answers table
-                if ($.fn.DataTable.isDataTable('#pdf-answers-table')) {
-                    const pdfTable = $('#pdf-answers-table').DataTable();
-
-                    // Transform data for PDF table
-                    const pdfData = data.map(item => ({
-                        index: item.index,
-                        question: item.question,
-                        pdf_answer: item.pdf_answer || '',
-                        combined_score: item.combined_score || 0,
-                        qa_score: item.qa_score || 0,
-                        retrieval_score: item.retrieval_score || 0
-                    }));
-
-                    pdfTable.rows.add(pdfData).draw();
-                }
-            }
-
-            function initializeDataTables() {
-                // Initialize the LLM comparison table
-                $('#llm-table').DataTable({
-                    columns: [{
-                            data: 'index',
-                            title: 'No'
-                        },
-                        {
-                            data: 'question',
-                            title: 'Question',
-                            className: 'text-wrap',
-                        },
-                        {
-                            data: 'answer_openai',
-                            title: 'OpenAI Answer',
-                            className: 'text-wrap'
-                        },
-                        {
-                            data: 'answer_gemini',
-                            title: 'Gemini Answer',
-                            className: 'text-wrap'
-                        },
-                        {
-                            data: 'answer_llama',
-                            title: 'Llama Answer',
-                            className: 'text-wrap'
-                        }
-                    ],
-                    scrollX: true,
-                    searching: true,
-                    paging: true,
-                    info: true
-                });
-
-                // Initialize the PDF answers table
-                $('#pdf-answers-table').DataTable({
-                    columns: [{
-                            data: 'index',
-                            title: 'No'
-                        },
-                        {
-                            data: 'question',
-                            title: 'Question',
-                            className: 'text-wrap',
-                        },
-                        {
-                            data: 'pdf_answer',
-                            title: 'PDF Answer',
-                            className: 'text-wrap'
-                        },
-                        {
-                            data: 'combined_score',
-                            title: 'Combined Score',
-                            render: function(data) {
-                                return parseFloat(data).toFixed(2);
-                            }
-                        },
-                        {
-                            data: 'qa_score',
-                            title: 'QA Score',
-                            render: function(data) {
-                                return parseFloat(data).toFixed(2);
-                            }
-                        },
-                        {
-                            data: 'retrieval_score',
-                            title: 'Retrieval Score',
-                            render: function(data) {
-                                return parseFloat(data).toFixed(2);
-                            }
-                        }
-                    ],
-                    scrollX: true,
-                    searching: true,
-                    paging: true,
-                    info: true
-                });
-            }
-
+            
             function updateFilterOptions() {
                 // Clear current options
                 $('#language-filters').empty();
@@ -1641,25 +1263,41 @@
                 $('#table-data').DataTable().draw();
             }
 
-            function refreshTabTable(tabId) {
-                // Redraw the table in the active tab to ensure proper rendering
-                switch (tabId) {
-                    case '#llm-comparison':
-                        if ($.fn.DataTable.isDataTable('#llm-table')) {
-                            $('#llm-table').DataTable().columns.adjust().draw();
-                        }
-                        break;
-                    case '#pdf-answers':
-                        if ($.fn.DataTable.isDataTable('#pdf-answers-table')) {
-                            $('#pdf-answers-table').DataTable().columns.adjust().draw();
-                        }
-                        break;
-                    default:
-                        if ($.fn.DataTable.isDataTable('#table-data')) {
-                            $('#table-data').DataTable().columns.adjust().draw();
-                        }
+            
+            function showPdfAnswersModal(rowData) {
+                $('#previewPdfQuestionText').text(rowData.question);
+
+                // Clear previous answers
+                $('#pdfAnswersAccordion').empty();
+
+                // Tambahkan jawaban PDF ke modal
+                if (rowData.all_pdf_answers && rowData.all_pdf_answers.length > 0) {
+                    rowData.all_pdf_answers.forEach((answer, index) => {
+                        $('#pdfAnswersAccordion').append(`
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="heading-pdf-${index}">
+                        <button class="accordion-button" type="button" data-bs-toggle="collapse"
+                            data-bs-target="#collapse-pdf-${index}" aria-expanded="true" aria-controls="collapse-pdf-${index}">
+                            Answer ${index + 1} (Score: ${answer.combined_score.toFixed(4)})
+                        </button>
+                    </h2>
+                    <div id="collapse-pdf-${index}" class="accordion-collapse collapse show"
+                        aria-labelledby="heading-pdf-${index}" data-bs-parent="#pdfAnswersAccordion">
+                        <div class="accordion-body">
+                            ${answer.answer}
+                        </div>
+                    </div>
+                </div>
+            `);
+                    });
+                } else {
+                    $('#pdfAnswersAccordion').append('<p>No PDF answers available.</p>');
                 }
+
+                // Tampilkan modal
+                $('#previewPdfAnswersModal').modal('show');
             }
+
 
             function showLlmAnswersModal(rowData) {
                 // Populate the modal with data
@@ -1762,16 +1400,18 @@
                 resetTableFilters();
             });
 
-            $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function(e) {
-                const targetTabId = $(e.target).attr('href');
-                refreshTabTable(targetTabId);
-            });
 
             // Preview LLM answers button handler
             $('#table-data').on('click', '.preview-llm-btn', function() {
                 const rowData = $('#table-data').DataTable().row($(this).closest('tr')).data();
                 showLlmAnswersModal(rowData);
             });
+
+            $('#table-data').on('click', '.preview-pdf-btn', function() {
+                const rowData = $('#table-data').DataTable().row($(this).closest('tr')).data();
+                showPdfAnswersModal(rowData);
+            });
+
 
 
             // Event listener untuk tombol update di dalam modal
