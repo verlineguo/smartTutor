@@ -2,36 +2,40 @@ import numpy as np
 import pandas as pd
 import re
 import torch
+import fitz  # PyMuPDF for better PDF extraction
 from transformers import AutoTokenizer, AutoModel, pipeline
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
-from PyPDF2 import PdfReader
 import nltk
 from nltk.tokenize import sent_tokenize, word_tokenize
 import logging
+import openai
 import warnings
-from typing import List, Dict, Tuple, Any
-import time
+import requests
+from typing import List, Dict, Tuple, Any, Optional, Union
 
-# Konfigurasi logging
+# Logging setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 warnings.filterwarnings('ignore')
 
-# Download NLTK resources jika belum ada
+# Download NLTK resources if needed
 try:
     nltk.data.find('tokenizers/punkt')
 except LookupError:
     nltk.download('punkt')
 
+with open('hidden.txt') as file:
+    openai.api_key = file.read()
+    
+
 class BertAnsweringSystem:
-    def __init__(self):
-        """Inisialisasi model dan komponen yang diperlukan untuk sistem QA Bahasa Indonesia."""
-        logging.info("Memulai inisialisasi sistem QA Bahasa Indonesia...")
+    def __init__(self, use_openai_for_formatting: bool = True, openai_api_key: Optional[str] = openai.api_key):
+
+        logging.info("Initializing Indonesian QA system...")
         
-        # Model untuk pemahaman bahasa - menggunakan model multilingual yang mendukung bahasa Indonesia
-        self.qa_model_name = "deepset/xlm-roberta-base-squad2"
-        # Model embedding untuk retrieval - model multilingual yang mendukung bahasa Indonesia
-        self.embedding_model_name = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+        # Models selection - using multilingual models with better Indonesian support
+        self.qa_model_name = "deepset/xlm-roberta-large-squad2"  # Upgraded to large model
+        self.embedding_model_name = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"  # More accurate model
         
         logging.info(f"Loading QA model: {self.qa_model_name}")
         self.qa_pipe = pipeline('question-answering', model=self.qa_model_name, tokenizer=self.qa_model_name)
@@ -39,33 +43,42 @@ class BertAnsweringSystem:
         logging.info(f"Loading embedding model: {self.embedding_model_name}")
         self.embedding_model = SentenceTransformer(self.embedding_model_name)
         
-        # Model BERT untuk validasi jawaban dan perhitungan relevansi
-        logging.info("Loading model BERT untuk validasi jawaban")
-        self.bert_model_name = "indobenchmark/indobert-base-p1" # Model yang mendukung bahasa Indonesia
+        # Model for answer validation and relevance calculation
+        logging.info("Loading BERT model for answer validation")
+        self.bert_model_name = "indolem/indobert-base-uncased"  # Better Indonesian model
         self.bert_tokenizer = AutoTokenizer.from_pretrained(self.bert_model_name)
         self.bert_model = AutoModel.from_pretrained(self.bert_model_name)
         
-        # Konstanta untuk scoring
-        self.CHUNK_OVERLAP = 150  # Meningkatkan overlap untuk konteks lebih baik
-        self.MIN_CHUNK_SIZE = 300
-        self.MAX_CHUNK_SIZE = 800  # Meningkatkan ukuran chunk untuk lebih banyak konteks
-        self.QA_WEIGHT = 0.55
-        self.RETRIEVAL_WEIGHT = 0.45
+        # OpenAI integration for answer formatting
+        self.use_openai_for_formatting = use_openai_for_formatting
+        self.openai_api_key = openai_api_key
         
-        # Deteksi level taksonomi Bloom
+        if use_openai_for_formatting and not openai_api_key:
+            logging.warning("OpenAI API key not provided. Formatting will use internal methods only.")
+            self.use_openai_for_formatting = False
+            
+        # Constants for text processing and scoring
+        self.CHUNK_OVERLAP = 200  # Increased overlap for better context
+        self.MIN_CHUNK_SIZE = 300
+        self.MAX_CHUNK_SIZE = 1000  # Larger chunks for more context
+        self.QA_WEIGHT = 0.6
+        self.RETRIEVAL_WEIGHT = 0.4
+        
+        # Mathematical notation extraction flag
+        self.has_math_notation = False
+        
+        # Bloom taxonomy keywords for question classification
         self.bloom_keywords = {
             'remembering': ['apa', 'siapa', 'kapan', 'dimana', 'sebutkan', 'identifikasi', 'jelaskan', 'definisikan'],
             'understanding': ['jelaskan', 'uraikan', 'bandingkan', 'bedakan', 'interpretasikan', 'simpulkan'],
             'applying': ['terapkan', 'gunakan', 'demonstrasikan', 'ilustrasikan', 'hitung', 'selesaikan'],
             'analyzing': ['analisis', 'mengapa', 'bagaimana', 'klasifikasikan', 'bandingkan', 'kontras', 'sebab', 'akibat'],
-            'evaluating': ['evaluasi', 'nilai', 'kritik', 'justifikasi', 'dukung', 'tolak', 'putuskan'],
-            'creating': ['buatlah', 'rancang', 'kembangkan', 'susun', 'formulasikan', 'hipotesis']
         }
         
-        logging.info("Inisialisasi sistem QA Bahasa Indonesia selesai!")
+        logging.info("Indonesian QA system initialization complete!")
 
     def detect_bloom_level(self, question: str) -> str:
-        """Mendeteksi level taksonomi Bloom dari pertanyaan."""
+        """Detect Bloom's taxonomy level from the question."""
         question_lower = question.lower()
         detected_levels = {}
         
@@ -80,76 +93,241 @@ class BertAnsweringSystem:
         if not detected_levels:
             return 'remembering'  # default level
         
-        # Return level dengan jumlah keyword terbanyak
+        # Return level with highest keyword count
         return max(detected_levels.items(), key=lambda x: x[1])[0]
 
-    def load_pdf(self, pdf_path: str) -> str:
-        """Memuat dan mengekstrak teks dari file PDF."""
-        logging.info(f"Memuat PDF dari: {pdf_path}")
-        text = ""
+    def load_pdf(self, pdf_path: str) -> Tuple[str, List[Dict]]:
+        """Load and process PDF, maintaining page information for each sentence."""
+        logging.info(f"Loading PDF from: {pdf_path}")
+        full_text = ""
+        metadata = []
+        page_text_data = []  # Store text data with page numbers
+        
         try:
-            pdf_reader = PdfReader(pdf_path)
-            for page in pdf_reader.pages:
-                page_text = page.extract_text()
-                if page_text:  # Pastikan teks tidak kosong
-                    text += page_text + " "
+            # Open PDF
+            doc = fitz.open(pdf_path)
             
-            # Menangani karakter khusus dan spacing
-            text = re.sub(r'\s+', ' ', text)
-            text = text.strip()
+            # Check for math notation
+            math_patterns = [r'\$.*?\$', r'\\\(.*?\\\)', r'\\\[.*?\\\]', r'\\begin\{equation\}.*?\\end\{equation\}']
             
-            logging.info(f"Berhasil mengekstrak {len(text)} karakter dari PDF")
-            return text
+            # Process each page
+            for page_num, page in enumerate(doc):
+                # Extract text with formatting
+                page_text = page.get_text("text")
+                
+                # Check for math notation
+                for pattern in math_patterns:
+                    if re.search(pattern, page_text):
+                        self.has_math_notation = True
+                        logging.info(f"Mathematical notation detected on page {page_num + 1}")
+                        metadata.append({
+                            "type": "math_notation",
+                            "page": page_num + 1,
+                            "content": re.findall(pattern, page_text)
+                        })
+                
+                # Clean text
+                cleaned_page_text = self.preprocess_text(page_text)
+                
+                # Store the page text with its page number
+                page_text_data.append({
+                    "text": cleaned_page_text,
+                    "page": page_num + 1
+                })
+                
+                full_text += cleaned_page_text + " "
+            
+            # Final cleaning for the full text
+            full_text = self.preprocess_text(full_text)
+            
+            # Add page text data to metadata
+            metadata.append({
+                "type": "page_text_data",
+                "data": page_text_data
+            })
+            
+            # Tokenize each page into sentences with page numbers
+            sentence_page_mapping = []
+            for page_data in page_text_data:
+                page_sentences = sent_tokenize(page_data["text"])
+                page_num = page_data["page"]
+                
+                for sentence in page_sentences:
+                    if sentence.strip():  # Skip empty sentences
+                        sentence_page_mapping.append({
+                            "text": sentence.strip(),
+                            "page": page_num
+                        })
+            
+            # Add sentence-to-page mapping to metadata
+            metadata.append({
+                "type": "sentence_page_mapping",
+                "mapping": sentence_page_mapping
+            })
+            
+            logging.info(f"Successfully extracted {len(full_text)} characters from PDF")
+            logging.info(f"Created page mapping for {len(sentence_page_mapping)} sentences")
+            
+            return full_text, metadata
+            
         except Exception as e:
-            logging.error(f"Gagal memuat PDF: {str(e)}")
+            logging.error(f"Failed to load PDF: {str(e)}")
             raise
 
     def preprocess_text(self, text: str) -> str:
-        """Pra-pemrosesan teks untuk meningkatkan kualitas hasil."""
-        # Membersihkan teks
-        text = re.sub(r'\n+', ' ', text)  # Menghapus newlines
-        text = re.sub(r'\s+', ' ', text)  # Menghapus whitespace berlebih
-        text = re.sub(r'[^\w\s.,?!:;()\[\]{}"\'-]', '', text)  # Menghapus karakter aneh
+        """Preprocess text to improve quality of results."""
+        # Clean text
+        text = re.sub(r'\n+', ' ', text)  # Remove newlines
+        text = re.sub(r'\s+', ' ', text)  # Remove excess whitespace
         
-        # Normalisasi tanda baca
-        text = re.sub(r'\.+', '.', text)  # Mengganti multiple dots dengan single dot
-        text = re.sub(r'\s+([.,;:!?])', r'\1', text)  # Menghapus space sebelum tanda baca
+        # Keep important mathematical symbols for formulas
+        if self.has_math_notation:
+            # Remove strange characters but keep math symbols
+            text = re.sub(r'[^\w\s.,?!:;()\[\]{}"\'\-+=/\\*^_]', '', text)
+        else:
+            # Remove strange characters
+            text = re.sub(r'[^\w\s.,?!:;()\[\]{}"\'\-]', '', text)
+        
+        # Normalize punctuation
+        text = re.sub(r'\.+', '.', text)  # Replace multiple dots with single dot
+        text = re.sub(r'\s+([.,;:!?])', r'\1', text)  # Remove space before punctuation
         
         return text.strip()
 
+    def chunk_text_with_page_info(self, text: str, metadata: List[Dict]) -> List[Dict]:
+        """Split text into chunks while preserving page information."""
+        logging.info("Splitting text into chunks with page tracking...")
+        
+        # Get the sentence-to-page mapping
+        sentence_page_mapping = None
+        for item in metadata:
+            if item['type'] == 'sentence_page_mapping' and 'mapping' in item:
+                sentence_page_mapping = item['mapping']
+                break
+        
+        if not sentence_page_mapping:
+            logging.warning("No sentence-to-page mapping found. Using default chunking.")
+            chunks = self.chunk_text(text)
+            return [{"text": chunk, "pages": [1]} for chunk in chunks]  # Default to page 1
+        
+        # Extract all sentences with their page numbers
+        all_sentences = [(item["text"], item["page"]) for item in sentence_page_mapping]
+        
+        chunks_with_pages = []
+        current_chunk_text = ""
+        current_chunk_pages = set()
+        
+        for sentence, page in all_sentences:
+            # Add sentence to current chunk if within size limit
+            if len(current_chunk_text) + len(sentence) <= self.MAX_CHUNK_SIZE:
+                current_chunk_text += " " + sentence if current_chunk_text else sentence
+                current_chunk_pages.add(page)
+            else:
+                # If chunk is large enough, save it and start new chunk
+                if current_chunk_text and len(current_chunk_text) >= self.MIN_CHUNK_SIZE:
+                    chunks_with_pages.append({
+                        "text": current_chunk_text.strip(),
+                        "pages": sorted(list(current_chunk_pages))
+                    })
+                current_chunk_text = sentence
+                current_chunk_pages = {page}
+        
+        # Add final chunk if not empty
+        if current_chunk_text and len(current_chunk_text) >= self.MIN_CHUNK_SIZE:
+            chunks_with_pages.append({
+                "text": current_chunk_text.strip(),
+                "pages": sorted(list(current_chunk_pages))
+            })
+        
+        # Add overlap between chunks for better context (while preserving page info)
+        overlapped_chunks = []
+        for i in range(len(chunks_with_pages)):
+            if i < len(chunks_with_pages) - 1:
+                # Get current chunk
+                current_chunk = chunks_with_pages[i]["text"]
+                current_pages = set(chunks_with_pages[i]["pages"])
+                
+                # Get some sentences from next chunk
+                next_chunk = chunks_with_pages[i+1]["text"]
+                next_pages = set(chunks_with_pages[i+1]["pages"])
+                
+                next_sentences = sent_tokenize(next_chunk)
+                overlap_text = " ".join(next_sentences[:3]) if len(next_sentences) >= 3 else next_chunk[:self.CHUNK_OVERLAP]
+                
+                # Combine text and pages
+                overlapped_text = current_chunk + " " + overlap_text
+                combined_pages = sorted(list(current_pages.union(next_pages)))
+                
+                overlapped_chunks.append({
+                    "text": overlapped_text,
+                    "pages": combined_pages
+                })
+            else:
+                overlapped_chunks.append(chunks_with_pages[i])
+        
+        # Ensure chunks aren't too small by combining when needed
+        final_chunks = []
+        current_text = ""
+        current_pages = set()
+        
+        for chunk in overlapped_chunks:
+            if len(current_text) + len(chunk["text"]) <= self.MAX_CHUNK_SIZE * 1.2:
+                current_text += " " + chunk["text"] if current_text else chunk["text"]
+                current_pages.update(chunk["pages"])
+            else:
+                if current_text:
+                    final_chunks.append({
+                        "text": current_text.strip(),
+                        "pages": sorted(list(current_pages))
+                    })
+                current_text = chunk["text"]
+                current_pages = set(chunk["pages"])
+        
+        if current_text:
+            final_chunks.append({
+                "text": current_text.strip(),
+                "pages": sorted(list(current_pages))
+            })
+        
+        logging.info(f"Text split into {len(final_chunks)} chunks with page tracking")
+        return final_chunks
+
     def chunk_text(self, text: str) -> List[str]:
-        """Membagi teks menjadi chunk dengan overlap untuk konteks yang lebih baik."""
-        logging.info("Membagi teks menjadi chunk...")
+        """
+        Legacy method: Split text into chunks with overlap.
+        Used as fallback when page information isn't available.
+        """
+        logging.info("Splitting text into chunks (legacy method)...")
         sentences = sent_tokenize(text)
         chunks = []
         current_chunk = ""
         
         for sentence in sentences:
-            # Menambahkan kalimat ke chunk saat ini jika masih dalam batas ukuran
+            # Add sentence to current chunk if within size limit
             if len(current_chunk) + len(sentence) <= self.MAX_CHUNK_SIZE:
                 current_chunk += " " + sentence if current_chunk else sentence
             else:
-                # Jika chunk sudah cukup besar, simpan dan mulai chunk baru
-                if current_chunk:
+                # If chunk is large enough, save it and start new chunk
+                if current_chunk and len(current_chunk) >= self.MIN_CHUNK_SIZE:
                     chunks.append(current_chunk.strip())
                 current_chunk = sentence
         
-        # Menambahkan chunk terakhir jika tidak kosong
-        if current_chunk:
+        # Add final chunk if not empty
+        if current_chunk and len(current_chunk) >= self.MIN_CHUNK_SIZE:
             chunks.append(current_chunk.strip())
             
-        # Menambahkan overlap antara chunk untuk konteks yang lebih baik
+        # Add overlap between chunks for better context
         overlapped_chunks = []
         for i in range(len(chunks)):
             if i < len(chunks) - 1:
-                # Dapatkan beberapa kalimat dari chunk berikutnya
+                # Get some sentences from next chunk
                 next_sentences = sent_tokenize(chunks[i+1])
                 overlap_text = " ".join(next_sentences[:3]) if len(next_sentences) >= 3 else chunks[i+1][:self.CHUNK_OVERLAP]
                 overlapped_chunks.append(chunks[i] + " " + overlap_text)
             else:
                 overlapped_chunks.append(chunks[i])
         
-        # Tambahan: pastikan chunk tidak terlalu kecil dengan menggabungkan chunk yang pendek
+        # Make sure chunks aren't too small by combining short chunks
         final_chunks = []
         current_chunk = ""
         for chunk in overlapped_chunks:
@@ -163,22 +341,22 @@ class BertAnsweringSystem:
         if current_chunk:
             final_chunks.append(current_chunk.strip())
         
-        logging.info(f"Teks dibagi menjadi {len(final_chunks)} chunk")
+        logging.info(f"Text split into {len(final_chunks)} chunks")
         return final_chunks
 
     def get_embeddings(self, texts: List[str]) -> np.ndarray:
-        """Menghasilkan embeddings untuk list teks menggunakan model embedding."""
+        """Generate embeddings for list of texts using embedding model."""
         return self.embedding_model.encode(texts)
 
     def calculate_relevance(self, question_embedding: np.ndarray, chunk_embeddings: np.ndarray) -> List[float]:
-        """Menghitung skor relevansi antara pertanyaan dan setiap chunk berdasarkan cosine similarity."""
+        """Calculate relevance scores between question and each chunk based on cosine similarity."""
         similarity_scores = cosine_similarity([question_embedding], chunk_embeddings)[0]
         return similarity_scores
 
     def validate_answer(self, question: str, answer: str, context: str) -> Tuple[bool, float]:
-        """Memvalidasi jawaban menggunakan BERT untuk mengukur konsistensi."""
+        """Validate answer using BERT to measure consistency."""
         try:
-            # Encode question + context dan question + answer
+            # Encode question + context and question + answer
             inputs_context = self.bert_tokenizer(question, context, return_tensors="pt", truncation=True, max_length=512)
             inputs_answer = self.bert_tokenizer(question, answer, return_tensors="pt", truncation=True, max_length=512)
             
@@ -191,410 +369,547 @@ class BertAnsweringSystem:
             context_embedding = outputs_context.last_hidden_state[:, 0, :].numpy()
             answer_embedding = outputs_answer.last_hidden_state[:, 0, :].numpy()
             
-            # Hitung cosine similarity
+            # Calculate cosine similarity
             similarity = cosine_similarity(context_embedding, answer_embedding)[0][0]
             
-            # Jawaban valid jika similarity diatas threshold tertentu
-            valid = similarity > 0.65
+            # Answer is valid if similarity above threshold
+            valid = similarity > 0.7  # Increased threshold for stricter validation
             return valid, similarity
         except Exception as e:
-            logging.warning(f"Error validasi jawaban: {str(e)}")
+            logging.warning(f"Error validating answer: {str(e)}")
             return True, 0.7  # Default fallback
 
-    def generate_essay_answer(self, question: str, relevant_chunks: List[str], bloom_level: str) -> str:
-        """
-        Menghasilkan jawaban esai berdasarkan konteks yang relevan dan level taksonomi Bloom.
-        """
+    def format_answer_with_openai(self, answer: str, question: str, page_refs: List[int] = None) -> str:
+        """Format the answer using OpenAI API for better readability."""
+        if not self.use_openai_for_formatting or not self.openai_api_key:
+            return answer
+            
         try:
-            # Gabungkan chunk-chunk yang relevan dengan batasan ukuran
-            combined_context = " ".join(relevant_chunks)
-            if len(combined_context) > 1500:
-                combined_context = combined_context[:1500]
+            # Page reference text
+            page_ref_text = ""
+            if page_refs and len(page_refs) > 0:
+                unique_pages = sorted(list(set(page_refs)))
+                page_ref_text = f"[Referensi: Halaman {', '.join(map(str, unique_pages))}]"
             
-            # Buat prompt yang sesuai dengan level taksonomi Bloom
-            if bloom_level in ['remembering', 'understanding']:
-                prompt = f"Berdasarkan informasi berikut, berikan jawaban detail dan komprehensif untuk pertanyaan: '{question}'. Jawaban harus lengkap dan informatif."
-            elif bloom_level == 'applying':
-                prompt = f"Berdasarkan informasi berikut, jelaskan secara lengkap bagaimana menerapkan konsep dalam pertanyaan: '{question}'. Sertakan contoh dan aplikasi praktis."
-            elif bloom_level == 'analyzing':
-                prompt = f"Berdasarkan informasi berikut, lakukan analisis mendalam untuk pertanyaan: '{question}'. Identifikasi komponen utama, hubungan antar konsep, dan berikan pemahaman yang mendalam."
-            elif bloom_level in ['evaluating', 'creating']:
-                prompt = f"Berdasarkan informasi berikut, berikan evaluasi kritis dan menyeluruh untuk pertanyaan: '{question}'. Sertakan argumen yang didukung bukti, kemungkinan solusi, dan kesimpulan."
+            # Prepare prompt for OpenAI
+            prompt = f"""
+            Berikut adalah pertanyaan dalam Bahasa Indonesia dan jawaban yang akan diformat ulang.
+            
+            Pertanyaan: {question}
+            
+            Jawaban mentah: {answer}
+            
+            Referensi halaman: {page_ref_text}
+            
+            Tolong format ulang jawaban tersebut agar lebih mudah dibaca dan dipahami. 
+            Pastikan untuk:
+            1. Memperbaiki tata bahasa dan ejaan
+            2. Menjaga konten asli tetap utuh
+            3. Memperbaiki format rumus matematika jika ada
+            4. Pastikan jawaban lengkap dan tidak dipotong
+            5. Tambahkan struktur yang jelas jika diperlukan (paragraf, dll)
+            6. PENTING: Sertakan referensi halaman di akhir jawaban dalam format [Referensi: Halaman X, Y, Z]
+            
+            Jawaban yang sudah diformat:
+            """
+            
+            # Call OpenAI API
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.openai_api_key}"
+            }
+            
+            data = {
+                "model": "gpt-3.5-turbo",
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.3,  # Low temperature for more consistent formatting
+                "max_tokens": 1000
+            }
+            
+            response = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers=headers,
+                json=data
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                formatted_answer = result["choices"][0]["message"]["content"].strip()
+                # Make sure page reference is included
+                if page_ref_text and page_ref_text not in formatted_answer:
+                    formatted_answer += f"\n\n{page_ref_text}"
+                return formatted_answer
             else:
-                prompt = f"Berdasarkan informasi berikut, berikan jawaban komprehensif untuk pertanyaan: '{question}'."
+                logging.warning(f"OpenAI API error: {response.status_code} - {response.text}")
+                # Add page reference if not formatted by OpenAI
+                if page_ref_text and page_ref_text not in answer:
+                    answer += f"\n\n{page_ref_text}"
+                return answer
+                
+        except Exception as e:
+            logging.error(f"Error formatting with OpenAI: {str(e)}")
+            # Add page reference if formatting fails
+            if page_refs and len(page_refs) > 0:
+                unique_pages = sorted(list(set(page_refs)))
+                page_ref_text = f"[Referensi: Halaman {', '.join(map(str, unique_pages))}]"
+                if page_ref_text not in answer:
+                    answer += f"\n\n{page_ref_text}"
+            return answer
+
+    def find_page_references(self, answer: str, metadata: List[Dict]) -> List[int]:
+        """Find page references for the given answer text using improved matching algorithm."""
+        page_refs = []
+        
+        # First try to get sentence-to-page mapping
+        sentence_page_mapping = None
+        for item in metadata:
+            if item['type'] == 'sentence_page_mapping' and 'mapping' in item:
+                sentence_page_mapping = item['mapping']
+                break
+                
+        if not sentence_page_mapping:
+            logging.warning("No sentence-to-page mapping found in metadata.")
+            return page_refs
+        
+        # Break answer into sentences for more precise matching
+        answer_sentences = sent_tokenize(answer)
+        
+        # For each answer sentence, try to find matching or similar sentences in our mapping
+        for ans_sentence in answer_sentences:
+            ans_sentence = ans_sentence.strip()
+            if len(ans_sentence) < 10:  # Skip very short sentences
+                continue
+                
+            # Prepare answer words for comparison (normalized)
+            ans_words = set(word.lower() for word in word_tokenize(ans_sentence) if len(word) > 3)
+            if not ans_words:  # Skip if no substantial words
+                continue
+                
+            best_match_score = 0
+            best_match_page = None
             
-            # Gunakan pipeline QA untuk mendapatkan jawaban awal
-            qa_result = self.qa_pipe(question=prompt, context=combined_context)
+            # For each sentence in our mapping, calculate similarity score
+            for mapping in sentence_page_mapping:
+                page_sentence = mapping['text'].strip()
+                page_num = mapping['page']
+                
+                # Skip very short sentences from mapping
+                if len(page_sentence) < 10:
+                    continue
+                    
+                # Check for exact matches first (highly reliable)
+                if ans_sentence in page_sentence or page_sentence in ans_sentence:
+                    page_refs.append(page_num)
+                    break
+                
+                # If no exact match, calculate word overlap ratio
+                page_words = set(word.lower() for word in word_tokenize(page_sentence) if len(word) > 3)
+                if not page_words:
+                    continue
+                    
+                # Calculate Jaccard similarity
+                common_words = ans_words.intersection(page_words)
+                if not common_words:
+                    continue
+                    
+                total_words = len(ans_words.union(page_words))
+                similarity = len(common_words) / total_words if total_words > 0 else 0
+                
+                # Keep track of best match
+                if similarity > best_match_score and similarity >= 0.4:  # Threshold for similarity
+                    best_match_score = similarity
+                    best_match_page = page_num
+            
+            # If we found a good match above threshold
+            if best_match_page is not None:
+                page_refs.append(best_match_page)
+        
+        # If we still have no references, try fallback method using chunk page info
+        if not page_refs:
+            logging.info("Using fallback method for page references")
+            
+            # Try to find matching pages from chunk metadata
+            for item in metadata:
+                if item['type'] == 'page_text_data' and 'data' in item:
+                    page_text_data = item['data']
+                    
+                    for page_data in page_text_data:
+                        page_text = page_data['text'].lower()
+                        page_num = page_data['page']
+                        
+                        # Check if significant parts of the answer appear on this page
+                        for ans_sentence in answer_sentences:
+                            if len(ans_sentence) > 15:  # Consider only substantial sentences
+                                # Look for key phrases (3+ word sequences)
+                                ans_words = word_tokenize(ans_sentence.lower())
+                                if len(ans_words) >= 3:
+                                    for i in range(len(ans_words) - 2):
+                                        phrase = " ".join(ans_words[i:i+3])
+                                        if len(phrase) >= 10 and phrase in page_text:
+                                            page_refs.append(page_num)
+                                            break
+        
+        # If still no references, use general content similarity as last resort
+        if not page_refs:
+            logging.info("Using content similarity for page references")
+            answer_embedding = self.embedding_model.encode(answer)
+            
+            page_texts = []
+            page_nums = []
+            
+            for item in metadata:
+                if item['type'] == 'page_text_data' and 'data' in item:
+                    for page_data in item['data']:
+                        page_texts.append(page_data['text'])
+                        page_nums.append(page_data['page'])
+            
+            if page_texts and page_nums:
+                page_embeddings = self.embedding_model.encode(page_texts)
+                similarities = cosine_similarity([answer_embedding], page_embeddings)[0]
+                
+                # Get pages with highest similarity scores
+                top_indices = similarities.argsort()[-3:][::-1]  # Top 3 similar pages
+                for idx in top_indices:
+                    if similarities[idx] > 0.5:  # Minimum similarity threshold
+                        page_refs.append(page_nums[idx])
+        
+        # Return unique, sorted page numbers
+        return sorted(list(set(page_refs)))
+
+    def generate_direct_answer(self, question: str, relevant_chunks: List[Dict], bloom_level: str, metadata: List[Dict]) -> Tuple[str, List[int]]:
+        """Generate a comprehensive answer from relevant chunks with page references."""
+        try:
+            # Extract text from chunks
+            chunk_texts = [chunk["text"] for chunk in relevant_chunks]
+            
+            # Combine relevant chunks with size limit
+            combined_context = " ".join(chunk_texts)
+            if len(combined_context) > 2000:  # Use first 2000 chars for initial pass
+                combined_context = combined_context[:2000]
+            
+            # Use QA pipeline to get initial answer
+            qa_result = self.qa_pipe(question=question, context=combined_context)
             initial_answer = qa_result['answer']
             
-            # Perluasan jawaban: Dapatkan jawaban lainnya dari chunk berbeda untuk memperkaya
+            # Get additional answers from different chunks to enrich
             additional_answers = []
-            for chunk in relevant_chunks[:3]:  # Ambil 3 chunk paling relevan
+            for chunk_dict in relevant_chunks[:3]:  # Take 3 most relevant chunks
                 try:
-                    result = self.qa_pipe(question=question, context=chunk)
+                    chunk_text = chunk_dict["text"]
+                    result = self.qa_pipe(question=question, context=chunk_text)
                     if result['answer'] not in [initial_answer] + additional_answers:
                         additional_answers.append(result['answer'])
                 except:
                     continue
             
-            # Gabungkan jawaban-jawaban untuk membuat esai yang lebih kaya
-            essay_parts = [initial_answer] + additional_answers
-            
-            # Gabungkan semua bagian menjadi esai yang koheren
+            # Combine answers in a coherent way based on bloom level
             if bloom_level in ['remembering', 'understanding']:
-                essay = self._construct_essay_remembering(question, essay_parts)
+                # For basic recall/understanding, keep it simple and direct
+                if additional_answers:
+                    combined_answer = initial_answer + " " + " ".join(additional_answers)
+                else:
+                    combined_answer = initial_answer
+                    
             elif bloom_level == 'applying':
-                essay = self._construct_essay_applying(question, essay_parts, combined_context)
+                # For application questions, include examples if available
+                combined_answer = initial_answer
+                if additional_answers:
+                    combined_answer += " " + additional_answers[0]
+                    if len(additional_answers) > 1:
+                        combined_answer += " " + additional_answers[1]
+                        
             elif bloom_level == 'analyzing':
-                essay = self._construct_essay_analyzing(question, essay_parts, combined_context)
+                # For analysis questions, structure the response by aspects
+                parts = [initial_answer] + additional_answers[:2]
+                combined_answer = " ".join(parts)
+                
             else:
-                essay = self._construct_essay_default(question, essay_parts)
+                # For higher-level questions, incorporate multiple perspectives
+                combined_answer = initial_answer
+                for ans in additional_answers[:2]:
+                    combined_answer += " " + ans
             
-            # Pastikan jawaban memiliki panjang minimum untuk esai (minimal 150 kata)
-            if len(word_tokenize(essay)) < 150:
-                # Tambahkan kalimat elaborasi jika terlalu pendek
-                essay = self._expand_answer(essay, combined_context, bloom_level)
+            # Ensure answer has sufficient substance
+            if len(word_tokenize(combined_answer)) < 100:
+                combined_answer = self._enhance_answer_content(combined_answer, combined_context)
             
-            return essay
+            # Clean up the answer
+            combined_answer = self._clean_answer(combined_answer)
+            
+            # Collect page references from chunks that contributed to the answer
+            chunk_pages = []
+            for chunk in relevant_chunks:
+                if "pages" in chunk:
+                    chunk_pages.extend(chunk["pages"])
+            
+            # Find additional page references for the answer content
+            content_page_refs = self.find_page_references(combined_answer, metadata)
+            
+            # Combine page references from chunks and content matching
+            all_page_refs = sorted(list(set(chunk_pages + content_page_refs)))
+            
+            # Format with OpenAI if enabled (including page references)
+            if self.use_openai_for_formatting:
+                combined_answer = self.format_answer_with_openai(combined_answer, question, all_page_refs)
+            else:
+                # Add page references manually if OpenAI formatting is not used
+                if all_page_refs:
+                    page_ref_text = f"[Referensi: Halaman {', '.join(map(str, all_page_refs))}]"
+                    if page_ref_text not in combined_answer:
+                        combined_answer += f"\n\n{page_ref_text}"
+                
+            return combined_answer, all_page_refs
             
         except Exception as e:
-            logging.warning(f"Error generating essay: {str(e)}")
-            # Fallback ke jawaban sederhana jika generasi esai gagal
-            combined_context = " ".join(relevant_chunks[:2])
-            qa_result = self.qa_pipe(question=question, context=combined_context)
-            return self._expand_answer(qa_result['answer'], combined_context, "remembering")
+            logging.warning(f"Error generating answer: {str(e)}")
+            # Fallback to simpler answer
+            try:
+                chunk_texts = [chunk["text"] for chunk in relevant_chunks[:2]]
+                combined_context = " ".join(chunk_texts)
+                qa_result = self.qa_pipe(question=question, context=combined_context)
+                answer = self._clean_answer(qa_result['answer'])
+                
+                # Get page references from chunks
+                chunk_pages = []
+                for chunk in relevant_chunks[:2]:
+                    if "pages" in chunk:
+                        chunk_pages.extend(chunk["pages"])
+                
+                # Add page references manually
+                if chunk_pages:
+                    unique_pages = sorted(list(set(chunk_pages)))
+                    page_ref_text = f"[Referensi: Halaman {', '.join(map(str, unique_pages))}]"
+                    if page_ref_text not in answer:
+                        answer += f"\n\n{page_ref_text}"
+                        
+                return answer, unique_pages
+            except:
+                logging.error("Critical failure in answer generation. Using empty fallback.")
+                return "Maaf, tidak dapat menemukan jawaban yang tepat.", []  
     
-    def _construct_essay_remembering(self, question: str, parts: List[str]) -> str:
-        """Menyusun esai untuk level remembering dan understanding."""
-        # Pembukaan
-        opening = f"Untuk menjawab pertanyaan '{question}', perlu dipahami beberapa konsep penting. "
-        
-        # Isi utama - gabungkan semua bagian dengan transisi yang tepat
-        main_content = ""
-        for i, part in enumerate(parts):
-            if i == 0:
-                main_content += part
-            else:
-                transition_phrases = [
-                    "Selain itu, ", "Lebih lanjut, ", "Penting juga untuk dicatat bahwa ", 
-                    "Dalam konteks ini, ", "Berdasarkan informasi yang ada, "
-                ]
-                transition = transition_phrases[i % len(transition_phrases)]
-                main_content += " " + transition + part[0].lower() + part[1:]
-        
-        # Penutup
-        closing = " Dengan demikian, dapat disimpulkan bahwa konsep ini merupakan aspek penting dalam memahami topik tersebut."
-        
-        essay = opening + main_content + closing
-        return essay
     
-    def _construct_essay_applying(self, question: str, parts: List[str], context: str) -> str:
-        """Menyusun esai untuk level applying."""
-        # Cari kata kunci dari konteks untuk digunakan sebagai contoh aplikasi
-        keywords = re.findall(r'\b[A-Z][a-z]{5,}\b', context)
-        examples = [k for k in keywords if len(k) > 5][:3]
-        
-        # Pembukaan
-        opening = f"Dalam mengaplikasikan konsep yang ditanyakan dalam '{question}', kita perlu memahami prinsip-prinsip dasar dan bagaimana penerapannya dalam situasi nyata. "
-        
-        # Isi utama
-        main_content = " ".join(parts)
-        
-        # Tambahkan contoh aplikasi
-        application = " Penerapan konsep ini dapat dilihat dalam beberapa konteks. "
-        if examples:
-            application += f"Misalnya dalam kasus {', '.join(examples[:-1])}" 
-            if len(examples) > 1:
-                application += f" dan {examples[-1]}" 
-            application += ", prinsip-prinsip tersebut menjadi sangat relevan. "
-        
-        # Penutup
-        closing = " Dengan demikian, pemahaman yang mendalam tentang konsep ini memungkinkan kita untuk mengaplikasikannya secara efektif dalam berbagai situasi."
-        
-        essay = opening + main_content + application + closing
-        return essay
-    
-    def _construct_essay_analyzing(self, question: str, parts: List[str], context: str) -> str:
-        """Menyusun esai untuk level analyzing."""
-        # Pembukaan dengan penekanan pada analisis
-        opening = f"Analisis terhadap pertanyaan '{question}' memerlukan pemahaman mendalam tentang berbagai aspek yang saling berkaitan. "
-        
-        # Isi utama dengan struktur yang lebih analitis
-        main_parts = []
-        for i, part in enumerate(parts):
-            if i == 0:
-                main_parts.append(f"Pertama, {part}")
-            elif i == 1:
-                main_parts.append(f"Kedua, {part[0].lower()}{part[1:]}")
-            elif i == 2:
-                main_parts.append(f"Ketiga, {part[0].lower()}{part[1:]}")
-            else:
-                main_parts.append(f"Selain itu, {part[0].lower()}{part[1:]}")
-        
-        main_content = " ".join(main_parts)
-        
-        # Temukan hubungan atau implikasi
-        implications = " Beberapa implikasi penting dari analisis ini antara lain adalah pemahaman yang lebih mendalam tentang konsep yang dibahas, kemampuan untuk menerapkannya dalam konteks yang lebih luas, dan pengetahuan tentang keterkaitannya dengan aspek-aspek lain."
-        
-        # Penutup dengan kesimpulan analitis
-        closing = " Berdasarkan analisis di atas, dapat disimpulkan bahwa masalah ini memiliki kompleksitas yang memerlukan pemahaman dari berbagai sudut pandang."
-        
-        essay = opening + main_content + implications + closing
-        return essay
-    
-    def _construct_essay_default(self, question: str, parts: List[str]) -> str:
-        """Menyusun esai default untuk level lainnya."""
-        # Pembukaan
-        opening = f"Dalam menjawab pertanyaan '{question}', terdapat beberapa aspek penting yang perlu diperhatikan. "
-        
-        # Isi
-        main_content = " ".join(parts)
-        
-        # Penutup
-        closing = " Dengan memahami konsep-konsep tersebut, kita dapat memperoleh gambaran yang lebih komprehensif tentang topik yang dibahas."
-        
-        essay = opening + main_content + closing
-        return essay
-    
-    def _expand_answer(self, answer: str, context: str, bloom_level: str) -> str:
-        """Memperluas jawaban untuk memastikan panjang memadai untuk esai."""
-        # Ekstrak kalimat-kalimat dari konteks yang mungkin relevan
+    def _enhance_answer_content(self, answer: str, context: str) -> str:
+        """Add more content to short answers by finding relevant sentences."""
+        # Extract sentences from context
         sentences = sent_tokenize(context)
         
-        # Buat embedding untuk jawaban
+        # Create embedding for answer
         answer_embedding = self.embedding_model.encode(answer)
         
-        # Cari kalimat yang mirip dengan jawaban
+        # Find sentences similar to answer
         sentence_embeddings = self.embedding_model.encode(sentences)
         similarities = cosine_similarity([answer_embedding], sentence_embeddings)[0]
         
-        # Ambil 3-5 kalimat yang paling relevan tapi belum ada di jawaban
+        # Get 3-5 most relevant sentences not already in answer
         relevant_sentences = []
         for idx in similarities.argsort()[-10:][::-1]:
             if sentences[idx] not in answer and len(relevant_sentences) < 5:
                 relevant_sentences.append(sentences[idx])
         
-        # Tambahkan paragraf berdasarkan level bloom
-        if bloom_level in ['remembering', 'understanding']:
-            expanded = f"{answer} Penting untuk dicatat bahwa {relevant_sentences[0] if relevant_sentences else 'konsep ini memiliki aspek-aspek penting'}. "
-            if len(relevant_sentences) > 1:
-                expanded += f"Selain itu, {relevant_sentences[1]}. "
-            expanded += "Pemahaman yang mendalam tentang topik ini sangat penting dalam konteks pembelajaran yang lebih luas."
+        # Add relevant content
+        enhanced = answer
+        for sent in relevant_sentences[:3]:
+            if sent not in enhanced:
+                enhanced += " " + sent
+                
+        return enhanced
+    
+    def _clean_answer(self, answer: str) -> str:
+        """Clean and normalize the answer text."""
+        # Fix capitalization and punctuation
+        if answer and len(answer) > 0:
+            answer = answer[0].upper() + answer[1:] if answer else answer
             
-        elif bloom_level == 'applying':
-            expanded = f"{answer} Dalam praktiknya, {relevant_sentences[0] if relevant_sentences else 'konsep ini dapat diterapkan dalam berbagai situasi'}. "
-            if len(relevant_sentences) > 1:
-                expanded += f"Contoh penerapan lainnya adalah ketika {relevant_sentences[1].lower() if relevant_sentences[1][0].isupper() else relevant_sentences[1]}. "
-            expanded += "Kemampuan untuk mengaplikasikan konsep ini dalam berbagai konteks menunjukkan pemahaman yang mendalam."
+        # Ensure proper sentence ending
+        if not answer.endswith(('.', '!', '?')):
+            answer += '.'
             
-        elif bloom_level == 'analyzing':
-            expanded = f"{answer} Analisis lebih lanjut menunjukkan bahwa {relevant_sentences[0] if relevant_sentences else 'terdapat beberapa komponen kunci dalam topik ini'}. "
-            if len(relevant_sentences) > 1:
-                expanded += f"Jika kita mengamati lebih detail, {relevant_sentences[1].lower() if relevant_sentences[1][0].isupper() else relevant_sentences[1]}. "
-            expanded += "Dengan memahami keterhubungan antar konsep, kita dapat memperoleh perspektif yang lebih holistik."
-            
+        # Preserve mathematical notation if present
+        if self.has_math_notation:
+            # Special handling for math expressions
+            # Preserve common LaTeX-like notations
+            pass
         else:
-            expanded = f"{answer} Perlu dipertimbangkan juga bahwa {relevant_sentences[0] if relevant_sentences else 'terdapat beberapa aspek penting dalam topik ini'}. "
-            if len(relevant_sentences) > 1:
-                expanded += f"{relevant_sentences[1]} "
-            if len(relevant_sentences) > 2:
-                expanded += f"Lebih lanjut, {relevant_sentences[2]}. "
-            expanded += "Dengan mempertimbangkan berbagai aspek ini, kita dapat memperoleh pemahaman yang komprehensif tentang topik yang dibahas."
+            # Remove unwanted characters
+            answer = re.sub(r'[^\w\s.,?!:;()\[\]{}"\'-]', '', answer)
         
-        return expanded
+        # Fix spacing after punctuation
+        answer = re.sub(r'([.,;:!?])([A-Za-z])', r'\1 \2', answer)
+        
+        # Fix common Indonesian errors
+        answer = re.sub(r'\bdi bawah ini\b', 'berikut', answer)
+        answer = re.sub(r'\badalah merupakan\b', 'adalah', answer)
+        
+        return answer
 
-    def answer_question(self, context: str, question: str, top_k: int = 3) -> List[Dict[str, Any]]:
-        """
-        Menjawab pertanyaan berdasarkan konteks dengan mengembalikan top-k jawaban terbaik.
-        Dirancang khusus untuk menghasilkan jawaban esai yang komprehensif.
+    def answer_question(self, context: str, question: str, metadata: List[Dict] = None, top_k: int = 3) -> List[Dict[str, Any]]:
+        logging.info(f"Answering question: '{question}'")
         
-        Args:
-            context (str): Teks konteks lengkap (dari PDF)
-            question (str): Pertanyaan dalam bahasa Indonesia
-            top_k (int): Jumlah jawaban terbaik yang akan dikembalikan
-            
-        Returns:
-            List[Dict]: Daftar top-k jawaban dengan skor dan metadata terkait
-        """
-        logging.info(f"Menjawab pertanyaan: '{question}'")
+        # Check if question relates to formulas
+        question_lower = question.lower()
+        is_formula_related = any(term in question_lower for term in ['rumus', 'formula', 'persamaan', 'matematika'])
         
-        # Deteksi level taksonomi Bloom
+        # Detect Bloom's taxonomy level
         bloom_level = self.detect_bloom_level(question)
-        logging.info(f"Terdeteksi level taksonomi Bloom: {bloom_level}")
+        logging.info(f"Detected Bloom's taxonomy level: {bloom_level}")
         
-        # Preprocess context dan bagi menjadi chunk
+        # Check if we need to process special content
+        if is_formula_related and metadata:
+            logging.info("Question is formula-related, processing formula content")
+            # Flag for special handling of formulas
+            self.has_math_notation = True
+            
+            # Extract and add formula content
+            formula_texts = []
+            for item in metadata:
+                if item['type'] == 'math_notation' and 'content' in item:
+                    if isinstance(item['content'], list):
+                        formula_texts.extend(item['content'])
+                    else:
+                        formula_texts.append(item['content'])
+            
+            # Add formula text to context
+            if formula_texts:
+                context += " " + " ".join(formula_texts)
+        
+        # Preprocess context and divide into chunks
         processed_context = self.preprocess_text(context)
         chunks = self.chunk_text(processed_context)
         
-        # Mendapatkan embeddings
+        # Get embeddings
         question_embedding = self.embedding_model.encode(question)
         chunk_embeddings = self.get_embeddings(chunks)
         
-        # Menghitung relevance scores
+        # Calculate relevance scores
         relevance_scores = self.calculate_relevance(question_embedding, chunk_embeddings)
         
-        # Urutkan chunk berdasarkan relevansi
+        # Sort chunks by relevance
         sorted_chunks_with_scores = sorted(zip(chunks, relevance_scores), key=lambda x: x[1], reverse=True)
         
-        # Ambil chunk paling relevan untuk digunakan dalam generasi jawaban esai
+        # Take most relevant chunks for answer generation
         top_relevant_chunks = [chunk for chunk, _ in sorted_chunks_with_scores[:5]]
         
-        # Generate jawaban esai dari chunk-chunk yang relevan
-        essay_answer = self.generate_essay_answer(question, top_relevant_chunks, bloom_level)
+        # Generate direct answer from relevant chunks (with page references)
+        direct_answer, direct_page_refs = self.generate_direct_answer(question, top_relevant_chunks, bloom_level, metadata)
         
-        # Proses jawaban reguler dari setiap chunk untuk mendapatkan top-k
+        # Process regular answers from each chunk to get top-k
         results = []
         for i, (chunk, relevance) in enumerate(sorted_chunks_with_scores):
-            if i >= min(10, len(chunks)):  # Batasi hanya 10 chunk teratas
+            if i >= min(10, len(chunks)):  # Limit to top 10 chunks
                 break
                 
-            logging.info(f"Mengevaluasi chunk {i+1}/{min(10, len(chunks))} (relevance: {relevance:.4f})")
+            logging.info(f"Evaluating chunk {i+1}/{min(10, len(chunks))} (relevance: {relevance:.4f})")
             
-            # Gunakan QA pipeline untuk mendapatkan jawaban dari chunk
+            # Use QA pipeline to get answer from chunk
             try:
                 qa_result = self.qa_pipe(question=question, context=chunk)
                 answer = qa_result['answer']
                 
-                # Untuk jawaban dari chunk, tambahkan konteks jika terlalu pendek
+                # For chunk answers, add context if too short
                 if len(word_tokenize(answer)) < 20:
-                    # Cari kalimat dari chunk yang berisi jawaban
+                    # Find sentence from chunk containing answer
                     sentences = sent_tokenize(chunk)
                     for sentence in sentences:
                         if answer in sentence and sentence != answer:
                             answer = sentence
                             break
                 
-                # Validasi jawaban menggunakan BERT
+                # Validate answer using BERT
                 is_valid, validation_score = self.validate_answer(question, answer, chunk)
                 
-                # Menghitung skor gabungan
+                # Find page references for this answer
+                page_refs = self.find_page_references(answer, metadata)
+                
+                # Calculate combined score
                 qa_score = qa_result['score']
                 
-                # Berikan bobot lebih untuk jawaban yang lebih panjang (untuk mendukung format esai)
-                length_bonus = min(0.2, 0.01 * len(word_tokenize(answer)))
+                # Give higher weight to longer answers
+                length_bonus = min(0.15, 0.008 * len(word_tokenize(answer)))
                 
                 combined_score = (self.QA_WEIGHT * qa_score) + (self.RETRIEVAL_WEIGHT * relevance) + length_bonus
                 
-                # Penyesuaian tambahan berdasarkan validasi BERT
+                # Adjust based on validation
                 if is_valid:
-                    combined_score *= (1.0 + 0.2 * validation_score)
+                    combined_score *= (1.0 + 0.15 * validation_score)
                 else:
-                    combined_score *= 0.7
+                    combined_score *= 0.65
                 
-                # Tambahkan hasil ke daftar
+                # Add result to list
                 results.append({
                     'answer': answer,
-                    'original_answer': qa_result['answer'],
                     'qa_score': qa_result['score'],
                     'retrieval_score': relevance,
                     'combined_score': combined_score,
                     'chunk': chunk,
                     'is_valid': is_valid,
-                    'bloom_level': bloom_level
+                    'bloom_level': bloom_level,
+                    'page_references': page_refs
                 })
                 
             except Exception as e:
-                logging.warning(f"Error pada chunk {i+1}: {str(e)}")
+                logging.warning(f"Error on chunk {i+1}: {str(e)}")
                 continue
-        
-        # Tambahkan jawaban esai sebagai hasil teratas
-        essay_result = {
-            'answer': essay_answer,
-            'original_answer': essay_answer[:50] + "...",  # Untuk referensi saja
-            'qa_score': 0.95,  # Nilai tinggi karena ini adalah jawaban esai komprehensif
-            'retrieval_score': 0.95,
-            'combined_score': 0.95,  # Prioritaskan jawaban esai
+            
+        try:
+            qa_result = self.qa_pipe(question=question, context=" ".join(top_relevant_chunks))
+            direct_qa_score = qa_result['score']
+        except Exception as e:
+            logging.warning(f"Error calculating QA score for direct answer: {str(e)}")
+            direct_qa_score = 0.0  # Default to 0 if QA pipeline fails
+
+                
+        # Add direct answer as top result
+        direct_result = {
+            'answer': direct_answer,
+            'qa_score': direct_qa_score,  # High value for direct answer
+            'retrieval_score': max(relevance_scores[:3]) if relevance_scores.size > 0 else 0.5,
+            'combined_score': (self.QA_WEIGHT * direct_qa_score) + (self.RETRIEVAL_WEIGHT * max(relevance_scores[:3])),
             'chunk': "combined_relevant_chunks",
             'is_valid': True,
             'bloom_level': bloom_level,
-            'is_essay': True
+            'is_direct': True,
+            'page_references': direct_page_refs
+            
         }
         
-        # Gabungkan essay result dengan hasil regular dan pilih top-k
-        all_results = [essay_result] + results
+        # Combine direct result with regular results and select top-k
+        all_results = [direct_result] + results
         top_results = sorted(all_results, key=lambda x: x['combined_score'], reverse=True)[:top_k]
         
-        logging.info(f"Berhasil menghasilkan {len(top_results)} jawaban terbaik")
+        logging.info(f"Successfully generated {len(top_results)} best answers")
         return top_results
 
-    def postprocess_answers(self, answers: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """
-        Memperbaiki format dan kualitas jawaban akhir.
-        """
+    def postprocess_answers(self, answers: List[Dict[str, Any]], question: str) -> List[Dict[str, Any]]:
+
         for i, answer_data in enumerate(answers):
-            # Perbaiki kapitalisasi dan tanda baca
-            answer = answer_data['answer']
+            # Apply cleaning to each answer
+            clean_answer = self._clean_answer(answer_data['answer'])
             
-            # Pastikan jawaban diakhiri dengan tanda baca yang tepat
-            if not answer.endswith(('.', '!', '?')):
-                answer += '.'
-            
-            # Pastikan huruf pertama kapital
-            if answer and len(answer) > 0:
-                answer = answer[0].upper() + answer[1:] if answer else answer
-            
-            # Hapus karakter khusus yang tidak diinginkan
-            answer = re.sub(r'[^\w\s.,?!:;()\[\]{}"\'-]', '', answer)
-            
-            # Perbaiki spasi setelah tanda baca
-            answer = re.sub(r'([.,;:!?])([A-Za-z])', r'\1 \2', answer)
-            
-            # Perbaiki kesalahan umum dalam bahasa Indonesia
-            answer = re.sub(r'\bdi bawah ini\b', 'berikut', answer)
-            answer = re.sub(r'\badalah merupakan\b', 'adalah', answer)
-            
-            answers[i]['answer'] = answer
+            # Apply OpenAI formatting if enabled
+            if self.use_openai_for_formatting:
+                formatted_answer = self.format_answer_with_openai(clean_answer, question)
+                answers[i]['answer'] = formatted_answer
+            else:
+                answers[i]['answer'] = clean_answer
             
         return answers
 
     def process_pdf_query(self, pdf_path: str, question: str, top_k: int = 3) -> List[Dict[str, Any]]:
-        """
-        Fungsi utilitas untuk memproses query dari PDF dalam satu langkah.
-        """
+
         try:
-            # Load dan proses PDF
-            context = self.load_pdf(pdf_path)
+            # Load and process PDF
+            context, metadata = self.load_pdf(pdf_path)
             
-            # Dapatkan jawaban
-            results = self.answer_question(context, question, top_k)
+            # Get answers
+            results = self.answer_question(context, question, metadata, top_k)
             
-            # Post-process jawaban
-            final_results = self.postprocess_answers(results)
+            # Post-process answers
+            final_results = self.postprocess_answers(results, question)
             
             return final_results
         except Exception as e:
-            logging.error(f"Error memproses query PDF: {str(e)}")
+            logging.error(f"Error processing PDF query: {str(e)}")
             return []
 
-
-# Contoh penggunaan
-if __name__ == "__main__":
-    qa_system = IndonesianQASystem()
-    
-    # Contoh dengan file PDF
-    pdf_path = "translated_67ff25827deef.pdf"
-    
-    # Contoh pertanyaan berbagai level taksonomi Bloom
-    pertanyaan_samples = [
-        "Apa pengertian dari machine learning?",  # Remembering
-        "Jelaskan bagaimana machine learning bekerja?",  # Understanding
-        "Bagaimana cara menerapkan konsep machine learning dalam spam filtering?",  # Applying
-        "Analisis perbandingan antara supervised learning dan unsupervised learning.",  # Analyzing
-
-    ]
-    
-    # Proses salah satu pertanyaan
-    question = pertanyaan_samples[1]  # Pilih salah satu pertanyaan
-    print(f"\nMemproses pertanyaan: {question}")
-    
-    # Dapatkan dan tampilkan jawaban
-    results = qa_system.process_pdf_query(pdf_path, question)
-    
-    print("\n===== Hasil Top 3 Jawaban =====")
-    for i, result in enumerate(results):
-        print(f"\nJawaban #{i+1} (Skor: {result['combined_score']:.4f}, Level Bloom: {result['bloom_level']}):")
-        print(f"- {result['answer']}")
-        print(f"- Valid: {result['is_valid']}")
-        print(f"- Panjang jawaban: {len(word_tokenize(result['answer']))} kata")
-        if 'is_essay' in result and result['is_essay']:
-            print("- [Jawaban dalam format esai]")

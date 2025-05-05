@@ -6,7 +6,8 @@ import translatePDF
 import tfidf
 import gc
 import cosine
-from similarity import cosine_similarity_score, jaccard_similarity, bert_similarity
+import pageNoun
+from similarity import adaptive_plagiarism_detection
 import os
 from answerBert import BertAnsweringSystem
 from multiLLM import get_llm_response
@@ -35,6 +36,13 @@ def count_tfidf():
     language = request.form['language']
     pdf = request.files['pdf']
     result = tfidf.main_count_tfidf(pdf, language)
+    return jsonify(json.loads(result))
+
+@app.route('/tfidf-page', methods=['POST'])
+def count_tfidf_page():
+    language = request.form['language']
+    pdf = request.files['pdf']
+    result = pageNoun.main_count_tfidf_per_page(pdf, language)
     return jsonify(json.loads(result))
 
 
@@ -114,7 +122,7 @@ def bert_qa():
         except ValueError:
             top_k = 3
         
-        # Save the uploaded PDF
+        
         file_path = os.path.join("uploads", secure_filename(pdf_file.filename))
         pdf_file.save(file_path)
         
@@ -136,32 +144,21 @@ def bert_qa():
                 'qa_score': float(result['qa_score']),
                 'retrieval_score': float(result['retrieval_score']),
                 'bloom_level': str(result['bloom_level']),
-                'is_valid': bool(result['is_valid'])
+                'is_valid': bool(result['is_valid']),
+                'page_references': list(map(int, result.get('page_references', []))),
+                'is_direct': bool(result.get('is_direct', False))
             }
             
-            # Add context with highlighting if it's not the essay result
-            if result.get('chunk') != "combined_relevant_chunks":
-                # Highlighting the answer in the context
-                chunk = result['chunk']
-                answer = result['original_answer']
-                highlighted_context = chunk.replace(answer, f"<mark>{answer}</mark>")
-                answer_data['context'] = highlighted_context
-            else:
-                answer_data['is_essay'] = True
+            
             
             formatted_results.append(answer_data)
-        
-        # Clean up - remove the uploaded file if needed
-        # os.remove(file_path)  # Uncomment if you want to delete files after processing
         
         return jsonify({'answers': formatted_results}), 200
         
     except MemoryError:
-        # Handle memory errors specifically
         gc.collect()
         return jsonify({"error": "Out of memory, please try with smaller PDF"}), 507
     except Exception as e:
-        # Log the full error with traceback
         app.logger.error(f"Indonesian QA Error: {str(e)}")
         app.logger.error(traceback.format_exc())
         return jsonify({"error": "An error occurred processing the request"}), 500
@@ -169,23 +166,36 @@ def bert_qa():
 
 @app.route('/checkPlagiarism', methods=['POST'])
 def plagiarism_check():
-    data = request.json
-    text1 = data.get('user_answer')
-    text2 = data.get('ai_answer')
+    try:
+        data = request.json
+        student_answer = data.get('user_answer', '')
+        llm_answer = data.get('ai_answer', '')
 
-    print(f"text1: {text1}")
-    print(f"text2: {text2}")
+        if not student_answer or not llm_answer:
+            return jsonify({
+                'error': 'Both user_answer and ai_answer are required',
+                'status': 'error'
+            }), 400
+        
+        result = adaptive_plagiarism_detection(student_answer, llm_answer)
+        
+        return jsonify({
+            'status': 'success',
+            'overall_percentage': result['overall_percentage'],
+            'overall_similarities': result['overall_similarities'],
+            'detected_strategies': result['detected_strategies'],
+            'method_weights': result['method_weights'],
+            'thresholds': result['thresholds'],
+            'sentence_results': result['sentence_results']
+        })
     
-    results = {
-        'cosine_similarity': cosine_similarity_score(text1, text2),
-        'jaccard_similarity': jaccard_similarity(text1, text2),
-        'bert_similarity': bert_similarity(text1, text2),
-        # 'highlighted_text': highlight_differences(text1, text2),
-        # 'multi_pattern_matches': multi_pattern_search(text2, list(set(text1.split()) & set(text2.split())))
-    }
-    
-    return jsonify(results)
-
+    except Exception as e:
+        print(f"Error in plagiarism check: {str(e)}")
+        return jsonify({
+            'error': str(e),
+            'status': 'error'
+        }), 500
+        
 @app.route('/evaluate', methods=['POST'])
 def evaluate_answer():
     try:
