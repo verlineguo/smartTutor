@@ -73,31 +73,16 @@ class User extends Authenticatable implements JWTSubject
     }
 
     /**
-     * ANSWER OBJECT
-     */
-    public function answer()
-    {
-        return $this->hasMany(Answer::class);
-    }
-    /**
-     * GRADE OBJECT
-     */
-    public function grade()
-    {
-        return $this->hasMany(Grade::class);
-    }
-    /**
      * ROLE OBJECT
      */
     public function role()
     {
         return $this->belongsTo(Role::class);
     }
-    /**
-     * CHAT HISTORY OBJECT
-     */
-    public function chathistories()
+    
+        public function answerUsers()
     {
-        return $this->hasMany(ChatHistory::class);
+        return $this->hasMany(AnswerUser::class);
     }
+
 }

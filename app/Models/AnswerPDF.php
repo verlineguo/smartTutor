@@ -21,7 +21,8 @@ class AnswerPDF extends Model
         'page',
         'combined_score',
         'qa_score',
-        'retrieval_score'
+        'retrieval_score',
+        'page_references'
     ];
 
     protected $casts = [

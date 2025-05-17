@@ -2,14 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AnswerLLM;
-use App\Models\AnswerPDF;
+
 use App\Models\AnswerUser;
-use App\Models\Plagiarism;
 use App\Models\Question;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 

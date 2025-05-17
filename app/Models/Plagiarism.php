@@ -42,4 +42,9 @@ class Plagiarism extends Model
     {
         return $this->belongsTo(AnswerLlm::class, 'ai_answer_guid', 'guid');
     }
+
+    public function details()
+    {
+        return $this->hasMany(PlagiarismDetail::class, 'plagiarism_guid', 'guid');
+    }
 }

@@ -15,20 +15,11 @@ class AnswerUser extends Model
     protected $keyType = 'string';
     public $incrementing = false;
 
-    protected $fillable = [
-        'user_id',
-        'question_guid',
-        'answer',
-        'page',
-        'is_correct',
-    'streak',
-    'evaluation_scores',
-    'current_level'
-    ];
+    protected $fillable = ['user_id', 'question_guid', 'answer', 'is_correct', 'streak', 'evaluation_scores', 'current_level'];
 
     protected $casts = [
         'created_at' => 'datetime',
-        'updated_at' => 'datetime'
+        'updated_at' => 'datetime',
     ];
 
     public function question()
@@ -45,5 +36,4 @@ class AnswerUser extends Model
     {
         return $this->hasMany(Plagiarism::class, 'user_answer_guid', 'guid');
     }
-    
 }

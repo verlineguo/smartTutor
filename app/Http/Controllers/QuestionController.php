@@ -10,12 +10,8 @@ use App\Models\Question;
 use App\Models\Topic;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
-use Symfony\Component\HttpFoundation\Session\Session;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Http;
@@ -279,41 +275,7 @@ class QuestionController extends Controller
         return ResponseController::getResponse(['tfidf_data' => $data], 200, 'TF-IDF berhasil dihitung.');
     }
 
-    public function getLlmAnswers($topicGuid)
-    {
-        try {
-            $questions = Question::where('topic_guid', $topicGuid)->orderByRaw('cast(page as unsigned) asc')->get();
-
-            $result = [];
-            foreach ($questions as $question) {
-                $llmAnswers = AnswerLLM::where('question_guid', $question->guid)->get();
-
-                $item = [
-                    'guid' => $question->guid,
-                    'question' => $question->question,
-                    'openai_answer' => null,
-                    'gemini_answer' => null,
-                    'llama_answer' => null,
-                ];
-
-                foreach ($llmAnswers as $answer) {
-                    if ($answer->source === 'openai') {
-                        $item['openai_answer'] = $answer->answer;
-                    } elseif ($answer->source === 'gemini') {
-                        $item['gemini_answer'] = $answer->answer;
-                    } elseif ($answer->source === 'llama') {
-                        $item['llama_answer'] = $answer->answer;
-                    }
-                }
-
-                $result[] = $item;
-            }
-
-            return DataTables::of($result)->addIndexColumn()->make(true);
-        } catch (\Exception $e) {
-            return ResponseController::getResponse(null, 500, $e->getMessage());
-        }
-    }
+   
 
     public function getLlmAnswersByQuestion($questionGuid)
     {
@@ -336,32 +298,7 @@ class QuestionController extends Controller
         }
     }
 
-    public function getPdfAnswers($topicGuid)
-    {
-        try {
-            $questions = Question::where('topic_guid', $topicGuid)->orderByRaw('cast(page as unsigned) asc')->get();
-
-            $result = [];
-            foreach ($questions as $question) {
-                $pdfAnswer = AnswerPdf::where('question_guid', $question->guid)->first();
-
-                $item = [
-                    'guid' => $question->guid,
-                    'question' => $question->question,
-                    'pdf_answer' => $pdfAnswer ? $pdfAnswer->answer : null,
-                    'combined_score' => $pdfAnswer ? $pdfAnswer->combined_score : null,
-                    'qa_score' => $pdfAnswer ? $pdfAnswer->qa_score : null,
-                    'retrieval_score' => $pdfAnswer ? $pdfAnswer->retrieval_score : null,
-                ];
-
-                $result[] = $item;
-            }
-
-            return DataTables::of($result)->addIndexColumn()->make(true);
-        } catch (\Exception $e) {
-            return ResponseController::getResponse(null, 500, $e->getMessage());
-        }
-    }
+  
 
     public function getPdfAnswersByQuestion($questionGuid)
     {
@@ -425,7 +362,7 @@ class QuestionController extends Controller
                     'topic_guid' => $request->topic_guid,
                     'question' => $questionData['question'],
                     'question_fix' => $questionData['question'],
-                    'language' => $questionData['language'],
+                    'language' => $questionData['language'] ?? 'indonesia',
                     'threshold' => $questionData['threshold'] ?? 0,
                     'weight' => 1.0,
                     'category' => $questionData['category'] ?? null,
@@ -436,7 +373,7 @@ class QuestionController extends Controller
 
                 if (isset($questionData['all_pdf_answers']) && is_array($questionData['all_pdf_answers'])) {
                     foreach ($questionData['all_pdf_answers'] as $pdfAnswer) {
-                        AnswerPDF::create([
+                        $answerPdf = AnswerPDF::create([
                             'question_guid' => $question->guid,
                             'answer' => $pdfAnswer['answer'],
                             'combined_score' => $pdfAnswer['combined_score'] ?? 0,
@@ -444,6 +381,11 @@ class QuestionController extends Controller
                             'retrieval_score' => $pdfAnswer['retrieval_score'] ?? 0,
                             'page_references' => json_encode($pdfAnswer['page_references'] ?? []), // Simpan page_references
                         ]);
+
+                        if (isset($questionData['pdf_answer']) && $questionData['pdf_answer'] == $pdfAnswer['answer']) {
+                            $question->answer_fix = $answerPdf->answer;
+                            $question->save();
+                        }
 
                 
                     }
@@ -693,9 +635,7 @@ class QuestionController extends Controller
         $data->language = $request['language'];
         $data->weight = $request['weight'] ?? 1.0;
         $data->save();
-        if ($request->has('answer_pdf_guid') && $request->answer_pdf_guid) {
-            $updateData['answer_pdf_guid'] = $request->answer_pdf_guid;
-        }
+        
 
         return response()->json(['data' => $data, 'message' => 'Success'], 200);
     }

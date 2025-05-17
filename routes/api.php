@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\AnswerController;
 use App\Http\Controllers\AnswerLLMController;
 use App\Http\Controllers\AnswerPDFController;
 use App\Http\Controllers\AssignmentController;
@@ -8,25 +7,15 @@ use App\Http\Controllers\AssistantController;
 use App\Http\Controllers\OtpController;
 use App\Http\Controllers\PasswordController;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\ChatbotController;
-use App\Http\Controllers\ChatHistoryController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\EvaluationController;
 use App\Http\Controllers\GradeController;
-use App\Http\Controllers\JawabanController;
-use App\Http\Controllers\MataKuliahController;
-use App\Http\Controllers\MateriController;
 use App\Http\Controllers\PlagiarismController;
 use App\Http\Controllers\QuestionController;
 use App\Http\Controllers\RoleController;
-use App\Http\Controllers\SoalController;
 use App\Http\Controllers\TopicController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserCourseController;
-use App\Http\Controllers\UserMataKuliahController;
-use App\Http\Controllers\SimilarityController;
-use App\Models\ChatHistory;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -146,21 +135,6 @@ Route::group([
     $router->post('/', [RoleController::class, 'insertData']);
 });
 
-/**
- * ANSWER
- */
-Route::group([
-    'prefix' => $url . 'answer',
-    'middleware' => 'jwt.verify'
-], function ($router) {
-    $router->get('/', [AnswerController::class, 'showData']);
-    $router->put('/', [AnswerController::class, 'updateData']);
-    $router->get('/{guid}/{id}', [AnswerController::class, 'getDataByUser']);
-    $router->post('/user', [AnswerController::class, 'getData']);
-    $router->delete('/{guid}', [AnswerController::class, 'deleteData']);
-    $router->post('/', [AnswerController::class, 'insertData']);
-    $router->post('/grade', [AnswerController::class, 'grade']);
-});
 
 /**
  * TOPIC
@@ -231,10 +205,12 @@ Route::group([
     'prefix' => $url . 'grade',
     'middleware' => 'jwt.verify'
 ], function ($router) {
-    $router->get('/topic/{code}/{guid}', [GradeController::class, 'getDataByTopic']);
-    $router->get('/', [GradeController::class, 'getData']);
-    $router->post('/', [GradeController::class, 'insertData']);
-    $router->put('/', [GradeController::class, 'updateData']);
+    $router->get('/topic/{code}/{guid}', [GradeController::class, 'getStudentsByTopic']);
+    $router->post('/reset-histories', [GradeController::class, 'resetHistories']);
+    $router->get('/student-details/{code}/{topicGuid}/{userGuid}', [GradeController::class, 'getStudentAnswerDetails']);
+    $router->get('/evaluation-stats/{courseCode}/{topicGuid}/{userId}', [GradeController::class, 'getEvaluationStats']);
+    $router->post('/lecturer-score', [GradeController::class, 'updateLecturerScore']);
+
 });
 
 /**
@@ -252,6 +228,7 @@ Route::group([
     $router->get('/answers/alternatives/{questionGuid}', [AssignmentController::class, 'getAlternativeAnswers']);
     $router->get('/history/{userId}/{topicGuid}', [AssignmentController::class, 'getHistory']);
     $router->post('/evaluate', [AssignmentController::class, 'evaluateAnswer']);
+    $router->get('/all-answers/{userId}/{topicGuid}', [AssignmentController::class, 'getAllAnswers']);
 });
 
 
