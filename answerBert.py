@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 import re
 import torch
 import fitz  # PyMuPDF for better PDF extraction
@@ -61,8 +60,8 @@ class BertAnsweringSystem:
         self.CHUNK_OVERLAP = 200  # Increased overlap for better context
         self.MIN_CHUNK_SIZE = 300
         self.MAX_CHUNK_SIZE = 1000  # Larger chunks for more context
-        self.QA_WEIGHT = 0.6
-        self.RETRIEVAL_WEIGHT = 0.4
+        self.QA_WEIGHT = 0.5
+        self.RETRIEVAL_WEIGHT = 0.5
         
         # Mathematical notation extraction flag
         self.has_math_notation = False
@@ -379,18 +378,13 @@ class BertAnsweringSystem:
             logging.warning(f"Error validating answer: {str(e)}")
             return True, 0.7  # Default fallback
 
-    def format_answer_with_openai(self, answer: str, question: str, page_refs: List[int] = None) -> str:
+    def format_answer_with_openai(self, answer: str, question: str) -> str:
         """Format the answer using OpenAI API for better readability."""
         if not self.use_openai_for_formatting or not self.openai_api_key:
             return answer
             
         try:
-            # Page reference text
-            page_ref_text = ""
-            if page_refs and len(page_refs) > 0:
-                unique_pages = sorted(list(set(page_refs)))
-                page_ref_text = f"[Referensi: Halaman {', '.join(map(str, unique_pages))}]"
-            
+  
             # Prepare prompt for OpenAI
             prompt = f"""
             Berikut adalah pertanyaan dalam Bahasa Indonesia dan jawaban yang akan diformat ulang.
@@ -398,9 +392,7 @@ class BertAnsweringSystem:
             Pertanyaan: {question}
             
             Jawaban mentah: {answer}
-            
-            Referensi halaman: {page_ref_text}
-            
+                        
             Tolong format ulang jawaban tersebut agar lebih mudah dibaca dan dipahami. 
             Pastikan untuk:
             1. Memperbaiki tata bahasa dan ejaan
@@ -408,7 +400,6 @@ class BertAnsweringSystem:
             3. Memperbaiki format rumus matematika jika ada
             4. Pastikan jawaban lengkap dan tidak dipotong
             5. Tambahkan struktur yang jelas jika diperlukan (paragraf, dll)
-            6. PENTING: Sertakan referensi halaman di akhir jawaban dalam format [Referensi: Halaman X, Y, Z]
             
             Jawaban yang sudah diformat:
             """
@@ -437,25 +428,16 @@ class BertAnsweringSystem:
             if response.status_code == 200:
                 result = response.json()
                 formatted_answer = result["choices"][0]["message"]["content"].strip()
-                # Make sure page reference is included
-                if page_ref_text and page_ref_text not in formatted_answer:
-                    formatted_answer += f"\n\n{page_ref_text}"
+             
                 return formatted_answer
             else:
                 logging.warning(f"OpenAI API error: {response.status_code} - {response.text}")
-                # Add page reference if not formatted by OpenAI
-                if page_ref_text and page_ref_text not in answer:
-                    answer += f"\n\n{page_ref_text}"
+
                 return answer
                 
         except Exception as e:
             logging.error(f"Error formatting with OpenAI: {str(e)}")
-            # Add page reference if formatting fails
-            if page_refs and len(page_refs) > 0:
-                unique_pages = sorted(list(set(page_refs)))
-                page_ref_text = f"[Referensi: Halaman {', '.join(map(str, unique_pages))}]"
-                if page_ref_text not in answer:
-                    answer += f"\n\n{page_ref_text}"
+       
             return answer
 
     def find_page_references(self, answer: str, metadata: List[Dict]) -> List[int]:
@@ -830,6 +812,7 @@ class BertAnsweringSystem:
                 
                 combined_score = (self.QA_WEIGHT * qa_score) + (self.RETRIEVAL_WEIGHT * relevance) + length_bonus
                 
+                combined_score = max(0.0, min(combined_score, 1.0))
                 # Adjust based on validation
                 if is_valid:
                     combined_score *= (1.0 + 0.15 * validation_score)

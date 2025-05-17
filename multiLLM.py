@@ -58,7 +58,7 @@ def get_llm_response(model, prompt, temp=0.7, top_p=0.7, freq_penalty=0.5, pres_
         client = Together(api_key=llama_api_key)
 
         response = client.chat.completions.create(
-            model="meta-llama/Llama-4-Scout-17B-16E-Instruct",
+            model="meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo",
             messages=[{"role": "user", "content": prompt}]
         )
         text = response.choices[0].message.content
