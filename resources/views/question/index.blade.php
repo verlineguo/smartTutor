@@ -44,7 +44,7 @@
                                 </button>
                             </div>
                             <div class="table-responsive">
-                                <table class="table" id="table-data">
+                                <table class="table table-responsive" id="table-data">
                                     <thead>
                                         <tr>
                                             <th class="text-center"><input type="checkbox" id="select-all"></th>
@@ -340,20 +340,20 @@
     <script type="text/javascript">
         $(document).ready(function() {
             $('#table-data').on('draw.dt', function() {
-    $('[data-bs-toggle="tooltip"]').tooltip();
-});
+                $('[data-bs-toggle="tooltip"]').tooltip();
+            });
             // Helper functions for rendering data
             function wrapTextWithTooltip(data) {
-    const maxLength = 50; // Panjang maksimum teks sebelum dipotong
-    if (data && data.length > maxLength) {
-        return `
+                const maxLength = 50; // Panjang maksimum teks sebelum dipotong
+                if (data && data.length > maxLength) {
+                    return `
             <span data-bs-toggle="tooltip" title="${data}">
                 ${data.substring(0, maxLength)}...
             </span>
         `;
-    }
-    return `<span>${data}</span>`;
-}
+                }
+                return `<span>${data}</span>`;
+            }
 
             function wrapText(data) {
                 return data ? `<div class='text-wrap' style='text-align: justify;'>${data}</div>` : '-';
@@ -588,7 +588,7 @@
                 var selectedRows = getSelectedRows();
                 if (selectedRows.length === 0) {
                     toastr.warning('No questions selected. Please select at least one question.',
-                    'Warning');
+                        'Warning');
                     return;
                 }
                 $('#modalBulkUpdate').modal('show');
@@ -624,7 +624,7 @@
                             }
                         });
                         request.setRequestHeader("Authorization",
-                        "Bearer {{ $token }}");
+                            "Bearer {{ $token }}");
                     },
                     success: function(response) {
                         $.unblockUI();
@@ -652,7 +652,7 @@
                 var selectedRows = getSelectedRows();
                 if (selectedRows.length === 0) {
                     toastr.warning('No questions selected. Please select at least one question.',
-                    'Warning');
+                        'Warning');
                     return;
                 }
 
@@ -750,7 +750,7 @@
                             }
                         });
                         request.setRequestHeader("Authorization",
-                        "Bearer {{ $token }}");
+                            "Bearer {{ $token }}");
                     },
                     success: function(result) {
                         $.unblockUI();
@@ -802,7 +802,7 @@
                             }
                         });
                         request.setRequestHeader("Authorization",
-                        "Bearer {{ $token }}");
+                            "Bearer {{ $token }}");
                     },
                     success: function(result) {
                         $.unblockUI();
@@ -842,7 +842,7 @@
                             }
                         });
                         request.setRequestHeader("Authorization",
-                        "Bearer {{ $token }}");
+                            "Bearer {{ $token }}");
                     },
                     success: function(result) {
                         $.unblockUI();
@@ -880,35 +880,35 @@
 
                                     // Replace textareas with formatted div elements
                                     $('#edit-llm-content').html(`
-        <div class="mb-3">
-            <label class="form-label">OpenAI Answer</label>
-            <div class="form-control markdown-content" style="height: auto; min-height: 150px; overflow-y: auto;">
-                ${openai ? marked.parse(openai.answer) : 'No answer available'}
-            </div>
-            <input type="hidden" id="answer-openai-raw" value="${openai ? encodeURIComponent(openai.answer) : ''}">
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Gemini Answer</label>
-            <div class="form-control markdown-content" style="height: auto; min-height: 150px; overflow-y: auto;">
-                ${gemini ? marked.parse(gemini.answer) : 'No answer available'}
-            </div>
-            <input type="hidden" id="answer-gemini-raw" value="${gemini ? encodeURIComponent(gemini.answer) : ''}">
-        </div>
-        <div class="mb-3">
-            <label class="form-label">LLama Answer</label>
-            <div class="form-control markdown-content" style="height: auto; min-height: 150px; overflow-y: auto;">
-                ${llama ? marked.parse(llama.answer) : 'No answer available'}
-            </div>
-            <input type="hidden" id="answer-llama-raw" value="${llama ? encodeURIComponent(llama.answer) : ''}">
-        </div>
-    `);
+                                        <div class="mb-3">
+                                            <label class="form-label">OpenAI Answer</label>
+                                            <div class="form-control markdown-content" style="height: auto; min-height: 150px; overflow-y: auto;">
+                                                ${openai ? marked.parse(openai.answer) : 'No answer available'}
+                                            </div>
+                                            <input type="hidden" id="answer-openai-raw" value="${openai ? encodeURIComponent(openai.answer) : ''}">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Gemini Answer</label>
+                                            <div class="form-control markdown-content" style="height: auto; min-height: 150px; overflow-y: auto;">
+                                                ${gemini ? marked.parse(gemini.answer) : 'No answer available'}
+                                            </div>
+                                            <input type="hidden" id="answer-gemini-raw" value="${gemini ? encodeURIComponent(gemini.answer) : ''}">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">LLama Answer</label>
+                                            <div class="form-control markdown-content" style="height: auto; min-height: 150px; overflow-y: auto;">
+                                                ${llama ? marked.parse(llama.answer) : 'No answer available'}
+                                            </div>
+                                            <input type="hidden" id="answer-llama-raw" value="${llama ? encodeURIComponent(llama.answer) : ''}">
+                                        </div>
+                                    `);
 
 
                                 } else {
                                     $('#answer-openai').val('No answer available');
                                     $('#answer-gemini').val('No answer available');
                                     $('#answer-llama').val(
-                                    'No answer available');
+                                        'No answer available');
                                 }
 
 
@@ -921,13 +921,13 @@
                                         request.setRequestHeader(
                                             "Authorization",
                                             "Bearer {{ $token }}"
-                                            );
+                                        );
                                     },
                                     success: function(pdfResult) {
                                         // Process PDF answers
                                         var pdfContainer = $(
                                             '#pdf-answers-container'
-                                            );
+                                        );
                                         pdfContainer.empty();
 
                                         if (pdfResult.data && pdfResult
@@ -974,28 +974,28 @@
                                                             $(this)
                                                             .data(
                                                                 'answer'
-                                                                ));
+                                                            ));
                                                     $('#selected-pdf-answer')
                                                         .val(
                                                             selectedAnswer
-                                                            );
+                                                        );
 
                                                     // Highlight selected card
                                                     $('.pdf-answer-card')
                                                         .removeClass(
                                                             'border-primary'
-                                                            );
+                                                        );
                                                     $(this).closest(
                                                             '.pdf-answer-card'
-                                                            )
+                                                        )
                                                         .addClass(
                                                             'border-primary'
-                                                            );
+                                                        );
                                                 });
                                         } else {
                                             pdfContainer.html(
                                                 '<div class="alert alert-info">No PDF answers available for this question.</div>'
-                                                );
+                                            );
                                         }
 
                                         // Show modal after all data is loaded
@@ -1005,7 +1005,7 @@
                                         $('#pdf-answers-container')
                                             .html(
                                                 '<div class="alert alert-danger">Error loading PDF answers.</div>'
-                                                );
+                                            );
                                         $('#modalEdit').modal('show');
                                     }
                                 });
@@ -1025,7 +1025,7 @@
                                         request.setRequestHeader(
                                             "Authorization",
                                             "Bearer {{ $token }}"
-                                            );
+                                        );
                                     },
                                     success: function(pdfResult) {
                                         // Process PDF answers (same code as above)
@@ -1036,11 +1036,11 @@
                                         $('#pdf-answers-container')
                                             .html(
                                                 '<div class="alert alert-danger">Error loading PDF answers.</div>'
-                                                );
+                                            );
                                         $('#modalEdit').modal('show');
                                         $('#edit-llm-content').html(
                                             '<div class="alert alert-danger">Error loading LLM answers.</div>'
-                                            );
+                                        );
 
                                     }
                                 });
@@ -1122,7 +1122,7 @@
                             }
                         });
                         request.setRequestHeader("Authorization",
-                        "Bearer {{ $token }}");
+                            "Bearer {{ $token }}");
                     },
                     success: function(result) {
                         $.unblockUI();

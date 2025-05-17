@@ -3,12 +3,13 @@
 @section('add-css')
     <style>
         .reference-note {
-    padding: 10px;
-    background-color: #f8f9fa;
-    border-left: 4px solid #cb0c9f;
-    border-radius: 5px;
-    margin-top: 20px;
-}
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-left: 4px solid #cb0c9f;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+
         /* Essential styling - removed redundant or unused styles */
         .card {
             border-radius: 10px;
@@ -229,6 +230,7 @@
         .plagiarism-metrics {
             font-size: 0.85rem;
         }
+        
 
         .detection-method {
             padding: 12px;
@@ -278,26 +280,6 @@
             z-index: 100;
         }
 
-        .plagiarism-very-high {
-            background-color: #ff4d4d;
-            /* Red */
-            color: white;
-        }
-
-        .plagiarism-high {
-            background-color: #ff9933;
-            /* Orange */
-        }
-
-        .plagiarism-medium {
-            background-color: #ffffcc;
-            /* Yellow */
-        }
-
-        .plagiarism-low {
-            background-color: rgba(40, 167, 69, 0.3);
-            /* Green */
-        }
 
         /* Comparison panels */
         .comparison-panel {
@@ -491,6 +473,9 @@
                 padding-bottom: 20px !important;
                 margin-bottom: 20px;
             }
+             .plagiarism-overview {
+            flex-direction: column;
+        }
         }
     </style>
 @endsection
@@ -578,12 +563,14 @@
                                 <div class="card-header">
                                     <ul class="nav nav-tabs card-header-tabs" id="answer-tabs">
                                         <li class="nav-item">
-                                            <a class="nav-link active" data-bs-toggle="tab" href="#your-answer">Jawaban Anda</a>
+                                            <a class="nav-link active" data-bs-toggle="tab" href="#your-answer">Jawaban
+                                                Anda</a>
                                         </li>
                                         <li class="nav-item">
-                                            <a class="nav-link" data-bs-toggle="tab" href="#reference-answer">Jawaban Referensi</a>
+                                            <a class="nav-link" data-bs-toggle="tab" href="#reference-answer">Jawaban
+                                                Referensi</a>
                                         </li>
-                                      
+
                                     </ul>
                                 </div>
                                 <div class="card-body">
@@ -604,7 +591,7 @@
                                                         <ul class="list-group list-group-flush">
                                                             <li
                                                                 class="list-group-item d-flex justify-content-between align-items-center">
-                                                                Similarity Score
+                                                                Answer Score
                                                                 <span></span>
                                                             </li>
                                                             <li
@@ -628,13 +615,13 @@
                                             </div>
                                         </div>
                                         <div class="tab-pane fade" id="reference-answer">
-                                                <div class="text-container">
-                                                    <h6 class="mb-3">Jawaban PDF:</h6>
-                                                    <p></p>
-    
+                                            <div class="text-container">
+                                                <h6 class="mb-3">Jawaban PDF:</h6>
+                                                <p></p>
+
                                             </div>
                                         </div>
-                                       
+
                                     </div>
                                 </div>
                             </div>
@@ -642,8 +629,8 @@
 
                         <!-- Plagiarism Tab -->
                         <div id="plagiarism-tab" class="tab-container">
-                            <div class="plagiarism-overview">
-                                <div class="plagiarism-card">
+                            <div class="plagiarism-overview"  style="display: flex; gap: 16px;">
+                                <div class="plagiarism-card"  style="flex: 1;">
                                     <div class="chart-circle"></div>
                                     <div class="chart-value"></div>
                                     <div class="plagiarism-source">AI Similarity Score</div>
@@ -654,7 +641,7 @@
                                     </div>
                                 </div>
 
-                                <div class="card">
+                                <div class="card" style="flex: 2;">
                                     <div class="card-header">
                                         <h6 class="mb-0">Detection Methods</h6>
                                     </div>
@@ -665,7 +652,7 @@
                                     </div>
                                 </div>
 
-                                <div class="card mb-4">
+                                <div class="card mb-4" style="flex: 1;">
                                     <div class="card-header">
                                         <h6 class="mb-0">Detected Obfuscation Strategies</h6>
                                     </div>
@@ -901,7 +888,7 @@
                 $("#your-answer .text-container #userAnswer").html(data.userAnswer.answer);
 
                 // Evaluation details
-                $(".list-group-item:contains('Similarity Score') span").text(
+                $(".list-group-item:contains('Answer Score') span").text(
                     `${parseFloat(data.userAnswer.evaluation_scores*100).toFixed(2)}%`);
                 $(".list-group-item:contains('Required Threshold') span").text(`${data.question.threshold}%`);
                 $(".list-group-item:contains('Submission Date') span").text(formatDate(data.userAnswer.created_at));
@@ -916,9 +903,10 @@
                     referenceContainer.empty(); // Kosongkan kontainer sebelum menambahkan data baru
 
                     data.referenceAnswers.forEach((reference, index) => {
-                        const pageReferences = Array.isArray(reference.page_references) && reference.page_references.length > 0
-                            ? reference.page_references.join(', ')
-                            : 'No page references available';
+                        const pageReferences = Array.isArray(reference.page_references) && reference
+                            .page_references.length > 0 ?
+                            reference.page_references.join(', ') :
+                            'No page references available';
 
                         referenceContainer.append(`
                             <div class="reference-answer-item mb-3">
@@ -930,9 +918,9 @@
                             </div>
                         `);
                     });
-                    
-    // Tambahkan catatan di luar elemen .text-container
-    $("#reference-answer").append(`
+
+                    // Tambahkan catatan di luar elemen .text-container
+                    $("#reference-answer").append(`
         <div class="reference-note mt-4">
             <p class="text-muted fst-italic">
                 Catatan: Jawaban referensi di atas dihasilkan sepenuhnya oleh sistem dan belum tentu sepenuhnya benar. Harap Jangan terlalu menaruh harapan 🙏.
@@ -1265,7 +1253,7 @@
                         if (item.sentence_results && item.sentence_results.length > 0) {
                             console.log(
                                 `Processing highlights for ${item.source} with ${item.sentence_results.length} results`
-                                );
+                            );
                             setTimeout(() => {
                                 // Target specific container for this model only
                                 const specificContainer = $(`#${uniqueId}`);
@@ -1388,7 +1376,9 @@
                     <span>Cosine: ${(result.individual_scores?.cosine * 100 || 0).toFixed(1)}%</span><br>
                     <span>Jaccard: ${(result.individual_scores?.jaccard * 100 || 0).toFixed(1)}%</span><br>
                     <span>Levenshtein: ${(result.individual_scores?.levenshtein * 100 || 0).toFixed(1)}%</span><br>
-                    <span>N-gram: ${(result.individual_scores?.ngram * 100 || 0).toFixed(1)}%</span>
+                    <span>N-gram: ${(result.individual_scores?.ngram * 100 || 0).toFixed(1)}%</span><br>
+                    <span>Content: ${result.best_match}</span>
+
                 </div>
             `.replace(/\n/g, '').replace(/\s{2,}/g, ' ');
 

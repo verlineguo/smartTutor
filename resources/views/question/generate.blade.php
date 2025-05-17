@@ -1003,6 +1003,7 @@
                                     question.qa_score = bestAnswer.qa_score;
                                     question.retrieval_score = bestAnswer
                                         .retrieval_score;
+                                    question.page_references = bestAnswer.page_references;
                                     question.context = bestAnswer.context;
                                 }
                                 resolve(question);
