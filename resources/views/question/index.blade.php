@@ -92,6 +92,8 @@
                                             <option value="">Select Category</option>
                                             <option value="remembering">Remembering</option>
                                             <option value="understanding">Understanding</option>
+                                            <option value="applying">Applying</option>
+                                            <option value="analyzing">Analyzing</option>
                                         </select>
                                     </div>
                                     <div class="col-md-4 mb-3">
