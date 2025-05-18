@@ -54,6 +54,37 @@ class QuestionController extends Controller
         return $dataTable;
     }
 
+    public function insertData(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'question' => 'required|string',
+            'question_fix' => 'required|string',
+            'answer_fix' => 'required|string',
+            'threshold' => 'required|numeric',
+            'category' => 'required|string|max:40',
+            'language' => 'required|string|max:40',
+            'topic_guid' => 'required|string|max:40',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['error' => $validator->errors()->first()], 422);
+        }
+
+        $data = Question::create([
+            'question' => $request['question'],
+            'question_fix' => $request['question_fix'],
+            'answer_fix' => $request['answer_fix'],
+            'category' => $request['category'],
+            'weight' => 1.0,
+            'threshold' => $request['threshold'],
+            'topic_guid' => $request['topic_guid'],
+            'language' => $request['language'],
+        ]);
+
+        return response()->json(['data' => $data, 'message' => 'Success'], 200);
+    }
+
+
     public function translateDocument(Request $request)
     {
         set_time_limit(1500);
