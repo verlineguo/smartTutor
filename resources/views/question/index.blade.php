@@ -741,7 +741,7 @@
                         language: language,
                         page: page,
                         weight: weight,
-                        topic_id: "{{ $guid }}"
+                        topic_guid: "{{ $guid }}"
                     },
                     beforeSend: function(request) {
                         $.blockUI({
