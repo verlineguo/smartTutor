@@ -138,13 +138,7 @@
             transition: width 0.5s;
         }
 
-        .suggestion-card {
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            border-left: 4px solid #3b71ca;
-            background-color: #f8f9fa;
-        }
+  
 
         .question-status {
             width: 12px;
@@ -185,12 +179,7 @@
             background-color: #54b4d3;
         }
 
-        .insight-category {
-            font-weight: bold;
-            margin-bottom: 10px;
-            padding-bottom: 5px;
-            border-bottom: 1px solid #dee2e6;
-        }
+  
     </style>
 @endsection
 @section('info-page')
@@ -199,7 +188,7 @@
         <li class="breadcrumb-item text-sm"><a class="opacity-5 text-dark"
                 href="/grade/{{ $code }}/{{ $guid }}">Grade/{{ $name }}</a></li>
         <li class="breadcrumb-item text-sm"><a class="opacity-5 text-dark"
-                href="/grade/{{ $code }}/{{ $guid }}/{{ $userId }}">Student Details</a></li>
+                href="/grade/detail/{{ $code }}/{{ $guid }}/{{ $userId }}">Student Details</a></li>
         <li class="breadcrumb-item text-sm text-dark active text-capitalize" aria-current="page">Learning Evaluation</li>
     </ol>
     <h5 class="font-weight-bolder mb-0 text-capitalize">Student Learning Evaluation</h5>
@@ -225,7 +214,7 @@
                             </div>
                         </div>
                         <div>
-                            <a href="/grade/{{ $code }}/{{ $guid }}/{{ $userId }}"
+                            <a href="/grade/detail/{{ $code }}/{{ $guid }}/{{ $userId }}"
                                 class="btn btn-secondary">
                                 <i class="fa-solid fa-arrow-left"></i> Back to Answers
                             </a>
@@ -268,15 +257,7 @@
                                                 <h5 class="mb-0" id="learning-path-status">Loading...</h5>
                                             </div>
                                         </div>
-                                        <div class="d-flex align-items-center">
-                                            <div class="status-icon bg-success">
-                                                <i class="fa-solid fa-award"></i>
-                                            </div>
-                                            <div class="ms-3">
-                                                <p class="mb-0 text-muted">Highest Level Achieved</p>
-                                                <h5 class="mb-0" id="highest-level">Loading...</h5>
-                                            </div>
-                                        </div>
+                                      
                                     </div>
                                 </div>
                             </div>
@@ -293,13 +274,8 @@
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-8">
-                            <div class="chart-container" style="height: 300px;" id="overall-progress-chart">
-                                <!-- Chart will be rendered here -->
-                                <div class="d-flex justify-content-center align-items-center h-100">
-                                    <div class="spinner-border text-primary" role="status">
-                                        <span class="visually-hidden">Loading...</span>
-                                    </div>
-                                </div>
+                            <div class="chart-container" style="height: 300px;">
+                                <canvas id="overall-progress-chart"></canvas>
                             </div>
                         </div>
                         <div class="col-md-4">
@@ -387,33 +363,18 @@
                         <!-- Performance Tab -->
                         <div class="tab-pane fade" id="performance-content" role="tabpanel"
                             aria-labelledby="performance-tab">
-                            <div class="chart-container" style="height: 300px;" id="performance-chart">
-                                <!-- Performance chart will be rendered here -->
-                                <div class="d-flex justify-content-center align-items-center h-100">
-                                    <div class="spinner-border text-primary" role="status">
-                                        <span class="visually-hidden">Loading...</span>
-                                    </div>
-                                </div>
+                            <div class="chart-container" style="height: 300px;">
+                                <canvas id="performance-chart"></canvas>
                             </div>
                             <div class="row mt-4">
                                 <div class="col-md-6">
-                                    <div class="chart-container" style="height: 300px;" id="score-comparison-chart">
-                                        <!-- AI vs Lecturer Score Chart -->
-                                        <div class="d-flex justify-content-center align-items-center h-100">
-                                            <div class="spinner-border text-primary" role="status">
-                                                <span class="visually-hidden">Loading...</span>
-                                            </div>
-                                        </div>
+                                    <div class="chart-container" style="height: 300px;">
+                                        <canvas id="score-comparison-chart"></canvas>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <div class="chart-container" style="height: 300px;" id="attempts-chart">
-                                        <!-- Attempts Chart -->
-                                        <div class="d-flex justify-content-center align-items-center h-100">
-                                            <div class="spinner-border text-primary" role="status">
-                                                <span class="visually-hidden">Loading...</span>
-                                            </div>
-                                        </div>
+                                    <div class="chart-container" style="height: 300px;">
+                                        <canvas id="attempts-chart"></canvas>
                                     </div>
                                 </div>
                             </div>
@@ -479,25 +440,10 @@
                 </div>
             </div>
 
-            <!-- Temporal Progression -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h6>Progress Over Time</h6>
-                </div>
-                <div class="card-body">
-                    <div class="chart-container" style="height: 300px;" id="temporal-chart">
-                        <!-- Temporal chart will be rendered here -->
-                        <div class="d-flex justify-content-center align-items-center h-100">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+
 
             <!-- Academic Integrity Analysis -->
-            <div class="card mb-4">
+            <div class="card mb-8">
                 <div class="card-header">
                     <h6>Academic Integrity Analysis</h6>
                 </div>
@@ -514,30 +460,33 @@
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="chart-container" style="height: 250px;" id="plagiarism-chart">
-                                <!-- Plagiarism chart will be rendered here -->
-                                <div class="d-flex justify-content-center align-items-center h-100">
-                                    <div class="spinner-border text-primary" role="status">
-                                        <span class="visually-hidden">Loading...</span>
-                                    </div>
-                                </div>
+                            <div class="chart-container" style="height: 250px;">
+                                <canvas id="plagiarism-chart"></canvas>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-           
+        
         </div>
     </main>
 @endsection
 
-
+@section('vendor-javascript')
+    <script src="{{ asset('./assets/dashboard/datatables/jquery.dataTables.js') }}"></script>
+    <script src="{{ asset('./assets/dashboard/datatables-bs5/datatables-bootstrap5.js') }}"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/js/toastr.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+@endsection
 
 @section('custom-javascript')
     <script>
         // Global variables to store chart objects
-        let overallProgressChart, performanceChart, scoreComparisonChart, attemptsChart, temporalChart, plagiarismChart;
+        let overallProgressChart, performanceChart, scoreComparisonChart, attemptsChart, plagiarismChart;
         let studentData = {};
 
         $(document).ready(function() {
@@ -566,7 +515,7 @@
                 success: function(response) {
                     // Store student data globally
                     studentData = response;
-
+console.log(studentData);
                     // Display student profile
                     displayStudentProfile(response.profile);
 
@@ -580,8 +529,7 @@
                     // Initialize charts
                     initCharts(response);
 
-                    // Display insights and recommendations
-                    generateInsights(response.recommendations);
+            
                 },
                 error: function(xhr) {
                     toastr.error('Failed to load evaluation data. Please try again.');
@@ -621,10 +569,9 @@
         function displayLearningPathStatus(overallProgress) {
             const learningPathStatus = overallProgress.learning_path_status;
             $('#learning-path-status').text(learningPathStatus);
-            $('#highest-level').text(overallProgress.highest_level);
 
             // Create learning path visualization
-            const levels = ['Not Started', 'Foundation Level', 'Intermediate Level', 'Advanced Level', 'Expert Level'];
+            const levels = ['Not Started', 'Remembering Level', 'Understanding Level', 'Applying Level', 'Analyzing Level'];
             const currentLevelIndex = levels.indexOf(learningPathStatus);
             let pathHTML = '<div class="path-line"></div>';
 
@@ -689,86 +636,172 @@
             }
         }
 
+       
         function displayLevelCards(levelsData) {
-            const levelColors = {
-                'remembering': {
-                    bg: '#3b71ca',
-                    text: 'white'
-                },
-                'understanding': {
-                    bg: '#54b4d3',
-                    text: 'white'
-                },
-                'applying': {
-                    bg: '#14a44d',
-                    text: 'white'
-                },
-                'analyzing': {
-                    bg: '#e4a11b',
-                    text: 'white'
-                }
+    const levelColors = {
+        'remembering': {
+            bg: '#3b71ca',
+            text: 'white'
+        },
+        'understanding': {
+            bg: '#54b4d3',
+            text: 'white'
+        },
+        'applying': {
+            bg: '#14a44d',
+            text: 'white'
+        },
+        'analyzing': {
+            bg: '#e4a11b',
+            text: 'white'
+        }
+    };
+
+    const levelOrder = ['remembering', 'understanding', 'applying', 'analyzing'];
+    let cardsHTML = '';
+
+    levelOrder.forEach(level => {
+        if (levelsData[level]) {
+            const levelData = levelsData[level];
+            const color = levelColors[level] || {
+                bg: '#6c757d',
+                text: 'white'
             };
 
+            // Status penyelesaian
+            const hasCorrectAnswer = levelData.passed_questions > 0;
+            const statusText = hasCorrectAnswer ? 'Sudah Dikerjakan' : 'Belum Dikerjakan';
+            const statusBadge = hasCorrectAnswer ?
+                `<span class="badge bg-success">Sudah Dikerjakan</span>` :
+                `<span class="badge bg-secondary">Belum Dikerjakan</span>`;
+
+            // Informasi usaha
+            const avgAttempts = levelData.avg_attempts || 0;
+            const attemptsText = levelData.attempted_questions > 0 ?
+                `<b>${levelData.attempted_questions} soal telah dicoba dengan rata-rata ${avgAttempts} percobaan</b>` :
+                'Belum ada soal yang dicoba';
+
+            cardsHTML += `
+            <div class="col-md-6 mb-4">
+                <div class="level-card">
+                    <div class="level-card-header" style="background-color: ${color.bg}; color: ${color.text}">
+                        <h6>${levelData.level_name}</h6>
+                        ${statusBadge}
+                    </div>
+                    <div class="level-card-body">
+                        <p class="text-muted small">${levelData.level_description}</p>
+                        <div class="level-status-info mb-3">
+                            <p class="mb-1"><strong>Status:</strong> ${statusText}</p>
+                            <p class="mb-0"><strong>Usaha:</strong> ${attemptsText}</p>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col">
+                                <p class="mb-1 small text-muted">Soal Dikerjakan</p>
+                                <h6>${levelData.attempted_questions}/1</h6>
+                            </div>
+                            <div class="col">
+                                <p class="mb-1 small text-muted">Soal Benar</p>
+                                <h6>${levelData.passed_questions}/1</h6>
+                            </div>
+                            <div class="col">
+                                <p class="mb-1 small text-muted">Rata-rata Skor</p>
+                                <h6>${levelData.avg_score !== null ? levelData.avg_score : 'N/A'}</h6>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <h6 class="text-muted small">Catatan Evaluasi:</h6>
+                            <ul class="small">
+                                ${levelData.improvement_suggestions.map(suggestion => `<li>${suggestion}</li>`).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            `;
+        }
+    });
+
+    $('#level-cards-container').html(cardsHTML);
+}
+
+
+        function displayQuestionsTable(levelsData) {
+            let tableRows = '';
             const levelOrder = ['remembering', 'understanding', 'applying', 'analyzing'];
-            let cardsHTML = '';
 
             levelOrder.forEach(level => {
                 if (levelsData[level]) {
-                    const levelData = levelsData[level];
-                    const color = levelColors[level] || {
-                        bg: '#6c757d',
-                        text: 'white'
-                    };
+                    const questions = levelsData[level].question_performance;
 
-                    cardsHTML += `
-                    <div class="col-md-6 mb-4">
-                        <div class="level-card">
-                            <div class="level-card-header" style="background-color: ${color.bg}; color: ${color.text}">
-                                <h6>${levelData.level_name}</h6>
-                                <span class="badge bg-light text-dark">${levelData.passed_questions}/${levelData.total_questions} Completed</span>
-                            </div>
-                            <div class="level-card-body">
-                                <p class="text-muted small">${levelData.level_description}</p>
-                                <div class="progress-label">
-                                    <span>Progress</span>
-                                    <span>${levelData.progress_percentage}%</span>
-                                </div>
-                                <div class="progress">
-                                    <div class="progress-bar" role="progressbar" style="width: ${levelData.progress_percentage}%; background-color: ${color.bg}" 
-                                        aria-valuenow="${levelData.progress_percentage}" aria-valuemin="0" aria-valuemax="100"></div>
-                                </div>
-                                <div class="row mt-3">
-                                    <div class="col">
-                                        <p class="mb-1 small text-muted">Average Score</p>
-                                        <h6>${levelData.avg_score !== null ? levelData.avg_score : 'N/A'}</h6>
-                                    </div>
-                                    <div class="col">
-                                        <p class="mb-1 small text-muted">Average Attempts</p>
-                                        <h6>${levelData.avg_attempts}</h6>
-                                    </div>
-                                    <div class="col">
-                                        <p class="mb-1 small text-muted">Lecturer Score</p>
-                                        <h6>${levelData.avg_lecturer_score !== null ? levelData.avg_lecturer_score : 'N/A'}</h6>
-                                    </div>
-                                </div>
-                                <div class="mt-3">
-                                    <h6 class="text-muted small">Improvement Suggestions:</h6>
-                                    <ul class="small">
-                                        ${levelData.improvement_suggestions.map(suggestion => `<li>${suggestion}</li>`).join('')}
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
+                    questions.forEach(question => {
+                        const status = question.is_correct ? 'correct' : (question.attempts > 0 ?
+                            'incorrect' : 'not-attempted');
+                        // Continue from line 717 of paste-2.txt where it was cut off
+                        const statusDisplay =
+                            `<span class="question-status ${status}"></span> ${status === 'correct' ? 'Correct' : (status === 'incorrect' ? 'Incorrect' : 'Not Attempted')}`;
+
+                        // Plagiarism flag
+                        let plagiarismDisplay = 'None';
+                        if (question.has_plagiarism) {
+                            // Determine severity based on highest score
+                            let maxScore = 0;
+                            let plagiarismLevel = 'low';
+
+                            if (question.plagiarism_scores) {
+                                const scores = Object.values(question.plagiarism_scores);
+                                maxScore = Math.max(...scores);
+
+                                if (maxScore >= 0.75) {
+                                    plagiarismLevel = 'high';
+                                } else if (maxScore >= 0.65) {
+                                    plagiarismLevel = 'medium';
+                                }
+                            }
+
+                            plagiarismDisplay =
+                                `<span class="plagiarism-flag ${plagiarismLevel}">${Math.round(maxScore * 100)}%</span>`;
+                        }
+
+                        tableRows += `
+                        <tr data-level="${level}" data-status="${status}" data-question="${question.question_text}">
+                            <td>${question.question_text}</td>
+                            <td>${levelsData[level].level_name}</td>
+                            <td>${question.attempts}</td>
+                            <td>${question.best_score !== null ? question.best_score.toFixed(1) : 'N/A'}</td>
+                            <td>${statusDisplay}</td>
+                            <td>${plagiarismDisplay}</td>
+                        </tr>
+                    `;
+                    });
                 }
             });
 
-            $('#level-cards-container').html(cardsHTML);
+            $('#questions-table-body').html(tableRows);
         }
 
-    
-        
+        function filterQuestionsTable() {
+            const levelFilter = $('#level-filter').val();
+            const statusFilter = $('#status-filter').val();
+            const searchTerm = $('#question-search').val().toLowerCase();
+
+            $('table#questions-table tbody tr').each(function() {
+                const row = $(this);
+                const level = row.data('level');
+                const status = row.data('status');
+                const questionText = row.data('question')?.toLowerCase() || '';
+
+                const levelMatch = levelFilter === 'all' || level === levelFilter;
+                const statusMatch = statusFilter === 'all' || status === statusFilter;
+                const searchMatch = questionText.includes(searchTerm);
+
+                if (levelMatch && statusMatch && searchMatch) {
+                    row.show();
+                } else {
+                    row.hide();
+                }
+            });
+        }
+
         function displayPlagiarismSummary(plagiarismData) {
             const totalDetected = plagiarismData.total_detected;
 
@@ -811,8 +844,263 @@
             return formatted.charAt(0).toUpperCase() + formatted.slice(1);
         }
 
-     
-        
+        function initCharts(data) {
+            // Overall progress chart (donut chart)
+            const overallCtx = document.getElementById('overall-progress-chart').getContext('2d');
+            overallProgressChart = new Chart(overallCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Correct', 'Incorrect/Not Attempted'],
+                    datasets: [{
+                        data: [
+                            data.overall_progress.correct_answers,
+                            data.overall_progress.total_questions - data.overall_progress
+                            .correct_answers
+                        ],
+                        backgroundColor: ['#14a44d', '#e4e4e4'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    const total = data.overall_progress.total_questions;
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return `${label}: ${value} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Performance by level chart (horizontal bar chart)
+            const performanceCtx = document.getElementById('performance-chart').getContext('2d');
+            const levelLabels = [];
+            const completionData = [];
+            const progressData = [];
+
+            // Extract data for performance chart
+            for (const level in data.levels) {
+                levelLabels.push(data.levels[level].level_name);
+                completionData.push(data.levels[level].progress_percentage);
+
+                // Calculate percentage of attempted questions
+                const attempted = data.levels[level].attempted_questions;
+                const total = data.levels[level].total_questions;
+                const attemptedPercentage = total > 0 ? (attempted / total) * 100 : 0;
+                progressData.push(attemptedPercentage);
+            }
+
+            performanceChart = new Chart(performanceCtx, {
+                type: 'bar',
+                data: {
+                    labels: levelLabels,
+                    datasets: [{
+                            label: 'Completed (%)',
+                            data: completionData,
+                            backgroundColor: '#14a44d',
+                            borderWidth: 0
+                        },
+                        {
+                            label: 'Attempted But Not Completed (%)',
+                            data: progressData.map((val, i) => val - completionData[i]),
+                            backgroundColor: '#e4a11b',
+                            borderWidth: 0
+                        }
+                    ]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            stacked: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Percentage'
+                            }
+                        },
+                        y: {
+                            stacked: true
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        },
+                        title: {
+                            display: true,
+                            text: 'Progress by Learning Level'
+                        }
+                    }
+                }
+            });
+
+            // Score comparison chart (radar chart)
+            const scoreCtx = document.getElementById('score-comparison-chart').getContext('2d');
+            const aiScores = [];
+            const lecturerScores = [];
+
+            // Extract data for score comparison
+            for (const level in data.levels) {
+                aiScores.push(data.levels[level].avg_score || 0);
+                lecturerScores.push(data.levels[level].avg_lecturer_score || 0);
+            }
+
+            scoreComparisonChart = new Chart(scoreCtx, {
+                type: 'radar',
+                data: {
+                    labels: levelLabels,
+                    datasets: [{
+                            label: 'AI Evaluation',
+                            data: aiScores,
+                            fill: true,
+                            backgroundColor: 'rgba(59, 113, 202, 0.2)',
+                            borderColor: 'rgb(59, 113, 202)',
+                            pointBackgroundColor: 'rgb(59, 113, 202)',
+                            pointBorderColor: '#fff',
+                            pointHoverBackgroundColor: '#fff',
+                            pointHoverBorderColor: 'rgb(59, 113, 202)'
+                        },
+                        {
+                            label: 'Lecturer Evaluation',
+                            data: lecturerScores,
+                            fill: true,
+                            backgroundColor: 'rgba(20, 164, 77, 0.2)',
+                            borderColor: 'rgb(20, 164, 77)',
+                            pointBackgroundColor: 'rgb(20, 164, 77)',
+                            pointBorderColor: '#fff',
+                            pointHoverBackgroundColor: '#fff',
+                            pointHoverBorderColor: 'rgb(20, 164, 77)'
+                        }
+                    ]
+                },
+                options: {
+                    elements: {
+                        line: {
+                            borderWidth: 2
+                        }
+                    },
+                    scales: {
+                        r: {
+                            min: 0,
+                            max: 10,
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 2
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'AI vs. Lecturer Evaluation'
+                        }
+                    }
+                }
+            });
+
+            // Attempts chart (bar chart)
+            const attemptsCtx = document.getElementById('attempts-chart').getContext('2d');
+            const attemptsData = [];
+
+            // Extract attempts data
+            for (const level in data.levels) {
+                attemptsData.push(data.levels[level].avg_attempts || 0);
+            }
+
+            attemptsChart = new Chart(attemptsCtx, {
+                type: 'bar',
+                data: {
+                    labels: levelLabels,
+                    datasets: [{
+                        label: 'Average Attempts per Question',
+                        data: attemptsData,
+                        backgroundColor: '#54b4d3',
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Average Attempts'
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Average Attempts by Level'
+                        }
+                    }
+                }
+            });
+
+            
+
+            // Plagiarism chart (pie chart)
+            const plagiarismData = data.plagiarism_summary;
+            if (plagiarismData && plagiarismData.detected_by_level) {
+                const plagiarismLabels = [];
+                const plagiarismValues = [];
+                const colorSet = ['#dc4c64', '#e4a11b', '#54b4d3', '#14a44d'];
+
+                let i = 0;
+                for (const level in plagiarismData.detected_by_level) {
+                    plagiarismLabels.push(level.charAt(0).toUpperCase() + level.slice(1));
+                    plagiarismValues.push(plagiarismData.detected_by_level[level]);
+                    i++;
+                }
+
+                const plagiarismCtx = document.getElementById('plagiarism-chart').getContext('2d');
+                plagiarismChart = new Chart(plagiarismCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: plagiarismLabels,
+                        datasets: [{
+                            data: plagiarismValues,
+                            backgroundColor: colorSet.slice(0, i),
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Plagiarism Distribution by Level'
+                            }
+                        }
+                    }
+                });
+            } else {
+                // Show message if no plagiarism data
+                $('#plagiarism-chart').html('<p class="text-center mt-5">No plagiarism detected</p>');
+            }
+        }
+
         // Function to generate PDF report
         function generatePDF() {
             // Show loading message
