@@ -305,15 +305,6 @@ class GradeController extends Controller
         }
     }
 
-    /**
-     * Get detailed evaluation statistics for a specific student in a topic
-     *
-     * @param string $code Course code
-     * @param string $guid Topic GUID
-     * @param string $userId User ID
-     * @return \Illuminate\Http\JsonResponse
-     */
-
     public function getEvaluationStats($code, $guid, $userId)
     {
         try {
@@ -336,7 +327,6 @@ class GradeController extends Controller
             $overallCorrectAnswers = 0;
             $overallTotalQuestions = 0;
             $highestAchievedLevel = null;
-            $levelProgression = [];
 
             // Get plagiarism data for this user
             $plagiarismData = Plagiarism::whereHas('userAnswer', function ($query) use ($userId) {
@@ -362,7 +352,10 @@ class GradeController extends Controller
                 }
 
                 // Get user answers for these questions
-                $userAnswers = AnswerUser::whereIn('question_guid', $questionIds)->where('user_id', $userId)->orderBy('created_at', 'asc')->get();
+                $userAnswers = AnswerUser::whereIn('question_guid', $questionIds)->where('user_id', $userId)->get();
+
+                // Get LLM answers for comparison
+                $llmAnswers = AnswerLLM::whereIn('question_guid', $questionIds)->get()->groupBy('question_guid');
 
                 // Calculate metrics
                 $attemptedQuestionIds = $userAnswers->pluck('question_guid')->unique()->toArray();
@@ -388,40 +381,55 @@ class GradeController extends Controller
 
                 $avgAttempts = count($attemptsPerQuestion) > 0 ? array_sum($attemptsPerQuestion) / count($attemptsPerQuestion) : 0;
 
-                // Calculate attempts required to level up
-                $attemptsToLevelUp = $this->calculateAttemptsToLevelUp($userAnswers, $passedQuestionIds);
-
-                // Check if this is the highest achieved level with at least one correct answer
-                if ($passedQuestions > 0) {
+                // Check if this is the highest achieved level with at least 40% completion
+                if ($passedQuestions > 0 && $passedQuestions / $totalQuestions >= 0.4) {
                     $highestAchievedLevel = $level;
                 }
 
-                // Check when the student reached this level
-                $firstCorrectAnswer = $userAnswers->where('is_correct', true)->first();
-                $reachedAt = $firstCorrectAnswer ? $firstCorrectAnswer->created_at : null;
+                // Question-specific performance
+                $questionPerformance = [];
+                foreach ($questions as $question) {
+                    $userAnswersForQ = $userAnswers->where('question_guid', $question->guid);
+                    $attempts = $userAnswersForQ->count();
+                    $bestScore = $userAnswersForQ->max('evaluation_scores');
+                    $isCorrect = $userAnswersForQ->where('is_correct', true)->count() > 0;
 
-                // Track progression through levels
-                if ($reachedAt) {
-                    $levelProgression[$level] = [
-                        'reached_at' => $reachedAt,
-                        'attempts_to_reach' => $attemptsToLevelUp,
+                    // Get plagiarism score if available
+                    $plagiarismFlag = false;
+                    $plagiarismScore = null;
+                    $detectedStrategies = [];
+
+                    foreach ($plagiarismData as $plagiarism) {
+                        if ($plagiarism->userAnswer && $plagiarism->userAnswer->question_guid === $question->guid) {
+                            $plagiarismFlag = true;
+                            $plagiarismScore = [
+                                'cosine' => $plagiarism->cosine_similarity,
+                                'jaccard' => $plagiarism->jaccard_similarity,
+                                'bert' => $plagiarism->bert_score,
+                                'levenshtein' => $plagiarism->levenshtein_similarity,
+                                'ngram' => $plagiarism->ngram_similarity,
+                            ];
+
+                            if ($plagiarism->detected_strategies) {
+                                $detectedStrategies = json_decode($plagiarism->detected_strategies, true);
+                            }
+                            break;
+                        }
+                    }
+
+                    $questionPerformance[] = [
+                        'question_id' => $question->guid,
+                        'question_text' => $question->question,
+                        'attempts' => $attempts,
+                        'best_score' => $bestScore,
+                        'is_correct' => $isCorrect,
+                        'has_plagiarism' => $plagiarismFlag,
+                        'plagiarism_scores' => $plagiarismScore,
+                        'plagiarism_strategies' => $detectedStrategies,
                     ];
                 }
 
-                // Plagiarism data for this level
-                $levelPlagiarismCount = $plagiarismData
-                    ->filter(function ($item) use ($questionIds) {
-                        return in_array($item->userAnswer->question_guid, $questionIds);
-                    })
-                    ->count();
-
-                // Generate improvement suggestions based on performance
-                $improvementSuggestions = $this->generateImprovementSuggestions($level, $avgScore, $avgAttempts, $passedQuestions, $totalQuestions);
-
-                // Question performance details (limit to just key metrics, not all questions)
-                $questionPerformance = $this->getQuestionPerformanceSummary($userAnswers, $questions, $plagiarismData);
-
-                // Add level data to response
+                // Store all level data
                 $levelsData[$level] = [
                     'level_name' => ucfirst($level),
                     'level_description' => $this->getLevelDescription($level),
@@ -429,34 +437,55 @@ class GradeController extends Controller
                     'attempted_questions' => $attemptedQuestions,
                     'passed_questions' => $passedQuestions,
                     'progress_percentage' => $totalQuestions > 0 ? round(($passedQuestions / $totalQuestions) * 100) : 0,
-                    'avg_score' => round($avgScore, 1),
+                    'avg_score' => $avgScore ? round($avgScore, 1) : null,
                     'avg_lecturer_score' => $avgLecturerScore ? round($avgLecturerScore, 1) : null,
-                    'avg_attempts' => round($avgAttempts, 1),
-                    'attempts_to_level_up' => $attemptsToLevelUp,
-                    'reached_at' => $reachedAt,
-                    'plagiarism_count' => $levelPlagiarismCount,
-                    'improvement_suggestions' => $improvementSuggestions,
+                    'avg_attempts' => $avgAttempts ? round($avgAttempts, 1) : 0,
                     'question_performance' => $questionPerformance,
+                    'improvement_suggestions' => $this->getImprovementSuggestions($level, $passedQuestions, $avgAttempts),
                 ];
             }
 
-            // Calculate level progression times and attempts
-            $progressionAnalysis = $this->analyzeLevelProgression($levelProgression);
-
             // Calculate plagiarism summary
-            $plagiarismSummary = $this->calculatePlagiarismSummary($plagiarismData, $levelsData);
+            $plagiarismSummary = [
+                'total_detected' => $plagiarismData->count(),
+                'detected_by_level' => [],
+                'most_common_strategies' => $this->getMostCommonPlagiarismStrategies($plagiarismData),
+                'details' => $plagiarismData->map(function ($plagiarism) {
+                    return [
+                        'similarity_scores' => [
+                            'cosine' => $plagiarism->cosine_similarity,
+                            'jaccard' => $plagiarism->jaccard_similarity,
+                            'bert' => $plagiarism->bert_score,
+                            'levenshtein' => $plagiarism->levenshtein_similarity,
+                            'ngram' => $plagiarism->ngram_similarity,
+                        ],
+                        'detected_strategies' => json_decode($plagiarism->detected_strategies ?? '[]', true),
+                        'weighted_score' => $plagiarism->details->pluck('weighted_score')->avg(),
+                    ];
+                }),
+            ];
 
-            // Generate temporal data (learning over time)
-            $temporalData = $this->generateTemporalData($userId, $guid, $levels);
+            // Count plagiarism instances by level
+            foreach ($plagiarismData as $plagiarism) {
+                if ($plagiarism->userAnswer && $plagiarism->userAnswer->question_guid) {
+                    $question = Question::find($plagiarism->userAnswer->question_guid);
+                    if ($question) {
+                        $level = $question->category;
+                        if (!isset($plagiarismSummary['detected_by_level'][$level])) {
+                            $plagiarismSummary['detected_by_level'][$level] = 0;
+                        }
+                        $plagiarismSummary['detected_by_level'][$level]++;
+                    }
+                }
+            }
 
-            // Overall progress data - modified to focus on level progression
+            // Overall progress data
             $overallProgress = [
                 'total_questions' => $overallTotalQuestions,
                 'correct_answers' => $overallCorrectAnswers,
                 'progress_percentage' => $overallTotalQuestions > 0 ? round(($overallCorrectAnswers / $overallTotalQuestions) * 100) : 0,
                 'highest_level' => $highestAchievedLevel ? ucfirst($highestAchievedLevel) : 'None',
-                'learning_path_status' => $this->getLearningPathStatus($highestAchievedLevel),
-                'level_progression' => $progressionAnalysis,
+                'learning_path_status' => $this->getLearningPathStatus($user->id, $guid),
             ];
 
             // Student profile data
@@ -467,17 +496,12 @@ class GradeController extends Controller
                 'username' => $user->username,
             ];
 
-            // Generate instructor-focused recommendations
-            $recommendations = $this->generateInstructorRecommendations($levelsData, $plagiarismSummary, $progressionAnalysis);
-
             return response()->json(
                 [
                     'profile' => $profile,
                     'levels' => $levelsData,
                     'overall_progress' => $overallProgress,
-                    'temporal_progression' => $temporalData,
                     'plagiarism_summary' => $plagiarismSummary,
-                    'recommendations' => $recommendations,
                 ],
                 200,
             );
@@ -493,469 +517,138 @@ class GradeController extends Controller
         }
     }
 
-    /**
-     * Calculate the number of attempts required to level up
-     */
-    private function calculateAttemptsToLevelUp($userAnswers, $passedQuestionIds)
+    private function getLearningPathStatus($userId, $topicGuid)
     {
-        if (empty($passedQuestionIds)) {
-            return null; // Level not reached yet
-        }
-
-        // Get the first correct answer for each passed question
-        $firstCorrectAttempts = [];
-        foreach ($passedQuestionIds as $qId) {
-            $attempts = $userAnswers->where('question_guid', $qId)->sortBy('created_at')->values();
-            $correctAttemptIndex = $attempts->search(function ($answer) {
-                return $answer->is_correct;
-            });
-
-            if ($correctAttemptIndex !== false) {
-                $firstCorrectAttempts[$qId] = $correctAttemptIndex + 1; // +1 because index is zero-based
-            }
-        }
-
-        // Calculate average attempts to get a correct answer
-        return !empty($firstCorrectAttempts) ? round(array_sum($firstCorrectAttempts) / count($firstCorrectAttempts), 1) : null;
-    }
-
-    /**
-     * Analyze how the student progressed through learning levels
-     */
-    private function analyzeLevelProgression($levelProgression)
-    {
-        if (empty($levelProgression)) {
-            return ['reached_levels' => 0, 'avg_time_between_levels' => null];
-        }
-
-        $reachedLevels = count($levelProgression);
-        $timesBetweenLevels = [];
-        $avgAttemptsPerLevel = array_filter(array_column($levelProgression, 'attempts_to_reach'));
-
-        // Sort levels by time reached
-        $sortedProgression = collect($levelProgression)->sortBy('reached_at')->values()->toArray();
-
-        // Calculate times between levels
-        for ($i = 1; $i < count($sortedProgression); $i++) {
-            $previousTime = new \DateTime($sortedProgression[$i - 1]['reached_at']);
-            $currentTime = new \DateTime($sortedProgression[$i]['reached_at']);
-            $interval = $previousTime->diff($currentTime);
-            $timesBetweenLevels[] = $interval->days * 24 + $interval->h; // hours
-        }
-
-        $avgTime = !empty($timesBetweenLevels) ? array_sum($timesBetweenLevels) / count($timesBetweenLevels) : null;
-        $avgAttempts = !empty($avgAttemptsPerLevel) ? array_sum($avgAttemptsPerLevel) / count($avgAttemptsPerLevel) : null;
-
-        return [
-            'reached_levels' => $reachedLevels,
-            'avg_time_between_levels' => $avgTime ? round($avgTime, 1) : null, // hours
-            'avg_attempts_per_level' => $avgAttempts ? round($avgAttempts, 1) : null,
-            'progression_details' => $sortedProgression,
+        // Define the expected learning path and mapping
+        $path = ['remembering', 'understanding', 'applying', 'analyzing'];
+        $levelMapping = [
+            'none' => 'Not Started',
+            'remembering' => 'Remembering Level',
+            'understanding' => 'Understanding Level',
+            'applying' => 'Applying Level',
+            'analyzing' => 'Analyzing Level',
         ];
-    }
 
-    /**
-     * Generate a summary of question performance instead of detailed per-question data
-     */
-    private function getQuestionPerformanceSummary($userAnswers, $questions, $plagiarismData)
-    {
-        $summary = [];
-
-        foreach ($questions as $question) {
-            $answers = $userAnswers->where('question_guid', $question->guid);
-
-            if ($answers->isEmpty()) {
-                continue; // Skip questions with no attempts
+        // Determine the highest level achieved
+        $highestLevel = 'none';
+        foreach (array_reverse($path) as $level) {
+            $hasCorrect = AnswerUser::where('user_id', $userId)
+                ->where('is_correct', true)
+                ->whereHas('question', function ($query) use ($topicGuid, $level) {
+                    $query->where('topic_guid', $topicGuid)->where('category', $level);
+                })
+                ->exists();
+            if ($hasCorrect) {
+                $highestLevel = $level;
+                break;
             }
-
-            $attempts = $answers->count();
-            $bestScore = $answers->max('evaluation_scores');
-            $isCorrect = $answers->contains('is_correct', true);
-
-            // Check for plagiarism
-            $hasPlagiarism = false;
-            $plagiarismScores = null;
-
-            foreach ($answers as $answer) {
-                $plagiarismRecord = $plagiarismData->where('user_answer_guid', $answer->guid)->first();
-                if ($plagiarismRecord) {
-                    $hasPlagiarism = true;
-                    $plagiarismScores = [
-                        'cosine' => $plagiarismRecord->cosine_similarity,
-                        'jaccard' => $plagiarismRecord->jaccard_similarity,
-                        'bert' => $plagiarismRecord->bert_score,
-                        'levenshtein' => $plagiarismRecord->levenshtein_similarity,
-                        'ngram' => $plagiarismRecord->ngram_similarity,
-                    ];
-                    break;
-                }
-            }
-
-            $summary[] = [
-                'question_text' => $question->question,
-                'attempts' => $attempts,
-                'best_score' => $bestScore,
-                'is_correct' => $isCorrect,
-                'has_plagiarism' => $hasPlagiarism,
-                'plagiarism_scores' => $plagiarismScores,
-            ];
         }
 
-        return $summary;
+        return $levelMapping[$highestLevel] ?? 'In Progress';
     }
 
-    /**
-     * Generate improvement suggestions based on performance
-     */
-    private function generateImprovementSuggestions($level, $avgScore, $avgAttempts, $passedQuestions, $totalQuestions)
+    private function getLevelDescription($level)
+    {
+        $descriptions = [
+            'remembering' => 'Mahasiswa mampu mengingat fakta, istilah, konsep dasar, dan jawaban.',
+            'understanding' => 'Mahasiswa menunjukkan pemahaman terhadap fakta dan ide dengan mengorganisir, membandingkan, menafsirkan, serta menyampaikan ide pokok.',
+            'applying' => 'Mahasiswa mampu menerapkan pengetahuan, fakta, teknik, dan aturan yang telah dipelajari untuk menyelesaikan permasalahan.',
+            'analyzing' => 'Mahasiswa dapat menganalisis informasi dengan memecahnya menjadi bagian-bagian, serta mengidentifikasi motif, penyebab, dan hubungan antar konsep.',
+        ];
+
+        return $descriptions[$level] ?? '';
+    }
+
+    private function getImprovementSuggestions($level, $isCorrect, $attempts)
     {
         $suggestions = [];
 
-        // Level hasn't been attempted or there are no questions for this level
-        if ($totalQuestions == 0) {
-            return ['No questions available for this level.'];
-        }
-
-        // Level hasn't been started
-        if ($passedQuestions == 0) {
-            $suggestions[] = "Student hasn't successfully completed any questions in this level yet.";
-
-            if ($level == 'remembering') {
-                $suggestions[] = 'Consider providing foundational resources to help student get started.';
+        // Berdasarkan hasil jawaban dan percobaan
+        if (!$isCorrect) {
+            if ($attempts >= 3) {
+                $suggestions[] = 'Mahasiswa belum berhasil menjawab meskipun telah mencoba beberapa kali. Perlu mengulang materi atau mendapat penjelasan tambahan.';
             } else {
-                $suggestions[] = "Review student's progress in previous levels to ensure readiness.";
+                $suggestions[] = 'Jawaban belum benar. Dorong mahasiswa untuk mengulas kembali konsep inti dari materi ini.';
             }
-
-            return $suggestions;
+        } else {
+            if ($attempts > 2) {
+                $suggestions[] = 'Jawaban benar, namun memerlukan beberapa kali percobaan. Ajak mahasiswa merefleksikan kesalahan awal.';
+            } else {
+                $suggestions[] = 'Mahasiswa berhasil menjawab dengan baik. Dapat melanjutkan ke level berikutnya.';
+            }
         }
 
-        // Level completion rate
-        $completionRate = $passedQuestions / $totalQuestions;
+        // Berdasarkan level kognitif
+        $suggestions = array_merge($suggestions, $this->suggestByCognitiveLevelSingle($level, $isCorrect, $attempts));
 
-        // Analyze based on level and metrics
+        return $suggestions;
+    }
+
+    private function suggestByCognitiveLevelSingle($level, $isCorrect, $attempts)
+    {
+        $suggestions = [];
+
         switch ($level) {
             case 'remembering':
-                if ($avgAttempts > 2) {
-                    $suggestions[] = 'Student requires multiple attempts at basic recall questions. Consider revising foundational concepts.';
-                }
-                if ($avgScore < 7) {
-                    $suggestions[] = 'Low score on remembering tasks suggests gaps in foundational knowledge.';
+                if (!$isCorrect) {
+                    $suggestions[] = 'Gunakan teknik seperti flashcard atau pengulangan untuk mengingat konsep.';
                 }
                 break;
 
             case 'understanding':
-                if ($avgAttempts > 3) {
-                    $suggestions[] = 'Student requires multiple attempts to demonstrate understanding. May benefit from conceptual clarification.';
-                }
-                if ($avgScore < 7) {
-                    $suggestions[] = 'Student may need help connecting concepts and establishing relationships between ideas.';
+                if (!$isCorrect) {
+                    $suggestions[] = 'Minta mahasiswa menjelaskan ulang konsep dengan bahasanya sendiri.';
                 }
                 break;
 
             case 'applying':
-                if ($avgAttempts > 3) {
-                    $suggestions[] = 'Student struggles to apply concepts in practice. Consider providing more hands-on examples.';
-                }
-                if ($avgScore < 7) {
-                    $suggestions[] = 'Difficulty applying knowledge suggests a gap between theoretical understanding and practical implementation.';
+                if (!$isCorrect) {
+                    $suggestions[] = 'Latihan dengan studi kasus serupa agar terbiasa menerapkan konsep.';
                 }
                 break;
 
             case 'analyzing':
-                if ($avgAttempts > 3) {
-                    $suggestions[] = 'Student requires multiple attempts at analysis tasks. May benefit from guided analytical practice.';
-                }
-                if ($avgScore < 7) {
-                    $suggestions[] = 'Low analytical scores suggest student may need more practice with complex problem decomposition.';
+                if (!$isCorrect) {
+                    $suggestions[] = 'Dorong mahasiswa untuk memecah permasalahan dan melihat hubungan antar konsep.';
                 }
                 break;
-        }
 
-        // Level progression
-        if ($completionRate < 0.5 && $passedQuestions > 0) {
-            $suggestions[] = 'Student has started but not completed this level. Check for specific obstacles.';
+            case 'evaluating':
+                if (!$isCorrect) {
+                    $suggestions[] = 'Latih kemampuan menilai solusi lain berdasarkan argumen logis.';
+                }
+                break;
+
+            case 'creating':
+                if (!$isCorrect) {
+                    $suggestions[] = 'Beri ruang untuk mencoba membuat solusi baru dari gabungan konsep.';
+                }
+                break;
         }
 
         return $suggestions;
     }
 
-    /**
-     * Get description for each learning level
-     */
-    private function getLevelDescription($level)
+    private function getMostCommonPlagiarismStrategies($plagiarismData)
     {
-        switch ($level) {
-            case 'remembering':
-                return 'Retrieval of relevant knowledge from long-term memory - recognition and recall of facts';
-            case 'understanding':
-                return 'Making meaning from educational messages through interpreting, exemplifying, classifying, summarizing, inferring, comparing and explaining';
-            case 'applying':
-                return 'Using procedures to perform exercises or solve problems - implementation and execution';
-            case 'analyzing':
-                return 'Breaking material into constituent parts and detecting how parts relate to one another and to an overall structure';
-            default:
-                return '';
-        }
-    }
-
-    /**
-     * Get learning path status based on highest achieved level
-     */
-    private function getLearningPathStatus($highestLevel)
-    {
-        if (!$highestLevel) {
-            return 'Not Started';
-        }
-
-        switch ($highestLevel) {
-            case 'remembering':
-                return 'Foundation Level';
-            case 'understanding':
-                return 'Intermediate Level';
-            case 'applying':
-                return 'Advanced Level';
-            case 'analyzing':
-                return 'Expert Level';
-            default:
-                return 'Not Started';
-        }
-    }
-
-    /**
-     * Calculate plagiarism summary for instructor view
-     */
-    private function calculatePlagiarismSummary($plagiarismData, $levelsData)
-    {
-        if ($plagiarismData->isEmpty()) {
-            return [
-                'total_detected' => 0,
-                'detected_by_level' => [],
-                'most_common_strategies' => [],
-                'average_similarity_scores' => [
-                    'cosine' => 0,
-                    'jaccard' => 0,
-                    'bert' => 0,
-                    'levenshtein' => 0,
-                    'ngram' => 0,
-                ],
-            ];
-        }
-
-        // Count by level
-        $detectedByLevel = [];
-        foreach ($levelsData as $level => $data) {
-            $detectedByLevel[$level] = $data['plagiarism_count'] ?? 0;
-        }
-
-        // Extract and count strategies
         $strategies = [];
-        foreach ($plagiarismData as $item) {
-            if (!empty($item->detected_strategies)) {
-                $itemStrategies = json_decode($item->detected_strategies, true);
-                foreach ($itemStrategies as $strategy) {
-                    if (!isset($strategies[$strategy])) {
-                        $strategies[$strategy] = 0;
+
+        foreach ($plagiarismData as $plagiarism) {
+            if ($plagiarism->detected_strategies) {
+                $detected = json_decode($plagiarism->detected_strategies, true);
+                if (is_array($detected)) {
+                    foreach ($detected as $strategy) {
+                        if (!isset($strategies[$strategy])) {
+                            $strategies[$strategy] = 0;
+                        }
+                        $strategies[$strategy]++;
                     }
-                    $strategies[$strategy]++;
                 }
             }
         }
 
-        // Sort strategies by frequency
         arsort($strategies);
 
-        // Calculate average similarity scores
-        $scores = [
-            'cosine' => $plagiarismData->avg('cosine_similarity'),
-            'jaccard' => $plagiarismData->avg('jaccard_similarity'),
-            'bert' => $plagiarismData->avg('bert_score'),
-            'levenshtein' => $plagiarismData->avg('levenshtein_similarity'),
-            'ngram' => $plagiarismData->avg('ngram_similarity'),
-        ];
-
-        return [
-            'total_detected' => $plagiarismData->count(),
-            'detected_by_level' => $detectedByLevel,
-            'most_common_strategies' => $strategies,
-            'average_similarity_scores' => $scores,
-        ];
-    }
-
-    /**
-     * Generate temporal data for learning progress over time
-     */
-    private function generateTemporalData($userId, $topicGuid, $levels)
-    {
-        // Get all user answers for this topic
-        $answers = AnswerUser::whereHas('question', function ($query) use ($topicGuid) {
-            $query->where('topic_guid', $topicGuid);
-        })
-            ->where('user_id', $userId)
-            ->orderBy('created_at', 'asc')
-            ->get();
-
-        if ($answers->isEmpty()) {
-            return null;
-        }
-
-        // Group answers by date
-        $answersByDate = $answers->groupBy(function ($answer) {
-            return $answer->created_at->format('Y-m-d');
-        });
-
-        // Initialize data structure
-        $dailyProgress = [];
-        $cumulativeByLevel = array_fill_keys($levels, ['attempts' => 0, 'correct' => 0, 'cumulative_correct' => 0]);
-
-        foreach ($answersByDate as $date => $dateAnswers) {
-            // Reset daily counters
-            $byLevel = [];
-            foreach ($levels as $level) {
-                $byLevel[$level] = [
-                    'attempts' => 0,
-                    'correct' => 0,
-                    'cumulative_correct' => $cumulativeByLevel[$level]['cumulative_correct'],
-                ];
-            }
-
-            // Count attempts and correct answers by level
-            foreach ($dateAnswers as $answer) {
-                $question = Question::find($answer->question_guid);
-                if (!$question) {
-                    continue;
-                }
-
-                $level = $question->category;
-                if (!isset($byLevel[$level])) {
-                    continue;
-                }
-
-                $byLevel[$level]['attempts']++;
-
-                if ($answer->is_correct) {
-                    $byLevel[$level]['correct']++;
-                    $byLevel[$level]['cumulative_correct']++;
-                    $cumulativeByLevel[$level]['cumulative_correct']++;
-                }
-            }
-
-            $dailyProgress[] = [
-                'date' => $date,
-                'by_level' => $byLevel,
-                'total_attempts' => $dateAnswers->count(),
-                'total_correct' => $dateAnswers->where('is_correct', true)->count(),
-            ];
-        }
-
-        // Calculate engagement and persistence metrics
-        $engagementDays = count($dailyProgress);
-        $totalDaysSpan = (new \DateTime(end($dailyProgress)['date']))->diff(new \DateTime($dailyProgress[0]['date']))->days + 1;
-        $engagementRate = $totalDaysSpan > 0 ? $engagementDays / $totalDaysSpan : 0;
-
-        // Calculate persistence score (higher score for consistent work over time)
-        $persistenceScore = min(100, round($engagementRate * 70 + ($engagementDays > 1 ? 30 : 0)));
-
-        return [
-            'daily_progress' => $dailyProgress,
-            'engagement_metrics' => [
-                'days_active' => $engagementDays,
-                'days_span' => $totalDaysSpan,
-                'engagement_rate' => round($engagementRate, 2),
-            ],
-            'persistence_metrics' => [
-                'persistence_score' => $persistenceScore,
-            ],
-        ];
-    }
-
-    /**
-     * Generate recommendations specifically for instructors
-     */
-    private function generateInstructorRecommendations($levelsData, $plagiarismSummary, $progressionAnalysis)
-    {
-        $recommendations = [];
-
-        // Learning path analysis
-        if ($progressionAnalysis['reached_levels'] == 0) {
-            $recommendations[] = [
-                'type' => 'learning_path',
-                'priority' => 'high',
-                'message' => 'Student has not yet reached any learning level. Consider checking for onboarding issues or prerequisite knowledge gaps.',
-            ];
-        } elseif ($progressionAnalysis['reached_levels'] < 4) {
-            $stuckLevel = null;
-            $levelsInOrder = ['remembering', 'understanding', 'applying', 'analyzing'];
-
-            for ($i = 0; $i < count($levelsInOrder); $i++) {
-                $level = $levelsInOrder[$i];
-                if (!isset($levelsData[$level]) || $levelsData[$level]['passed_questions'] == 0) {
-                    $stuckLevel = $level;
-                    break;
-                }
-            }
-
-            if ($stuckLevel) {
-                $recommendations[] = [
-                    'type' => 'learning_path',
-                    'priority' => 'medium',
-                    'message' => "Student appears to be stuck at the $stuckLevel level. Consider providing targeted interventions for this learning stage.",
-                ];
-            }
-        }
-
-        // Attempt analysis
-        $highAttemptLevels = [];
-        foreach ($levelsData as $level => $data) {
-            if (($data['avg_attempts'] ?? 0) > 3 && $data['attempted_questions'] > 0) {
-                $highAttemptLevels[] = $level;
-            }
-        }
-
-        if (!empty($highAttemptLevels)) {
-            $recommendations[] = [
-                'type' => 'attempts',
-                'priority' => 'medium',
-                'message' => 'Student required multiple attempts in these levels: ' . implode(', ', array_map('ucfirst', $highAttemptLevels)) . '. Consider reviewing teaching materials for these concepts.',
-            ];
-        }
-
-        // Plagiarism analysis
-        if ($plagiarismSummary['total_detected'] > 0) {
-            $recommendations[] = [
-                'type' => 'plagiarism',
-                'priority' => 'high',
-                'message' => "Detected {$plagiarismSummary['total_detected']} instance(s) of potential plagiarism. Academic integrity discussion recommended.",
-            ];
-        }
-
-        // Learning progress analysis
-        if ($progressionAnalysis['avg_time_between_levels'] !== null) {
-            if ($progressionAnalysis['avg_time_between_levels'] > 72) {
-                // 3 days
-                $recommendations[] = [
-                    'type' => 'progress_rate',
-                    'priority' => 'medium',
-                    'message' => 'Student is progressing slowly between levels (avg. ' . round($progressionAnalysis['avg_time_between_levels'] / 24, 1) . ' days between levels). Consider checking for comprehension issues.',
-                ];
-            } elseif ($progressionAnalysis['avg_time_between_levels'] < 1) {
-                // Less than 1 hour
-                $recommendations[] = [
-                    'type' => 'progress_rate',
-                    'priority' => 'low',
-                    'message' => 'Student is progressing very quickly between levels. Verify depth of understanding.',
-                ];
-            }
-        }
-
-        // Add general recommendation if none were generated
-        if (empty($recommendations)) {
-            $recommendations[] = [
-                'type' => 'general',
-                'priority' => 'low',
-                'message' => 'Student is progressing as expected through the learning levels.',
-            ];
-        }
-
-        return $recommendations;
+        return $strategies;
     }
 }
