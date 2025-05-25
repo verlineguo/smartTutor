@@ -19,6 +19,14 @@ app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024
 
 
+current_dir = os.path.dirname(os.path.abspath(__file__))
+huggingface_cache_path = os.path.join(current_dir, 'huggingface')
+
+# Hugging Face cache directory
+os.environ['TRANSFORMERS_CACHE'] = huggingface_cache_path
+
+
+
 @app.route('/')
 def test():
     return 'Hello World'
