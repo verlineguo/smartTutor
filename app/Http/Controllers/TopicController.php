@@ -19,17 +19,20 @@ use Yajra\DataTables\Facades\DataTables;
 
 class TopicController extends Controller
 {
-
     public function insertData(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:100',
-            'description' => 'required|string',
-            'max_attempt_gpt' => 'required|int',
-            'course_code' => 'required|string|max:10',
-            'time_start' => 'required|date_format:Y-m-d\TH:i',
-            'time_end' => 'required|date_format:Y-m-d\TH:i|after:' . $request['time_start'],
-        ], MessagesController::messages());
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'name' => 'required|string|max:100',
+                'description' => 'required|string',
+                'max_attempt_gpt' => 'required|int',
+                'course_code' => 'required|string|max:10',
+                'time_start' => 'required|date_format:Y-m-d\TH:i',
+                'time_end' => 'required|date_format:Y-m-d\TH:i|after:' . $request['time_start'],
+            ],
+            MessagesController::messages(),
+        );
 
         if ($validator->fails()) {
             return ResponseController::getResponse(null, 422, $validator->errors()->first());
@@ -48,10 +51,9 @@ class TopicController extends Controller
 
     public function showData()
     {
-        
         $data = Topic::all();
         if (!isset($data)) {
-            return ResponseController::getResponse(null, 400, "Data not found");
+            return ResponseController::getResponse(null, 400, 'Data not found');
         }
         $currentDateTime = Carbon::now('Asia/Jakarta');
         foreach ($data as $topic) {
@@ -62,18 +64,14 @@ class TopicController extends Controller
             }
         }
 
-        $dataTable = DataTables::of($data)
-            ->addIndexColumn()
-            ->make(true);
+        $dataTable = DataTables::of($data)->addIndexColumn()->make(true);
 
         return $dataTable;
     }
     public function topicByCourse(Request $request)
     {
         // Ambil semua topik berdasarkan course_code
-        $data = Topic::where('course_code', '=', $request['code'])
-            ->with('course')
-            ->get();
+        $data = Topic::where('course_code', '=', $request['code'])->with('course')->get();
 
         $currentDateTime = Carbon::now('Asia/Jakarta');
 
@@ -91,9 +89,7 @@ class TopicController extends Controller
         }
         // Log::info($data);
         // Format data sebagai DataTables
-        $dataTable = DataTables::of($data)
-            ->addIndexColumn()
-            ->make(true);
+        $dataTable = DataTables::of($data)->addIndexColumn()->make(true);
 
         return $dataTable;
     }
@@ -103,39 +99,56 @@ class TopicController extends Controller
      */
     private function calculateGradeByTopic($userId, $topicGuid)
     {
-        $questionGuids = Question::where('topic_guid', $topicGuid)->pluck('guid');
+        // Get all questions for the specified topic
+        $questions = Question::where('topic_guid', $topicGuid)->get();
 
-        // Ambil chat history untuk user dan topic tertentu
-        $answerUsers = AnswerUser::whereIn('question_guid', $questionGuids)
-        ->where('user_id', $userId)
-        ->get();
+        // Get total number of questions for this topic
+        $totalQuestions = $questions->count();
 
-        // Ambil jumlah halaman dari tabel questions
-        $totalPages = Question::where('topic_guid', $topicGuid)->max('page');
-
-        // Hitung cosine tertinggi per halaman
-        $cosinePerPage = $answerUsers->groupBy('page')->map(function ($chats) {
-            return $chats->max('cosine_similarity'); // Nilai cosine tertinggi di setiap halaman
-        });
-
-        // Hitung total nilai cosine tertinggi
-        $totalCosine = $cosinePerPage->sum();
-
-        // Jika tidak ada halaman atau cosine tertinggi, grade = 0
-        if ($totalPages == 0 || $totalCosine == 0) {
+        // If there are no questions, return 0
+        if ($totalQuestions == 0) {
             return 0;
         }
 
-        // Hitung grade
-        $grade = round($totalCosine / $totalPages, 2); // Rata-rata cosine, dibulatkan 2 desimal
+        // Get all answer attempts for the user for these questions
+        $questionGuids = $questions->pluck('guid')->toArray();
+
+        // Get the highest evaluation score for each question this user has answered
+        $answeredQuestions = AnswerUser::whereIn('question_guid', $questionGuids)
+            ->where('user_id', $userId)
+            ->get()
+            ->groupBy('question_guid')
+            ->map(function ($answers) {
+                // For each question, get the highest evaluation score
+                return $answers->max('evaluation_scores');
+            });
+
+        // Calculate total score (sum of highest scores)
+        $totalScore = $answeredQuestions->sum();
+
+        // Calculate number of questions answered
+        $questionsAnswered = $answeredQuestions->count();
+
+        // If no questions have been answered, return 0
+        if ($questionsAnswered == 0) {
+            return 0;
+        }
+
+        // Calculate grade based on average of answered questions
+        $grade = round($totalScore / $questionsAnswered, 2);
+
         return $grade;
     }
 
     public function topicByDeadline(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'id' => 'required|string',
-        ], MessagesController::messages());
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'id' => 'required|string',
+            ],
+            MessagesController::messages(),
+        );
         if ($validator->fails()) {
             return ResponseController::getResponse(null, 422, $validator->errors()->first());
         }
@@ -160,33 +173,33 @@ class TopicController extends Controller
         $course = UserCourse::where('user_id', '=', $id)->pluck('course_code');
         $currentDateTime = Carbon::now('Asia/Jakarta');
         $topic = Topic::with('course')
-            ->with(['grade' => function ($query) use ($request) {
-                $query->where('user_id', '=', $request['id']);
-            }])
+            ->with([
+                'grade' => function ($query) use ($request) {
+                    $query->where('user_id', '=', $request['id']);
+                },
+            ])
             ->where('time_end', '>', $currentDateTime)
             ->where('time_start', '<=', $currentDateTime)
-            ->whereIn("course_code", $course)
+            ->whereIn('course_code', $course)
             ->get();
-        $dataTable = DataTables::of($topic)
-            ->addIndexColumn()
-            ->make(true);
+        $dataTable = DataTables::of($topic)->addIndexColumn()->make(true);
 
         return $dataTable;
     }
     public function checkSubmit(Request $request)
     {
-
-        $validator = Validator::make($request->all(), [
-            'user_id' => 'required|string',
-            'topic_guid' => 'required|string|max:36',
-
-        ], MessagesController::messages());
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'user_id' => 'required|string',
+                'topic_guid' => 'required|string|max:36',
+            ],
+            MessagesController::messages(),
+        );
         if ($validator->fails()) {
             return ResponseController::getResponse(null, 422, $validator->errors()->first());
         }
-        $data = Grade::where('user_id', '=', $request['user_id'])
-            ->where('topic_guid', '=', $request['topic_guid'])
-            ->first();
+        $data = Grade::where('user_id', '=', $request['user_id'])->where('topic_guid', '=', $request['topic_guid'])->first();
 
         if ($data->count() > 0) {
             $response = true;
@@ -212,15 +225,19 @@ class TopicController extends Controller
     }
     public function updateData(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:100',
-            'guid' => 'required|string|max:36',
-            'description' => 'required|string',
-            'course_code' => 'required|string|max:10',
-            'max_attempt_gpt' => 'required|int',
-            'time_start' => 'required|date_format:Y-m-d\TH:i',
-            'time_end' => 'required|date_format:Y-m-d\TH:i|after:' . $request['time_start'],
-        ], MessagesController::messages());
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'name' => 'required|string|max:100',
+                'guid' => 'required|string|max:36',
+                'description' => 'required|string',
+                'course_code' => 'required|string|max:10',
+                'max_attempt_gpt' => 'required|int',
+                'time_start' => 'required|date_format:Y-m-d\TH:i',
+                'time_end' => 'required|date_format:Y-m-d\TH:i|after:' . $request['time_start'],
+            ],
+            MessagesController::messages(),
+        );
 
         if ($validator->fails()) {
             return ResponseController::getResponse(null, 422, $validator->errors()->first());
@@ -229,7 +246,7 @@ class TopicController extends Controller
         $data = Topic::where('guid', '=', $request['guid'])->first();
 
         if (!isset($data)) {
-            return ResponseController::getResponse(null, 400, "Data not found");
+            return ResponseController::getResponse(null, 400, 'Data not found');
         }
         /// UPDATE DATA
         $data->name = $request['name'];
@@ -244,11 +261,15 @@ class TopicController extends Controller
     }
     public function uploadFile(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'topic_guid' => 'required|string|max:36', // Identifier for the topic
-            'file' => 'required|file|mimes:pdf|max:10048', // Only PDF files with a max size of 10MB
-            'language' => 'required|string|max:10', // File language is required
-        ], MessagesController::messages());
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'topic_guid' => 'required|string|max:36', // Identifier for the topic
+                'file' => 'required|file|mimes:pdf|max:10048', // Only PDF files with a max size of 10MB
+                'language' => 'required|string|max:10', // File language is required
+            ],
+            MessagesController::messages(),
+        );
 
         if ($validator->fails()) {
             return ResponseController::getResponse(null, 422, $validator->errors()->first());
@@ -287,7 +308,7 @@ class TopicController extends Controller
             $translationMetadata = json_decode($topic->translation_metadata, true) ?? [];
             $translationMetadata[] = [
                 'language' => $request->input('language'),
-                'path' => $filePath
+                'path' => $filePath,
             ];
             $topic->translation_metadata = json_encode($translationMetadata);
 
@@ -300,9 +321,13 @@ class TopicController extends Controller
     }
     public function deleteFile(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'topic_guid' => 'required|string|max:36', // Verifikasi topic_guid
-        ], MessagesController::messages());
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'topic_guid' => 'required|string|max:36', // Verifikasi topic_guid
+            ],
+            MessagesController::messages(),
+        );
 
         if ($validator->fails()) {
             return ResponseController::getResponse(null, 422, $validator->errors()->first());
@@ -352,7 +377,7 @@ class TopicController extends Controller
         $data = Topic::where('guid', '=', $guid)->first();
 
         if (!isset($data)) {
-            return ResponseController::getResponse(null, 400, "Data not found");
+            return ResponseController::getResponse(null, 400, 'Data not found');
         }
 
         // Hapus semua file dari storage yang terkait dengan metadata terjemahan

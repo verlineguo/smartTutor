@@ -66,6 +66,8 @@ class QuestionController extends Controller
             'topic_guid' => 'required|string|max:40',
         ]);
 
+        
+
         if ($validator->fails()) {
             return response()->json(['error' => $validator->errors()->first()], 422);
         }
