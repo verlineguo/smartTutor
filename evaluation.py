@@ -47,7 +47,7 @@ class AnswerEvaluator:
         "is_correct": is_correct_int,  
         "current_level": current_level,
         "level_progress": {
-            "current_streak": 1 if combined >= 0.7 else 0,
+            "current_streak": 1 if combined >= 0.65 else 0,
             "needed_for_next": 4
         }
     }
