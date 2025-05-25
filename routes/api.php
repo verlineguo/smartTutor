@@ -229,6 +229,7 @@ Route::group([
     $router->get('/history/{userId}/{topicGuid}', [AssignmentController::class, 'getHistory']);
     $router->post('/evaluate', [AssignmentController::class, 'evaluateAnswer']);
     $router->get('/all-answers/{userId}/{topicGuid}', [AssignmentController::class, 'getAllAnswers']);
+    $router->post('/reset-histories', [AssignmentController::class, 'resetHistories']);
 });
 
 

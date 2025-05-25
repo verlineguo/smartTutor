@@ -8,6 +8,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use App\Models\AnswerUser;
 use App\Models\Plagiarism;
+use App\Models\PlagiarismDetail;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -272,11 +274,9 @@ class AssignmentController extends Controller
                 'current_level' => $request->current_level,
             ]);
 
-            
             $combinedScore = $evaluationResult['combined_score'] ?? 0;
             $threshold = $question->threshold ?? 0.5; // default threshold kalau null
-            $isCorrect = ($combinedScore * 100) >= $threshold;
-            
+            $isCorrect = $combinedScore * 100 >= $threshold;
 
             $currentLevel = $request->current_level;
 
@@ -405,7 +405,6 @@ class AssignmentController extends Controller
     // Get next question based on student's level
     protected function getNextQuestion($userId, $topicGuid, $language, $level)
     {
-        // First check if there's an ongoing question at this level that wasn't answered correctly
         $ongoingQuestion = AnswerUser::where('user_id', $userId)->where('current_level', $level)->where('is_correct', 0)->join('questions', 'answer_user.question_guid', '=', 'questions.guid')->where('questions.topic_guid', $topicGuid)->where('questions.language', $language)->where('questions.category', $level)->orderBy('answer_user.created_at', 'desc')->first();
 
         if ($ongoingQuestion) {
@@ -413,18 +412,14 @@ class AssignmentController extends Controller
             return Question::find($ongoingQuestion->question_guid);
         }
 
-        // If no ongoing incorrect question, get a random question for this level
-        // that hasn't been answered correctly yet
         $answeredCorrectlyGuids = AnswerUser::where('user_id', $userId)->where('is_correct', 1)->pluck('question_guid')->toArray();
 
         $availableQuestions = Question::where('topic_guid', $topicGuid)->where('language', $language)->where('category', $level)->whereNotIn('guid', $answeredCorrectlyGuids)->get();
 
         if ($availableQuestions->isEmpty()) {
-            // If all questions for this level are answered correctly, get any question
             $availableQuestions = Question::where('topic_guid', $topicGuid)->where('language', $language)->where('category', $level)->get();
         }
 
-        // Return a random question from available ones
         if ($availableQuestions->isNotEmpty()) {
             return $availableQuestions->random();
         }
@@ -436,5 +431,104 @@ class AssignmentController extends Controller
     {
         $levels = ['remembering', 'understanding', 'applying', 'analyzing'];
         return $currentLevel === end($levels);
+    }
+
+    public function resetHistories(Request $request)
+    {
+        // Validate request
+        $validator = Validator::make($request->all(), [
+            'user_id' => 'required|string',
+            'topic_guid' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(
+                [
+                    'status' => false,
+                    'message' => 'Validation error',
+                    'errors' => $validator->errors(),
+                ],
+                422,
+            );
+        }
+
+        try {
+            $userId = $request->user_id;
+            $topicGuid = $request->topic_guid;
+
+            $questionGuids = Question::where('topic_guid', $topicGuid)->pluck('guid')->toArray();
+
+            if (empty($questionGuids)) {
+                return response()->json(
+                    [
+                        'status' => false,
+                        'message' => 'No questions found for this topic',
+                    ],
+                    404,
+                );
+            }
+
+            DB::beginTransaction();
+
+            $userAnswerGuids = AnswerUser::where('user_id', $userId)->whereIn('question_guid', $questionGuids)->pluck('guid')->toArray();
+
+            if (!empty($userAnswerGuids)) {
+                PlagiarismDetail::whereIn('plagiarism_guid', function ($query) use ($userAnswerGuids) {
+                    $query->select('guid')->from('plagiarism')->whereIn('user_answer_guid', $userAnswerGuids);
+                })->delete();
+
+                Plagiarism::whereIn('user_answer_guid', $userAnswerGuids)->delete();
+            }
+
+            $deletedCount = AnswerUser::where('user_id', $userId)->whereIn('question_guid', $questionGuids)->delete();
+
+            DB::commit();
+
+            return response()->json(
+                [
+                    'status' => true,
+                    'message' => 'User histories reset successfully',
+                    'data' => [
+                        'deleted_answers' => $deletedCount,
+                        'user_id' => $userId,
+                        'topic_guid' => $topicGuid,
+                    ],
+                ],
+                200,
+            );
+
+            //     $hasAnswers = AnswerUser::where('user_id', $userId)
+            //     ->whereHas('question', function($query) use ($topicGuid) {
+            //         $query->where('topic_guid', $topicGuid);
+            //     })
+            //     ->exists();
+
+            // if (!$hasAnswers) {
+            //     return response()->json([
+            //         'status' => false,
+            //         'message' => 'No answer history found for this user and topic',
+            //     ], 404);
+            // }
+
+            // return response()->json([
+            //     'status' => true,
+            //     'message' => 'User level reset successfully. User will start from remembering level on next question.',
+            //     'data' => [
+            //         'user_id' => $userId,
+            //         'topic_guid' => $topicGuid,
+            //         'reset_level' => 'remembering'
+            //     ]
+            // ], 200);
+        } catch (\Exception $e) {
+            DB::rollback();
+
+            return response()->json(
+                [
+                    'status' => false,
+                    'message' => 'Failed to reset user histories: ' . $e->getMessage(),
+                ],
+                500,
+            );
+        }
     }
 }
