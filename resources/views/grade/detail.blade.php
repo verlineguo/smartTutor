@@ -215,10 +215,12 @@
                             class="btn btn-primary btn-evaluation">
                             <i class="fa-solid fa-chart-line"></i> View Evaluation
                         </a>
+                        @isRole(['admin', 'lecturer', 'assistant'])
                         <button type="button" class="btn btn-danger"
                             onclick="resetHistories('{{ $userId }}', '{{ $guid }}')">
                             <i class="fa-solid fa-rotate-left"></i> Reset Progress
                         </button>
+                        @endisRole
                     </div>
                 </div>
                 <div class="progress-section">
@@ -696,6 +698,7 @@ function createLecturerScoreForm(answerGuid, currentScore) {
     const formId = `lecturer-score-form-${answerGuid}`;
     // Always make the form editable, regardless of whether a score exists
     return `
+    @isRole(['admin', 'lecturer', 'assistant'])              
     <form id="${formId}" class="lecturer-score-form" onsubmit="event.preventDefault(); updateLecturerScore('${answerGuid}', '${formId}')">
         <div class="input-group" style="max-width: 200px; display: flex; flex-direction: column; gap: 10px;">
             <input type="number" class="form-control form-control-sm w-100 input-underline" name="lecturer_score"
@@ -705,6 +708,7 @@ function createLecturerScoreForm(answerGuid, currentScore) {
             </button>
         </div>
     </form>
+    @endisRole
 `;
 }
 

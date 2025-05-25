@@ -351,7 +351,7 @@
                 </a>
             `;
                                 } else {
-                                    return `<a href="/answer/detail/{{ $code }}/${data['guid']}/{{ $id }} " role="button" class="edit-btn" style="text-decoration: none; margin-right: 10px;">
+                                    return `<a href="/grade/detail/{{ $code }}/${data['guid']}/{{ $id }} " role="button" class="edit-btn" style="text-decoration: none; margin-right: 10px;">
                                     <i class="fa-solid fa-eye" style="font-size: 15px; color: blue;"></i></a>`;
                                 }
                             }
