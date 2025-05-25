@@ -29,7 +29,7 @@ class AnswerEvaluator:
         bert_score = self.calculate_bertscore(ref_answer, user_answer)
         
         # Gabungkan dengan weighting (bisa disesuaikan)
-        combined = 0.5 * tfidf_score + 0.5 * bert_score
+        combined = 0.4 * tfidf_score + 0.6 * bert_score
         
         is_correct = combined >= 0.7  # This is a boolean
         is_correct_int = 1 if is_correct else 0

@@ -144,9 +144,7 @@ def bert_qa():
                 'qa_score': float(result['qa_score']),
                 'retrieval_score': float(result['retrieval_score']),
                 'bloom_level': str(result['bloom_level']),
-                'is_valid': bool(result['is_valid']),
                 'page_references': list(map(int, result.get('page_references', []))),
-                'is_direct': bool(result.get('is_direct', False))
             }
             
             
