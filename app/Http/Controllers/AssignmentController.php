@@ -272,8 +272,10 @@ class AssignmentController extends Controller
                 'current_level' => $request->current_level,
             ]);
 
-            $isCorrect = $evaluationResult['is_correct'] ?? false;
+            
             $combinedScore = $evaluationResult['combined_score'] ?? 0;
+            $threshold = $question->threshold ?? 0.5; // default threshold kalau null
+            $isCorrect = $combinedScore >= $threshold;
             $currentLevel = $request->current_level;
 
             $hasCompletedAllLevels = false;
