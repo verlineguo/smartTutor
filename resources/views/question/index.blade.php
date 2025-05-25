@@ -107,7 +107,7 @@
                                         <select class="form-select" id="add-language" name="add-language" required>
                                             <option value="">Select Language</option>
                                             <option value="English">English</option>
-                                            <option value="Indonesian">Indonesian</option>
+                                            <option value="indonesia">Indonesian</option>
                                             <option value="Japanese">Japanese</option>
                                         </select>
                                     </div>
@@ -253,7 +253,7 @@
                                                 <select class="form-select" id="edit-language" name="language" required>
                                                     <option value="">Select Language</option>
                                                     <option value="english">English</option>
-                                                    <option value="indonesian">Indonesian</option>
+                                                    <option value="indonesia">Indonesian</option>
                                                     <option value="japanese">Japanese</option>
                                                 </select>
                                             </div>
