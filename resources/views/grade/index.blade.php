@@ -92,7 +92,7 @@
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({
-                        url: "{{ env('URL_API') }}/api/v1/chatbot/reset-histories",
+                        url: "{{ env('URL_API') }}/api/v1/assignment/reset-histories",
                         type: "POST",
                         data: {
                             user_id: userId,
