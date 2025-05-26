@@ -175,7 +175,7 @@ class PlagiarismController extends Controller
                 'detected_strategies' => $data['detected_strategies'],
                 'sentence_results' => $data['sentence_results'] ?? [],
                 'thresholds' => $data['thresholds'],
-    'method_weights' => $data['method_weights'],
+                'method_weights' => $data['method_weights'],
             ];
         } catch (\Exception $e) {
             throw new \Exception('Error calculating plagiarism: ' . $e->getMessage());
