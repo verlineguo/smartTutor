@@ -525,7 +525,6 @@
                 });
             }
 
-            // Check for existing user progress - FIXED to properly save and restore level
             function checkForExistingProgress() {
                 showLoading();
                 $.ajax({
@@ -536,43 +535,18 @@
                     },
                     success: function(response) {
                         if (response.success && response.data && response.data.length > 0) {
-                            // Get the HIGHEST level achieved from any correct answer
-                            let highestLevel = "remembering";
-                            const levelRanking = {
-                                'remembering': 0,
-                                'understanding': 1,
-                                'applying': 2,
-                                'analyzing': 3
-                            };
-
-                            // First check if there are any correct answers with saved current_level
-                            const correctAnswers = response.data.filter(answer => answer.is_correct ===
-                                1);
-
-                            if (correctAnswers.length > 0) {
-                                // Find highest level from correct answers
-                                correctAnswers.forEach(answer => {
-                                    // Get the saved level directly from the answer
-                                    const answerLevel = answer.current_level || "remembering";
-                                    if (levelRanking[answerLevel] > levelRanking[
-                                            highestLevel]) {
-                                        highestLevel = answerLevel;
-                                    }
-                                });
-                            }
-
                             selectedLanguage = response.data[0].language || "indonesia";
-                            currentLevel = highestLevel;
+
+                            // FIXED: Determine current level based on completed question categories
+                            currentLevel = determineUserCurrentLevel(response.data);
 
                             console.log("Restored user level:", currentLevel);
                             updateBloomLevelUI();
 
-                            // Check if user has already reached analyzing level with correct answers
-                            const hasAnalyzingCorrect = correctAnswers.some(answer =>
-                                answer.current_level === 'analyzing' || answer.category ===
-                                'analyzing');
+                            // Check if user has completed all levels by checking analyzing category completion
+                            const hasCompletedAllLevels = checkIfAllLevelsCompleted(response.data);
 
-                            if (hasAnalyzingCorrect) {
+                            if (hasCompletedAllLevels) {
                                 // User has completed all levels, show history-only view
                                 startAssignment();
                                 setTimeout(() => {
@@ -601,6 +575,57 @@
                     }
                 });
             }
+
+            /**
+             * NEW FUNCTION: Determine user's current level based on completed question categories
+             */
+            function determineUserCurrentLevel(answers) {
+                const levels = ['remembering', 'understanding', 'applying', 'analyzing'];
+                const levelRanking = {
+                    'remembering': 0,
+                    'understanding': 1,
+                    'applying': 2,
+                    'analyzing': 3
+                };
+
+                // Get all correct answers
+                const correctAnswers = answers.filter(answer => answer.is_correct === 1);
+
+                if (correctAnswers.length === 0) {
+                    return "remembering"; // No correct answers, start from beginning
+                }
+
+                // Find which categories/levels have been completed
+                const completedCategories = new Set();
+                correctAnswers.forEach(answer => {
+                    if (answer.category) {
+                        completedCategories.add(answer.category);
+                    }
+                });
+
+                // Find the next level that hasn't been completed
+                for (let level of levels) {
+                    if (!completedCategories.has(level)) {
+                        return level;
+                    }
+                }
+
+                // If all levels have at least one correct answer, return analyzing
+                return "analyzing";
+            }
+
+            /**
+             * NEW FUNCTION: Check if user has completed all levels (specifically analyzing)
+             */
+            function checkIfAllLevelsCompleted(answers) {
+                // For now, we'll consider "all levels completed" if user has correct answers in analyzing category
+                // In a more sophisticated approach, you might want to check if ALL analyzing questions are completed
+                const correctAnswers = answers.filter(answer => answer.is_correct === 1);
+                const hasAnalyzingCorrect = correctAnswers.some(answer => answer.category === 'analyzing');
+
+                return hasAnalyzingCorrect;
+            }
+
 
             function handleMaxLevelCompletion() {
                 $("#bloom-level-display")
@@ -990,18 +1015,18 @@
 
                                             toastr.warning(
                                                 `Your answer needs improvement. ${pagesText}`
-                                                );
+                                            );
                                         } else {
                                             toastr.warning(
                                                 "Your answer needs improvement. Please review the material."
-                                                );
+                                            );
                                             $("#reference-pages-section").hide();
                                         }
 
                                         // Reset UI for next attempt
                                         $("#submit-answer").html(
                                                 '<i class="fas fa-paper-plane me-2"></i>Submit Answer'
-                                                )
+                                            )
                                             .prop("disabled", false);
                                     });
                             }
