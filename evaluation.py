@@ -3,8 +3,7 @@
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity as tfidf_cosine_sim
 from bert_score import score as bert_score
-import numpy as np
-import json
+import re
 
 # Note:     Gunakan model multilingual untuk bahasa Indonesia/Inggris/Jepang
 # Contoh:   bert-base-multilingual-cased
@@ -12,15 +11,35 @@ import json
 class AnswerEvaluator:
     def __init__(self):
         self.tfidf_vectorizer = TfidfVectorizer()
+    
+    def clean_text(self, text):
+        """Membersihkan teks dari HTML tags dan TinyMCE artifacts"""
+        if not text:
+            return ""
         
+        # Remove HTML tags
+        text = re.sub(r'<[^>]+>', '', text)
+        
+        # Remove HTML entities
+        text = re.sub(r'&nbsp;|&amp;|&lt;|&gt;|&quot;|&#39;', ' ', text)
+        
+        # Remove extra whitespaces
+        text = re.sub(r'\s+', ' ', text).strip()
+        
+        return text
+
     def calculate_tfidf_similarity(self, ref_answer, user_answer):
         """Menghitung similarity berbasis TF-IDF"""
-        tfidf_matrix = self.tfidf_vectorizer.fit_transform([ref_answer, user_answer])
+        clean_ref = self.clean_text(ref_answer)
+        clean_user = self.clean_text(user_answer)
+        tfidf_matrix = self.tfidf_vectorizer.fit_transform([clean_ref, clean_user])
         return tfidf_cosine_sim(tfidf_matrix[0], tfidf_matrix[1])[0][0]
     
     def calculate_bertscore(self, ref_answer, user_answer):
         """Menghitung BERTScore"""
-        P, R, F1 = bert_score([user_answer], [ref_answer], lang='id')  # Ganti 'id' dengan 'en' untuk English
+        clean_ref = self.clean_text(ref_answer)
+        clean_user = self.clean_text(user_answer)
+        P, R, F1 = bert_score([clean_user], [clean_ref], lang='id')  # Ganti 'id' dengan 'en' untuk English
         return float(F1.mean())
     
     def combined_evaluation(self, ref_answer, user_answer, current_level):
