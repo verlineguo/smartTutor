@@ -18,6 +18,7 @@
     <h5 class="font-weight-bolder mb-0 text-capitalize">List Question/{{ $name }}</h5>
 @endsection
 
+
 @section('content')
     <main class="main-content position-relative max-height-vh-100 h-100 mt-1 border-radius-lg ">
         <div class="container-xxl flex-grow-1 container-p-y">

@@ -390,8 +390,7 @@
                                 <h6>History</h6>
 
                                 <div class="dropdown">
-                                    <button
-                                        class="btn btn-sm btn-primary dropdown-toggle d-flex align-items-center"
+                                    <button class="btn btn-sm btn-primary dropdown-toggle d-flex align-items-center"
                                         type="button" id="filterDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                                         <i class="fas fa-filter me-2"></i>
                                         <span id="current-filter-label">All Levels</span>
@@ -920,10 +919,8 @@
                         const combinedScore = Math.round((response.evaluation.combined_score ||
                             0) * 100);
                         $("#score").text(`Score: ${combinedScore}%`);
-checkPlagiarism(userId, topicGuid, currentQuestionGuid,
-                                response.data.user_answer_guid, userAnswer);
+
                         if (response.status === 'success') {
-                            
                             if (response.is_correct) {
                                 $("#is-correct").removeClass("bg-danger").addClass("bg-success")
                                     .text("Correct");
@@ -932,7 +929,13 @@ checkPlagiarism(userId, topicGuid, currentQuestionGuid,
                                 answeredQuestions.add(currentQuestionGuid);
 
                                 if (response.has_completed_all_levels) {
-                                    handleMaxLevelCompletion();
+                                    // Check plagiarism first, then handle completion
+                                    checkPlagiarism(userId, topicGuid, currentQuestionGuid,
+                                        response.data.user_answer_guid, userAnswer,
+                                        function() {
+                                            handleMaxLevelCompletion();
+                                        });
+                                    refreshHistory();
                                 } else if (response.new_level && response.new_level !==
                                     currentLevel) {
                                     currentLevel = response.new_level;
@@ -940,49 +943,67 @@ checkPlagiarism(userId, topicGuid, currentQuestionGuid,
                                     toastr.info(
                                         `Congratulations! You've advanced to the ${capitalizeFirstLetter(currentLevel)} level.`
                                     );
+
+                                    // Check plagiarism, then continue
+                                    checkPlagiarism(userId, topicGuid, currentQuestionGuid,
+                                        response.data.user_answer_guid, userAnswer,
+                                        function() {
+                                            toastr.success("Correct answer! Well done.");
+                                            refreshHistory();
+                                            setTimeout(() => {
+                                                askQuestion();
+                                            }, 3000);
+                                        });
+                                } else {
+                                    // Check plagiarism for regular correct answer
+                                    checkPlagiarism(userId, topicGuid, currentQuestionGuid,
+                                        response.data.user_answer_guid, userAnswer,
+                                        function() {
+                                            toastr.success("Correct answer! Well done.");
+                                            refreshHistory();
+                                            setTimeout(() => {
+                                                askQuestion();
+                                            }, 3000);
+                                        });
                                 }
-
-                                toastr.success("Correct answer! Well done.");
-
-
-                                // Refresh history since we have a correct answer
-                                refreshHistory();
-
-                                // Show next question after a delay
-                                setTimeout(() => {
-                                    askQuestion();
-                                }, 3000);
                             } else {
                                 $("#is-correct").removeClass("bg-success").addClass("bg-danger")
                                     .text("Incorrect");
 
-                                // Show reference pages for improvement
-                                if (response.reference_pages) {
-                                    showReferencePages(response.reference_pages);
+                                // Check plagiarism for incorrect answer too
+                                checkPlagiarism(userId, topicGuid, currentQuestionGuid,
+                                    response.data.user_answer_guid, userAnswer,
+                                    function() {
+                                        // Show reference pages for improvement
+                                        if (response.reference_pages) {
+                                            showReferencePages(response.reference_pages);
 
-                                    let pagesText = "Reference pages: ";
-                                    if (Array.isArray(response.reference_pages)) {
-                                        pagesText += response.reference_pages.join(", ");
-                                    } else if (typeof response.reference_pages === 'object') {
-                                        pagesText += Object.values(response.reference_pages)
-                                            .join(", ");
-                                    }
+                                            let pagesText = "Reference pages: ";
+                                            if (Array.isArray(response.reference_pages)) {
+                                                pagesText += response.reference_pages.join(
+                                                    ", ");
+                                            } else if (typeof response.reference_pages ===
+                                                'object') {
+                                                pagesText += Object.values(response
+                                                    .reference_pages).join(", ");
+                                            }
 
-                                    toastr.warning(
-                                        `Your answer needs improvement. ${pagesText}`);
-                                } else {
-                                    toastr.warning(
-                                        "Your answer needs improvement. Please review the material."
-                                    );
-                                    $("#reference-pages-section").hide();
-                                }
+                                            toastr.warning(
+                                                `Your answer needs improvement. ${pagesText}`
+                                                );
+                                        } else {
+                                            toastr.warning(
+                                                "Your answer needs improvement. Please review the material."
+                                                );
+                                            $("#reference-pages-section").hide();
+                                        }
 
-                                hideLoading();
-                                isSubmitting = false;
-                                // Keep the same question by not calling askQuestion()
-                                $("#submit-answer").html(
-                                        '<i class="fas fa-paper-plane me-2"></i>Submit Answer')
-                                    .prop("disabled", false);
+                                        // Reset UI for next attempt
+                                        $("#submit-answer").html(
+                                                '<i class="fas fa-paper-plane me-2"></i>Submit Answer'
+                                                )
+                                            .prop("disabled", false);
+                                    });
                             }
                         } else {
                             hideLoading();
@@ -1004,6 +1025,7 @@ checkPlagiarism(userId, topicGuid, currentQuestionGuid,
                     }
                 });
             });
+
 
             $('.dropdown-item').on('click', function(e) {
                 e.preventDefault();
@@ -1058,8 +1080,9 @@ checkPlagiarism(userId, topicGuid, currentQuestionGuid,
             }
 
             // Check plagiarism after submitting a correct answer - FIXED to maintain loading state
-            function checkPlagiarism(userId, topicGuid, questionGuid, userAnswerGuid, userAnswer) {
+            function checkPlagiarism(userId, topicGuid, questionGuid, userAnswerGuid, userAnswer, callback) {
                 console.log("Starting plagiarism check for answer:", userAnswerGuid);
+
                 // Keep loading state visible
                 showLoading();
                 $("#loading-overlay p").text("Checking for plagiarism...");
@@ -1084,29 +1107,34 @@ checkPlagiarism(userId, topicGuid, currentQuestionGuid,
                         isSubmitting = false;
                         $("#loading-overlay p").text("Processing..."); // Reset text for next time
 
+                        // Show plagiarism warning if detected
                         if (plagiarismResponse.weighted_score > 0.7) { // Adjust threshold as needed
                             toastr.warning(
-                                "Your answer shows similarities to various AI. Please ensure your work is original."
+                                "Your answer shows similarities to various AI sources. Please ensure your work is original."
                             );
                         }
+
+                        // Execute callback if provided
                         if (typeof callback === "function") {
                             callback();
                         }
-
                     },
                     error: function(xhr) {
                         console.error("Error checking plagiarism:", xhr);
                         hideLoading();
                         isSubmitting = false;
                         $("#loading-overlay p").text("Processing..."); // Reset text for next time
-                        toastr.error("Failed to check plagiarism.");
-if (typeof callback === "function") {
+
+                        // Don't show error toast for plagiarism check failure
+                        // Just continue with the callback
+                        console.warn("Plagiarism check failed, continuing without it");
+
+                        if (typeof callback === "function") {
                             callback();
                         }
                     }
                 });
             }
-
             // Display reference pages for incorrect answers
             function showReferencePages(referencePages) {
                 const referenceList = $("#reference-pages-list");

@@ -265,7 +265,7 @@
 
             <!-- Tabs and Table -->
             <div class="card" id="card-block">
-                
+
                 <div class="card-body">
                     <div class="tab-content" id="questionsTabContent">
                         <!-- All Questions Tab -->
@@ -957,16 +957,16 @@
                         const table = $('#table-data').DataTable();
                         table.draw();
                         hideLoading();
-            
+
 
                         toastr.success('LLM answers generated successfully.');
                     }
                 }
             }
 
-            
 
-      
+
+
             function getBertAnswers(questions, topic, language) {
                 const promises = questions.map(question => {
                     return new Promise((resolve, reject) => {
@@ -1003,7 +1003,8 @@
                                     question.qa_score = bestAnswer.qa_score;
                                     question.retrieval_score = bestAnswer
                                         .retrieval_score;
-                                    question.page_references = bestAnswer.page_references;
+                                    question.page_references = bestAnswer
+                                        .page_references;
                                     question.context = bestAnswer.context;
                                 }
                                 resolve(question);
@@ -1017,6 +1018,7 @@
                                 resolve(question);
                             }
                         });
+
                     });
                 });
 
@@ -1029,6 +1031,7 @@
             }
 
             // Fungsi untuk mengecek apakah semua permintaan selesai
+            
             function checkCompletion() {
                 completedRequests++;
                 console.log(completedRequests);
@@ -1164,7 +1167,7 @@
                 updateFilterOptions();
             }
 
-            
+
             function updateFilterOptions() {
                 // Clear current options
                 $('#language-filters').empty();
@@ -1264,7 +1267,7 @@
                 $('#table-data').DataTable().draw();
             }
 
-            
+
             function showPdfAnswersModal(rowData) {
                 $('#previewPdfQuestionText').text(rowData.question);
 
