@@ -84,6 +84,14 @@ class GradeController extends Controller
                 ->whereNotNull('evaluation_scores')
                 ->avg('evaluation_scores');
 
+                $lecturerScore = AnswerUser::where('user_id', $user->id)
+                ->whereHas('question', function ($query) use ($guid) {
+                    $query->where('topic_guid', $guid);
+                })
+                ->whereNotNull('lecturer_score')
+                ->avg('lecturer_score');
+
+
             // Get current level (latest correct answer)
             $currentLevel = AnswerUser::where('user_id', $user->id)
                 ->where('is_correct', true)
@@ -113,8 +121,11 @@ class GradeController extends Controller
                 'progress' => "$answeredLevels/$totalLevels",
                 'average_score' => $averageScore ? round($averageScore * 100, 2) : null,
                 'current_level' => $currentLevel,
+                'lecturer_score' => $lecturerScore ? round($lecturerScore, 2) : null,
+
                 // Remove this debug field in production
             ];
+            
         }
 
         return response()->json(
@@ -550,15 +561,16 @@ class GradeController extends Controller
                 'username' => $user->username,
             ];
 
-            return ResponseController::getResponse(
+            
+            return response()->json(
                 [
                     'profile' => $profile,
                     'levels' => $levelsData,
                     'overall_progress' => $overallProgress,
                     'plagiarism_summary' => $plagiarismSummary,
+                    'message' => 'Student evaluation statistics retrieved successfully.',
                 ],
                 200,
-                'Answer generated successfully.',
             );
         } catch (\Exception $e) {
             Log::error('Error getting student evaluation statistics: ' . $e->getMessage());
