@@ -585,4 +585,3 @@ class AssignmentController extends Controller
     }
 }
 
-
