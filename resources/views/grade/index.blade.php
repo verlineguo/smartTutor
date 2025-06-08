@@ -47,6 +47,7 @@
                                 <th>Name</th>
                                 <th>Progress</th>
                                 <th>Score</th>
+                                <th>Lecturer Score</th>
                                 <th>Current Level</th>
                                 <th>Actions</th>
                             </tr>
@@ -164,6 +165,30 @@
                     {
                         data: 'average_score',
                         title: "Avg Score",
+                        render: function(data, type, full, meta) {
+                            if (data !== null && data !== undefined) {
+                                // Determine color based on score
+                                let color = '#dc3545'; // Red for low scores
+                                if (data >= 80) {
+                                    color = '#28a745'; // Green for high scores
+                                } else if (data >= 70) {
+                                    color = '#4caf50'; // Light green
+                                } else if (data >= 60) {
+                                    color = '#8bc34a'; // Lime green
+                                } else if (data >= 50) {
+                                    color = '#ffc107'; // Yellow for medium scores
+                                } else if (data >= 40) {
+                                    color = '#ff9800'; // Orange
+                                }
+
+                                return `<span style="color: ${color}; font-weight: bold;">${data.toFixed(1)}</span>`;
+                            }
+                            return '<span>-</span>';
+                        }
+                    },
+                     {
+                        data: 'lecturer_score',
+                        title: "Lecturer Score",
                         render: function(data, type, full, meta) {
                             if (data !== null && data !== undefined) {
                                 // Determine color based on score
