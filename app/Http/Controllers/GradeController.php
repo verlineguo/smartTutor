@@ -17,76 +17,118 @@ use Illuminate\Support\Facades\Validator;
 class GradeController extends Controller
 {
     public function getStudentsByTopic($code, $guid)
-    {
-        try {
-            // Get student role GUID
-            $roleGuid = Role::where('role_name', '=', 'student')->value('guid');
+{
+    try {
+        // Get student role GUID
+        $roleGuid = Role::where('role_name', '=', 'student')->value('guid');
 
-            if (!$roleGuid) {
-                return response()->json(['message' => 'Student role not found'], 404);
-            }
+        if (!$roleGuid) {
+            return response()->json(['message' => 'Student role not found'], 404);
+        }
 
-            // Get all students in the course
-            $students = UserCourse::where('course_code', $code)
-                ->whereHas('user', function ($query) use ($roleGuid) {
-                    $query->where('role_guid', $roleGuid);
+        // Get all students in the course
+        $students = UserCourse::where('course_code', $code)
+            ->whereHas('user', function ($query) use ($roleGuid) {
+                $query->where('role_guid', $roleGuid);
+            })
+            ->with(['user:id,name,username,email,role_guid'])
+            ->get();
+
+        // Get total unique levels/categories for this topic
+        $totalLevels = Question::where('topic_guid', $guid)
+            ->pluck('category')
+            ->unique()
+            ->count();
+
+        // Define the expected learning levels in order
+        $expectedLevels = ['remembering', 'understanding', 'applying', 'analyzing'];
+        $maxLevels = count($expectedLevels);
+
+        // Process each student to get their progress information
+        $result = [];
+        foreach ($students as $userCourse) {
+            $user = $userCourse->user;
+
+            // Get distinct levels that the student has answered correctly
+            // Use groupBy to ensure we only count each level once
+            $correctAnswers = AnswerUser::where('user_id', $user->id)
+                ->where('is_correct', true)
+                ->whereHas('question', function ($query) use ($guid) {
+                    $query->where('topic_guid', $guid);
                 })
-                ->with(['user:id,name,username,email,role_guid'])
-                ->get();
+                ->whereNotNull('current_level')
+                ->get()
+                ->groupBy('current_level');
 
-            $totalLevels = Question::where('topic_guid', $guid)->pluck('category')->unique()->count();
+            // Count unique levels completed
+            $completedLevels = $correctAnswers->keys()->count();
 
-            // Process each student to get their progress information
-            $result = [];
-            foreach ($students as $userCourse) {
-                $user = $userCourse->user;
+            // Alternative approach: Use DB query with distinct
+            $completedLevelsDB = AnswerUser::where('user_id', $user->id)
+                ->where('is_correct', true)
+                ->whereHas('question', function ($query) use ($guid) {
+                    $query->where('topic_guid', $guid);
+                })
+                ->whereNotNull('current_level')
+                ->distinct('current_level')
+                ->count('current_level');
 
-                $answeredLevels = AnswerUser::where('user_id', $user->id)
-                    ->where('is_correct', true)
-                    ->whereHas('question', function ($query) use ($guid) {
-                        $query->where('topic_guid', $guid);
-                    })
-                    ->select('current_level')
-                    ->distinct()
-                    ->count();
+            // Use the smaller value to ensure accuracy (should be the same)
+            $answeredLevels = min($completedLevels, $completedLevelsDB, $maxLevels);
 
-                // Calculate average score
-                $averageScore = AnswerUser::where('user_id', $user->id)
-                    ->whereHas('question', function ($query) use ($guid) {
-                        $query->where('topic_guid', $guid);
-                    })
-                    ->avg('evaluation_scores');
+            // Calculate average score for this topic
+            $averageScore = AnswerUser::where('user_id', $user->id)
+                ->whereHas('question', function ($query) use ($guid) {
+                    $query->where('topic_guid', $guid);
+                })
+                ->whereNotNull('evaluation_scores')
+                ->avg('evaluation_scores');
 
-                // Get current level (latest one based on created_at)
+            // Get current level (latest correct answer)
+            $currentLevel = AnswerUser::where('user_id', $user->id)
+                ->where('is_correct', true)
+                ->whereHas('question', function ($query) use ($guid) {
+                    $query->where('topic_guid', $guid);
+                })
+                ->whereNotNull('current_level')
+                ->orderByDesc('created_at')
+                ->value('current_level');
+
+            // If no current level from correct answers, get the latest attempt
+            if (!$currentLevel) {
                 $currentLevel = AnswerUser::where('user_id', $user->id)
                     ->whereHas('question', function ($query) use ($guid) {
                         $query->where('topic_guid', $guid);
                     })
+                    ->whereNotNull('current_level')
                     ->orderByDesc('created_at')
                     ->value('current_level');
-
-                // Format the data
-                $result[] = [
-                    'user_id' => $user->id,
-                    'name' => $user->name,
-                    'progress' => "$answeredLevels/$totalLevels",
-                    'average_score' => $averageScore ? round($averageScore, 1) : null,
-                    'current_level' => $currentLevel,
-                ];
             }
 
-            return response()->json(
-                [
-                    'message' => 'Your answer retrieved successfully.',
-                    'data' => $result,
-                ],
-                200,
-            );
-        } catch (\Exception $e) {
-            Log::error('Error getting students by topic: ' . $e->getMessage());
-            return response()->json(['message' => 'Error getting students data', 'error' => $e->getMessage()], 500);
+    
+            // Format the data
+            $result[] = [
+                'user_id' => $user->id,
+                'name' => $user->name,
+                'progress' => "$answeredLevels/$totalLevels",
+                'average_score' => $averageScore ? round($averageScore * 100, 2) : null,
+                'current_level' => $currentLevel,
+                // Remove this debug field in production
+            ];
         }
+
+        return response()->json(
+            [
+                'message' => 'Student data retrieved successfully.',
+                'data' => $result,
+            ],
+            200,
+        );
+    } catch (\Exception $e) {
+        Log::error('Error getting students by topic: ' . $e->getMessage());
+        return response()->json(['message' => 'Error getting students data', 'error' => $e->getMessage()], 500);
     }
+}
 
     /**
      * Get detailed answers for a specific student in a topic
@@ -140,7 +182,11 @@ class GradeController extends Controller
                 ];
 
                 foreach ($questions as $question) {
-                    $answers = AnswerUser::where('question_guid', $question->guid)->orderByDesc('created_at')->get();
+                    // PERBAIKAN: Filter jawaban berdasarkan user_id dan question_guid
+                    $answers = AnswerUser::where('question_guid', $question->guid)
+                        ->where('user_id', $userId) // Tambahkan filter user_id
+                        ->orderByDesc('created_at')
+                        ->get();
 
                     if ($answers->count() > 0) {
                         $latestAnswer = $answers->first();
@@ -194,15 +240,16 @@ class GradeController extends Controller
                 'username' => $user->username,
             ];
 
-            // Calculate level progress statistics
+            // Calculate level progress statistics - JUGA PERLU DIPERBAIKI
             $levelStats = [];
             foreach ($levels as $level) {
                 $questions = Question::where('topic_guid', $guid)->where('category', $level)->count();
 
+                // Hitung jawaban benar per user untuk level ini
                 $correctAnswers = AnswerUser::whereHas('question', function ($query) use ($guid, $level) {
                     $query->where('topic_guid', $guid)->where('category', $level);
                 })
-                    ->where('user_id', $userId)
+                    ->where('user_id', $userId) // Filter berdasarkan user
                     ->where('is_correct', true)
                     ->distinct('question_guid')
                     ->count('question_guid');
@@ -214,13 +261,13 @@ class GradeController extends Controller
                 ];
             }
 
-            // Determine highest achieved level
+            // Determine highest achieved level - JUGA PERLU DIPERBAIKI
             $highestLevel = 'None';
             foreach (array_reverse($levels) as $level) {
                 $hasCorrectAnswer = AnswerUser::whereHas('question', function ($query) use ($guid, $level) {
                     $query->where('topic_guid', $guid)->where('category', $level);
                 })
-                    ->where('user_id', $userId)
+                    ->where('user_id', $userId) // Filter berdasarkan user
                     ->where('is_correct', true)
                     ->exists();
 
@@ -230,15 +277,15 @@ class GradeController extends Controller
                 }
             }
 
-            return ResponseController::getResponse(
+            return response()->json(
                 [
                     'profile' => $profileData,
                     'level_stats' => $levelStats,
                     'highest_level' => $highestLevel,
                     'data' => $result,
+                    'message' => 'Student answer details retrieved successfully.',
                 ],
                 200,
-                'Data Mahasiswa berhasil diambil',
             );
         } catch (\Exception $e) {
             Log::error('Error getting student answer details: ' . $e->getMessage());
