@@ -21,9 +21,7 @@ class AssignmentController extends Controller
         // Ambil bahasa unik dari tabel pertanyaan berdasarkan topik
         $languages = Question::where('topic_guid', $topicGuid)->select('language')->distinct()->pluck('language');
 
-        return ResponseController::getResponse(['data' => $languages], 200, 'Language retrieved successfully.');
-
-
+        return response()->json(['data' => $languages]);
     }
 
     public function getAllAnswers($userId, $topicGuid)
@@ -68,8 +66,11 @@ class AssignmentController extends Controller
                 ];
             });
 
-            return ResponseController::getResponse(['data' => $formattedAnswers], 200, 'Answer retrieved successfully.');
-
+            return response()->json([
+                'success' => true,
+                'message' => 'Answer history retrieved successfully',
+                'data' => $formattedAnswers,
+            ]);
         } catch (\Exception $e) {
             Log::error('Error retrieving all answers: ' . $e->getMessage());
             return response()->json(
@@ -91,9 +92,8 @@ class AssignmentController extends Controller
                 return response()->json(['error' => 'PDF answer not found'], 404);
             }
 
-           
-
-            return ResponseController::getResponse([
+            return response()->json(
+                [
                     'status' => true,
                     'data' => [
                         'guid' => $pdfAnswer->guid,
@@ -106,8 +106,9 @@ class AssignmentController extends Controller
                         'created_at' => $pdfAnswer->created_at,
                         'updated_at' => $pdfAnswer->updated_at,
                     ],
-                ], 200, 'Answer history retrieved successfully.');
-
+                ],
+                200,
+            );
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
@@ -146,9 +147,10 @@ class AssignmentController extends Controller
                 ];
             }
 
-            
-            return ResponseController::getResponse(['data' => $result], 200, 'Plagiarism Analysis retrieved successfully.');
-
+            return response()->json([
+                'status' => 'success',
+                'data' => $result,
+            ]);
         } catch (\Exception $e) {
             return response()->json(
                 [
@@ -205,10 +207,11 @@ class AssignmentController extends Controller
                 ];
             });
 
-         
-
-            return ResponseController::getResponse(['data' => $formattedAnswers], 200, 'Answer history retrieved successfully.');
-
+            return response()->json([
+                'success' => true,
+                'message' => 'Answer history retrieved successfully',
+                'data' => $formattedAnswers,
+            ]);
         } catch (\Exception $e) {
             Log::error('Error retrieving history: ' . $e->getMessage());
             return response()->json(
@@ -272,65 +275,67 @@ class AssignmentController extends Controller
             ]);
 
             $combinedScore = $evaluationResult['combined_score'] ?? 0;
-            $threshold = $question->threshold ?? 0.5;
-            $isCorrect = $combinedScore * 100 >= $threshold;
-            
+            $threshold = ($question->threshold ?? 50)/100; // default threshold kalau null
+            $isCorrect = $combinedScore >= $threshold;
+            Log::info($combinedScore);
             Log::info($isCorrect);
-            
-            // FIXED: Set current_level based on the question's category, not progression
-            $currentLevel = $question->category;
+            Log::info($threshold);
+            $currentLevel = $request->current_level;
+
             $hasCompletedAllLevels = false;
 
-            if ($isCorrect && $currentLevel === 'analyzing') {
-                // Check if user has completed all analyzing questions
-                $hasCompletedAllLevels = $this->checkAnalyzingLevelCompleted(
-                    $request->user_id, 
-                    $request->topic_guid,
-                    $question->language
-                );
+            if ($isCorrect) {
+                if ($this->checkMaxLevelReached($currentLevel)) {
+                    $hasCompletedAllLevels = true;
+                } else {
+                    // Move to next level if correct
+                    $levels = ['remembering', 'understanding', 'applying', 'analyzing'];
+                    $currentIndex = array_search($currentLevel, $levels);
+
+                    if ($currentIndex < count($levels) - 1) {
+                        $currentLevel = $levels[$currentIndex + 1];
+                    }
+                }
             }
 
-            // Save user answer with the question's actual category
+
             $userAnswer = new AnswerUser();
             $userAnswer->guid = (string) Str::uuid();
             $userAnswer->user_id = $request->user_id;
             $userAnswer->question_guid = $request->question_guid;
             $userAnswer->answer = $request->answer;
-            $userAnswer->current_level = $currentLevel; // Use question's category
+            $userAnswer->current_level = $currentLevel;
             $userAnswer->is_correct = $isCorrect;
             $userAnswer->evaluation_scores = $combinedScore;
             $userAnswer->save();
 
-            // Get next question logic - FIXED to use proper level determination
+            // Get next question only if the current one was answered correctly
+            // Otherwise, keep the same question
             $nextQuestion = null;
-            if ($isCorrect && !$hasCompletedAllLevels) {
-                $nextLevelToShow = $this->getNextLevelForUser($request->user_id, $request->topic_guid, $question->language);
-                $nextQuestion = $this->getNextQuestion($request->user_id, $request->topic_guid, $question->language, $nextLevelToShow);
-            } else if (!$isCorrect) {
+            if ($isCorrect) {
+                $nextQuestion = $this->getNextQuestion($request->user_id, $request->topic_guid, $question->language, $currentLevel);
+            } else {
+
                 $nextQuestion = $question; // Keep the same question if incorrect
             }
-            // If completed all levels, nextQuestion stays null
+
 
             $feedback = $this->generateFeedback($combinedScore, $isCorrect, $currentLevel);
 
-
-            return ResponseController::getResponse(
-                [
+            return response()->json([
                 'status' => 'success',
                 'is_correct' => $isCorrect,
-                'new_level' => $this->getNextLevelForUser($request->user_id, $request->topic_guid, $question->language),
+                'new_level' => $currentLevel,
                 'nextQuestion' => $nextQuestion ? $nextQuestion->question_fix : null,
                 'nextQuestionGuid' => $nextQuestion ? $nextQuestion->guid : null,
                 'evaluation' => $evaluationResult,
-                'reference_pages' => $referencePages,
+                'reference_pages' => $referencePages, // Include reference pages for feedback
                 'data' => [
                     'user_answer_guid' => $userAnswer->guid,
                 ],
                 'feedback' => $feedback,
                 'has_completed_all_levels' => $hasCompletedAllLevels,
-            ], 200, 'Answer Submitted successfully.');
-
-
+            ]);
         } catch (\Exception $e) {
             Log::error('Error processing submission: ' . $e->getMessage());
 
@@ -367,62 +372,7 @@ class AssignmentController extends Controller
         }
     }
 
-
-     protected function getNextLevelForUser($userId, $topicGuid, $language)
-    {
-        $levels = ['remembering', 'understanding', 'applying', 'analyzing'];
-        
-        foreach ($levels as $level) {
-            // Check if user has correctly answered at least one question in this category
-            $hasCompletedLevel = AnswerUser::where('user_id', $userId)
-                ->where('is_correct', 1)
-                ->whereHas('question', function ($query) use ($topicGuid, $language, $level) {
-                    $query->where('topic_guid', $topicGuid)
-                          ->where('language', $language)
-                          ->where('category', $level);
-                })
-                ->exists();
-            
-            if (!$hasCompletedLevel) {
-                return $level; // Return the first level they haven't completed
-            }
-        }
-        
-        // If all levels completed, return analyzing
-        return 'analyzing';
-    }
-
-    /**
-     * UPDATED METHOD: Check if user has completed all analyzing questions
-     */
-    protected function checkAnalyzingLevelCompleted($userId, $topicGuid, $language)
-    {
-        // Get all analyzing questions for this topic
-        $analyzingQuestions = Question::where('topic_guid', $topicGuid)
-            ->where('language', $language)
-            ->where('category', 'analyzing')
-            ->pluck('guid')
-            ->toArray();
-
-        if (empty($analyzingQuestions)) {
-            return true; // If no analyzing questions exist, consider it completed
-        }
-
-        // Get correctly answered analyzing questions
-        $correctlyAnsweredAnalyzing = AnswerUser::where('user_id', $userId)
-            ->whereIn('question_guid', $analyzingQuestions)
-            ->where('is_correct', 1)
-            ->distinct('question_guid')
-            ->pluck('question_guid')
-            ->toArray();
-
-        // Check if all analyzing questions have been answered correctly
-        return count($correctlyAnsweredAnalyzing) >= count($analyzingQuestions);
-    }
-
-
-
-    protected function evaluateAnswer($data)
+   protected function evaluateAnswer($data)
     {
         try {
             $evaluationResponse = Http::timeout(60)->post(env('FLASK_API_URL') . '/evaluate', [
@@ -483,7 +433,11 @@ class AssignmentController extends Controller
         return null;
     }
 
-    
+    public function checkMaxLevelReached($currentLevel)
+    {
+        $levels = ['remembering', 'understanding', 'applying', 'analyzing'];
+        return $currentLevel === end($levels);
+    }
 
     public function resetHistories(Request $request)
     {
@@ -584,4 +538,3 @@ class AssignmentController extends Controller
         }
     }
 }
-

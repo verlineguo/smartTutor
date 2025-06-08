@@ -75,7 +75,13 @@ class GradeController extends Controller
                 ];
             }
 
-            return ResponseController::getResponse(['data' => $result], 200, 'Data Mahasiswa diambil.');
+            return response()->json(
+                [
+                    'message' => 'Your answer retrieved successfully.',
+                    'data' => $result,
+                ],
+                200,
+            );
         } catch (\Exception $e) {
             Log::error('Error getting students by topic: ' . $e->getMessage());
             return response()->json(['message' => 'Error getting students data', 'error' => $e->getMessage()], 500);
