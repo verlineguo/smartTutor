@@ -75,7 +75,7 @@ class GradeController extends Controller
                 ];
             }
 
-            return response()->json(['data' => $result], 200);
+            return ResponseController::getResponse(['data' => $result], 200, 'Data Mahasiswa diambil.');
         } catch (\Exception $e) {
             Log::error('Error getting students by topic: ' . $e->getMessage());
             return response()->json(['message' => 'Error getting students data', 'error' => $e->getMessage()], 500);
@@ -224,7 +224,7 @@ class GradeController extends Controller
                 }
             }
 
-            return response()->json(
+            return ResponseController::getResponse(
                 [
                     'profile' => $profileData,
                     'level_stats' => $levelStats,
@@ -232,6 +232,7 @@ class GradeController extends Controller
                     'data' => $result,
                 ],
                 200,
+                'Data Mahasiswa berhasil diambil',
             );
         } catch (\Exception $e) {
             Log::error('Error getting student answer details: ' . $e->getMessage());
@@ -496,7 +497,7 @@ class GradeController extends Controller
                 'username' => $user->username,
             ];
 
-            return response()->json(
+            return ResponseController::getResponse(
                 [
                     'profile' => $profile,
                     'levels' => $levelsData,
@@ -504,6 +505,7 @@ class GradeController extends Controller
                     'plagiarism_summary' => $plagiarismSummary,
                 ],
                 200,
+                'Answer generated successfully.',
             );
         } catch (\Exception $e) {
             Log::error('Error getting student evaluation statistics: ' . $e->getMessage());

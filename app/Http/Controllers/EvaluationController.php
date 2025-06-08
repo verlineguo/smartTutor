@@ -56,6 +56,8 @@ class EvaluationController extends Controller
                     'highestAISimilarity' => $plagiarismData['highestSimilarity'],
                     'highestAISource' => $plagiarismData['highestSource'],
                 ],
+                'message' => 'Evaluation Data retrieved successfully',
+
             ]);
         } catch (\Exception $e) {
             return response()->json(
@@ -121,6 +123,7 @@ class EvaluationController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $result,
+                'message' => 'Plagiarism data retrieved successfully',
             ]);
         } catch (\Exception $e) {
             Log::error('Error retrieving plagiarism data:', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
@@ -181,18 +184,4 @@ class EvaluationController extends Controller
         ];
     }
 
-    public function downloadReport($questionGuid, $answerGuid)
-    {
-        // Get data
-        $question = Question::where('guid', $questionGuid)->firstOrFail();
-        $userAnswer = AnswerUser::where('guid', $answerGuid)->firstOrFail();
-        $referenceAnswer = AnswerPdf::where('question_guid', $questionGuid)->first();
-        $plagiarismData = Plagiarism::where('user_answer_guid', $answerGuid)->with('answerLlm')->get();
-
-        // Generate PDF (This is just a placeholder - implement your PDF generation logic)
-        $pdf = app()->make('dompdf.wrapper');
-        $pdf->loadView('evaluation.report', compact('question', 'userAnswer', 'referenceAnswer', 'plagiarismData'));
-
-        return $pdf->download('evaluation-report-' . $answerGuid . '.pdf');
-    }
 }

@@ -21,7 +21,9 @@ class AssignmentController extends Controller
         // Ambil bahasa unik dari tabel pertanyaan berdasarkan topik
         $languages = Question::where('topic_guid', $topicGuid)->select('language')->distinct()->pluck('language');
 
-        return response()->json(['data' => $languages]);
+        return ResponseController::getResponse(['data' => $languages], 200, 'Language retrieved successfully.');
+
+
     }
 
     public function getAllAnswers($userId, $topicGuid)
@@ -66,11 +68,8 @@ class AssignmentController extends Controller
                 ];
             });
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Answer history retrieved successfully',
-                'data' => $formattedAnswers,
-            ]);
+            return ResponseController::getResponse(['data' => $formattedAnswers], 200, 'Answer retrieved successfully.');
+
         } catch (\Exception $e) {
             Log::error('Error retrieving all answers: ' . $e->getMessage());
             return response()->json(
@@ -92,8 +91,9 @@ class AssignmentController extends Controller
                 return response()->json(['error' => 'PDF answer not found'], 404);
             }
 
-            return response()->json(
-                [
+           
+
+            return ResponseController::getResponse([
                     'status' => true,
                     'data' => [
                         'guid' => $pdfAnswer->guid,
@@ -106,9 +106,8 @@ class AssignmentController extends Controller
                         'created_at' => $pdfAnswer->created_at,
                         'updated_at' => $pdfAnswer->updated_at,
                     ],
-                ],
-                200,
-            );
+                ], 200, 'Answer history retrieved successfully.');
+
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
@@ -147,10 +146,9 @@ class AssignmentController extends Controller
                 ];
             }
 
-            return response()->json([
-                'status' => 'success',
-                'data' => $result,
-            ]);
+            
+            return ResponseController::getResponse(['data' => $result], 200, 'Plagiarism Analysis retrieved successfully.');
+
         } catch (\Exception $e) {
             return response()->json(
                 [
@@ -207,11 +205,10 @@ class AssignmentController extends Controller
                 ];
             });
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Answer history retrieved successfully',
-                'data' => $formattedAnswers,
-            ]);
+         
+
+            return ResponseController::getResponse(['data' => $formattedAnswers], 200, 'Answer history retrieved successfully.');
+
         } catch (\Exception $e) {
             Log::error('Error retrieving history: ' . $e->getMessage());
             return response()->json(
@@ -316,9 +313,11 @@ class AssignmentController extends Controller
 
             $feedback = $this->generateFeedback($combinedScore, $isCorrect, $currentLevel);
 
-            return response()->json([
+
+            return ResponseController::getResponse(
+                [
                 'status' => 'success',
-                'is_correct' => $evaluationResult['is_correct'],
+                'is_correct' => $isCorrect,
                 'new_level' => $this->getNextLevelForUser($request->user_id, $request->topic_guid, $question->language),
                 'nextQuestion' => $nextQuestion ? $nextQuestion->question_fix : null,
                 'nextQuestionGuid' => $nextQuestion ? $nextQuestion->guid : null,
@@ -329,7 +328,9 @@ class AssignmentController extends Controller
                 ],
                 'feedback' => $feedback,
                 'has_completed_all_levels' => $hasCompletedAllLevels,
-            ]);
+            ], 200, 'Answer Submitted successfully.');
+
+
         } catch (\Exception $e) {
             Log::error('Error processing submission: ' . $e->getMessage());
 

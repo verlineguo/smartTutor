@@ -112,9 +112,7 @@ Route::group([
     $router->get('/{guid}', [QuestionController::class, 'getData']);
     $router->delete('/{guid}', [QuestionController::class, 'deleteData']);
     $router->post('/', [QuestionController::class, 'insertData']);
-    $router->get('llm-answers/{topicGuid}', [QuestionController::class, 'getLlmAnswers']);
     $router->get('llm-answers-by-question/{questionGuid}', [QuestionController::class, 'getLlmAnswersByQuestion']);
-    $router->get('pdf-answers/{topicGuid}', [QuestionController::class, 'getPdfAnswers']);
     $router->get('pdf-answers-by-question/{questionGuid}', [QuestionController::class, 'getPdfAnswersByQuestion']);
 });
 
@@ -224,10 +222,7 @@ Route::group([
     
     $router->get('/languages/{topicGuid}', [AssignmentController::class, 'getAvailableLanguages']);
     $router->post('/submit', [AssignmentController::class, 'submitAnswer']);
-    $router->post('/plagiarism/check', [AssignmentController::class, 'checkPlagiarism']);
-    $router->get('/answers/alternatives/{questionGuid}', [AssignmentController::class, 'getAlternativeAnswers']);
     $router->get('/history/{userId}/{topicGuid}', [AssignmentController::class, 'getHistory']);
-    $router->post('/evaluate', [AssignmentController::class, 'evaluateAnswer']);
     $router->get('/all-answers/{userId}/{topicGuid}', [AssignmentController::class, 'getAllAnswers']);
     $router->post('/reset-histories', [AssignmentController::class, 'resetHistories']);
 });
@@ -253,15 +248,6 @@ Route::group([
 
 });
 
-Route::group([
-    'prefix' => $url . 'answerUser',
-    'middleware' => 'jwt.verify'
-], function ($router) {
-  
-    $router->post('/save', [AnswerLLMController::class, 'submit']);
-
-
-});
 
 Route::group([
     'prefix' => $url . 'plagiarism',
@@ -280,7 +266,5 @@ Route::group([
 
     $router->get('/{questionGuid}/{answerGuid}', [EvaluationController::class, 'show']);
     $router->get('/plagiarism/{questionGuid}/{answerGuid}', [EvaluationController::class, 'getAllPlagiarismData']);
-    $router->get('/history/{userId?}', [EvaluationController::class, 'getSubmissionHistory']);
-    $router->get('/download-report/{questionGuid}/{answerGuid}', [EvaluationController::class, 'downloadReport']);
 
 });
