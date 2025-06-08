@@ -939,13 +939,14 @@
 
                         // Display evaluation results
                         $("#evaluation-results").show();
-                        $("#evaluation-feedback").html(response.evaluation.feedback || "");
+                        $("#evaluation-feedback").html(response.feedback || "");
 
                         const combinedScore = Math.round((response.evaluation.combined_score ||
                             0) * 100);
                         $("#score").text(`Score: ${combinedScore}%`);
 
                         if (response.status === 'success') {
+                        console.log(response);
                             if (response.is_correct) {
                                 $("#is-correct").removeClass("bg-danger").addClass("bg-success")
                                     .text("Correct");
@@ -964,6 +965,7 @@
                                 } else if (response.new_level && response.new_level !==
                                     currentLevel) {
                                     currentLevel = response.new_level;
+                                    console.log(currentLevel);
                                     updateBloomLevelUI();
                                     toastr.info(
                                         `Congratulations! You've advanced to the ${capitalizeFirstLetter(currentLevel)} level.`
