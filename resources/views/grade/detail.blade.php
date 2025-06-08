@@ -29,18 +29,26 @@
         }
 
         .input-underline {
-    border: none; /* Hapus semua border */
-    border-bottom: 2px solid #dee2e6; /* Tambahkan border bawah */
-    border-radius: 0; /* Hapus border radius */
-    outline: none; /* Hapus outline saat fokus */
-    transition: border-color 0.3s ease; /* Animasi untuk perubahan warna border */
-    margin-bottom: 10px; /* Tambahkan jarak bawah */
-}
+            border: none;
+            /* Hapus semua border */
+            border-bottom: 2px solid #dee2e6;
+            /* Tambahkan border bawah */
+            border-radius: 0;
+            /* Hapus border radius */
+            outline: none;
+            /* Hapus outline saat fokus */
+            transition: border-color 0.3s ease;
+            /* Animasi untuk perubahan warna border */
+            margin-bottom: 10px;
+            /* Tambahkan jarak bawah */
+        }
 
-.input-underline:focus {
-    border-bottom: 2px solid #dee2e6; /* Ubah warna border saat fokus */
-    box-shadow: none; /* Hapus efek shadow */
-}
+        .input-underline:focus {
+            border-bottom: 2px solid #dee2e6;
+            /* Ubah warna border saat fokus */
+            box-shadow: none;
+            /* Hapus efek shadow */
+        }
 
         .profile-card {
             background-color: #f8f9fa;
@@ -216,15 +224,15 @@
                             <i class="fa-solid fa-chart-line"></i> View Evaluation
                         </a>
                         @isRole(['admin', 'lecturer', 'assistant'])
-                        <button type="button" class="btn btn-danger"
-                            onclick="resetHistories('{{ $userId }}', '{{ $guid }}')">
-                            <i class="fa-solid fa-rotate-left"></i> Reset Progress
-                        </button>
+                            <button type="button" class="btn btn-danger"
+                                onclick="resetHistories('{{ $userId }}', '{{ $guid }}')">
+                                <i class="fa-solid fa-rotate-left"></i> Reset Progress
+                            </button>
                         @endisRole
                     </div>
                 </div>
                 <div class="progress-section">
-                   
+
                     <div class="mt-3 text-end">
                         <span id="highest-level" class="badge bg-primary">Loading...</span>
                     </div>
@@ -421,7 +429,7 @@
             const topicGuid = pathSegments[4];
             const userId = pathSegments[5];
 
-// Add filter variables
+            // Add filter variables
             let currentFilter = 'all'; // Default show all answers (options: 'all', 'correct', 'incorrect')
 
             // Add filter controls to the page
@@ -657,22 +665,22 @@
 
             // Helper function to create plagiarism alert
             function createPlagiarismAlert(plagiarismData) {
-    // Only display alert if the weighted average is above 70%
-    const weightedAverage = (
-        (plagiarismData.bert_score * 0.4) + 
-        (plagiarismData.cosine_similarity * 0.15) + 
-        (plagiarismData.jaccard_similarity * 0.15) + 
-        (plagiarismData.levenshtein_similarity || 0) * 0.05 + 
-        (plagiarismData.ngram_similarity || 0) * 0.25
-    ) * 100;
-    
-    // Only show alert if above 70%
-    if (weightedAverage < 70) {
-        return '';
-    }
-    
-    const strategies = plagiarismData.detected_strategies.join(', ');
-    return `
+                // Only display alert if the weighted average is above 70%
+                const weightedAverage = (
+                    (plagiarismData.bert_score * 0.4) +
+                    (plagiarismData.cosine_similarity * 0.15) +
+                    (plagiarismData.jaccard_similarity * 0.15) +
+                    (plagiarismData.levenshtein_similarity || 0) * 0.05 +
+                    (plagiarismData.ngram_similarity || 0) * 0.25
+                ) * 100;
+
+                // Only show alert if above 70%
+                if (weightedAverage < 70) {
+                    return '';
+                }
+
+                const strategies = plagiarismData.detected_strategies.join(', ');
+                return `
     <div class="alert plagiarism-alert mt-3">
         <h6><i class="fa-solid fa-triangle-exclamation"></i> Potential AI Usage Detected</h6>
         <p class="mb-1">Our system detected potential AI usage in this answer with the following strategies:</p>
@@ -693,13 +701,14 @@
         </div>
     </div>
 `;
-}
-function createLecturerScoreForm(answerGuid, currentScore) {
-    const formId = `lecturer-score-form-${answerGuid}`;
-    // Always make the form editable, regardless of whether a score exists
-    return `
-    @isRole(['admin', 'lecturer', 'assistant'])              
-    <form id="${formId}" class="lecturer-score-form" onsubmit="event.preventDefault(); updateLecturerScore('${answerGuid}', '${formId}')">
+            }
+
+            function createLecturerScoreForm(answerGuid, currentScore) {
+                const formId = `lecturer-score-form-${answerGuid}`;
+                // Always make the form editable, regardless of whether a score exists
+                return `
+    @isRole(['admin', 'lecturer', 'assistant'])
+<form id="${formId}" class="lecturer-score-form" onsubmit="event.preventDefault(); updateLecturerScore('${answerGuid}', '${formId}')">
         <div class="input-group" style="max-width: 200px; display: flex; flex-direction: column; gap: 10px;">
             <input type="number" class="form-control form-control-sm w-100 input-underline" name="lecturer_score"
                    min="0" max="100" placeholder="0-100" value="${currentScore !== null ? currentScore : ''}">
@@ -708,9 +717,9 @@ function createLecturerScoreForm(answerGuid, currentScore) {
             </button>
         </div>
     </form>
-    @endisRole
+@endisRole
 `;
-}
+            }
 
             // Helper function to truncate text
             function truncateText(text, maxLength) {
@@ -734,6 +743,5 @@ function createLecturerScoreForm(answerGuid, currentScore) {
                     .replace(/'/g, "&#039;");
             }
         });
-
     </script>
 @endsection
